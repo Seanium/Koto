@@ -23,7 +23,7 @@
   --muted: #b0b0b0;
   --line: #303030;
   --accent: #d99564;
-  --on-accent: #181818;
+  --on-accent: #111;
   --surface: #242424;
   --tab: #33251d;
   --subtle: #a0a0a0;
@@ -126,7 +126,7 @@ html:lang(en) .cli-title-action, html:lang(de) .cli-title-action { column-gap: .
 .download-status { min-width: 0; text-align: right; }
 .download-controls { display: flex; align-items: stretch; gap: 8px; min-width: 0; }
 .download-controls select { min-width: 0; max-width: 100%; border: 1px solid var(--line); background: var(--background); color: var(--ink); border-radius: 8px; padding: 12px 10px; font-size: 13px; cursor: pointer; }
-.download-button { display: inline-flex; align-items: center; justify-content: center; background: var(--accent); color: var(--on-accent); border-radius: 8px; font-size: 13px; padding: 13px 18px; white-space: nowrap; }
+.download-button { display: inline-flex; align-items: center; justify-content: center; background: var(--accent); color: var(--on-accent); border-radius: 8px; font-size: 14px; font-weight: 600; padding: 13px 18px; white-space: nowrap; }
 .download-button[aria-disabled=true] { cursor: default; }
 footer { display: flex; align-items: center; justify-content: space-between; min-height: 110px; border-top: 1px solid var(--line); }
 footer .wordmark { font-size: 28px; letter-spacing: -1.5px; gap: 8px; }
