@@ -13,7 +13,6 @@ import (
 	"errors"
 	"fmt"
 	"koto/internal/connectors/shared"
-	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -87,11 +86,7 @@ func pbTime(ms int64) []byte {
 	return pbJoin(pbInt(1, uint64(ms/1000)), pbInt(2, uint64(ms%1000)*1_000_000))
 }
 func fileURI(path string) string {
-	p := filepath.ToSlash(path)
-	if !strings.HasPrefix(p, "/") {
-		p = "/" + p
-	}
-	return (&url.URL{Scheme: "file", Path: p}).String()
+	return shared.FileURL(path).String()
 }
 func nativeUUID(key string) string            { return core.UUID5(key) }
 func (c *agy) NewSessionID(key string) string { return nativeUUID("antigravity\x00" + key) }
@@ -217,7 +212,7 @@ func stepHash(typ int, payload []byte) string {
 var sessionID = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
 func openNative(file string, mode string) (*sql.DB, error) {
-	u := url.URL{Scheme: "file", Path: filepath.ToSlash(file)}
+	u := shared.FileURL(file)
 	q := u.Query()
 	q.Set("mode", mode)
 	q.Set("_pragma", "busy_timeout(5000)")

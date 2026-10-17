@@ -22,17 +22,18 @@ koto は設定で有効にした Agent フォルダーからセッションを�
 
 ## Agent にコピーを頼む
 
-CLI はアプリに同梱されています。`--help` に Agent 向けの手順があります。
+App と CLI は [Releases](https://github.com/Seanium/koto/releases) から個別にダウンロードできます。CLI に App や WebView は不要です。`--help` に Agent 向けの手順があります。
 
-| パッケージ | CLI |
+| プラットフォーム | CLI の準備 |
 | --- | --- |
-| macOS | `/Applications/koto.app/Contents/Helpers/koto` |
-| Linux DEB | `koto` |
-| Linux アーカイブ | 展開先の `./koto` |
+| macOS / Linux | `koto-cli-<os>-<arch>` をダウンロードし、`koto` に改名して `chmod +x koto` を実行します。 |
+| Windows | `koto-cli-windows-<arch>.exe` をダウンロードし、`koto.exe` に改名します。 |
 
-macOS では CLI は PATH に追加されません。Agent がコマンドを見つけられない場合は、上記のパスを伝えてください。アプリを別の場所に置いた場合はパスを変更します。
+CLI を PATH 内のフォルダーに置くか、Agent にフルパスを伝えてください。Windows の継続コマンドは PowerShell で実行します。Windows App は直接起動する `.exe`、Linux App はバイナリと DEB です。CLI は同梱しません。
 
 **「koto で今の対話を pi にコピーして。」**と頼みます。
+
+OpenCode がホストのセッション ID を提供しない場合は、実行中のツール呼び出しで現在のセッションを確認します。Skill のインストールは不要です。
 
 自動識別には、ホストが提供する `CODEX_THREAD_ID`、`PI_SESSION_ID`、`DSH_SESSION_ID`、`ANTIGRAVITY_CONVERSATION_ID`、`CLAUDE_CODE_SESSION_ID` を使います。提供されない場合は、正確な `agent:session-id` を直接、または `KOTO_SESSION` で指定します。明示的な `KOTO_SESSION` を優先し、複数のホスト ID が競合する場合はエラーを返します。更新日時やプロジェクトフォルダーからは推測しません。
 

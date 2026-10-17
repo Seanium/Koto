@@ -11,17 +11,20 @@
 | Codex | rollout JSONL / zstd | 新原生 rollout，再以 app-server 驗證讀取 |
 | DeepSeek Harness | v4 JSONL / zstd | 新目錄與原生壓縮日誌 |
 | Antigravity CLI | SQLite 與 protobuf 軌跡 | 新對話資料庫和摘要項目 |
+| OpenCode | SQLite v1（`session`、`message`、`part`） | 在原生資料庫中新建工作階段記錄 |
 
-所有複製都會建立新的原生工作階段；寫入目標時拒絕既有路徑。目標 Agent 載入自己的設定，來源的系統、開發者、環境、設定和權限上下文不會複製。目標不支援對應原生表達時，工具紀錄和推理內容可能轉換為可讀文字。
+支援 OpenCode 1.19.3 的 v1 格式；遇到 v2 工作階段儲存會明確拒絕。複製到 OpenCode 需要其 CLI 與已設定的預設模型，續聊使用目標模型。
+
+所有複製都會建立新的原生工作階段，不覆寫既有工作階段 ID 或獨立檔案。目標 Agent 載入自己的設定，來源的系統、開發者、環境、設定和權限上下文不會複製。目標不支援對應原生表達時，工具紀錄和推理內容可能轉換為可讀文字。
 
 ## 附件
 
-| 素材 | Claude Code | pi | Codex | DeepSeek Harness | Antigravity CLI |
-| --- | --- | --- | --- | --- | --- |
-| PNG、JPEG、GIF、WebP | 原生圖片 | 原生圖片 | 原生圖片 | 原生圖片附件 | 原生 Media |
-| PDF、UTF-8 文字 | 原生文件 | 完整檔案 | 完整檔案 | 原生檔案附件 | 原生 Media |
-| 音訊 | 完整檔案 | 完整檔案 | 原生音訊 | 原生檔案附件 | 原生 Media |
-| DOCX、ZIP、JSON、其他二進位檔 | 完整檔案 | 完整檔案 | 完整檔案 | 原生檔案附件 | 原生 Media |
+| 素材 | Claude Code | pi | Codex | DeepSeek Harness | Antigravity CLI | OpenCode |
+| --- | --- | --- | --- | --- | --- | --- |
+| PNG、JPEG、GIF、WebP | 原生圖片 | 原生圖片 | 原生圖片 | 原生圖片附件 | 原生 Media | 原生檔案 |
+| PDF、UTF-8 文字 | 原生文件 | 完整檔案 | 完整檔案 | 原生檔案附件 | 原生 Media | 原生檔案 |
+| 音訊 | 完整檔案 | 完整檔案 | 原生音訊 | 原生檔案附件 | 原生 Media | 原生檔案 |
+| DOCX、ZIP、JSON、其他二進位檔 | 完整檔案 | 完整檔案 | 完整檔案 | 原生檔案附件 | 原生 Media | 原生檔案 |
 
 若角色或目標格式無法內嵌檔案，koto 會在新工作階段的附件目錄中保存完整位元組，並加入檔案參照。工具紀錄轉為文字時，工具結果中的附件仍會保留。
 

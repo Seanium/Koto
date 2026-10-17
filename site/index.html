@@ -8,8 +8,8 @@
   <title>koto — copy sessions between agents</title>
   <link rel="icon" href="favicon.svg?v=native-emoji" type="image/svg+xml">
   <script>try{const p=localStorage.getItem("koto-site-appearance")||"system";document.documentElement.dataset.theme=p==="dark"||p!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}catch{document.documentElement.dataset.theme=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}</script>
-  <link rel="stylesheet" href="style.css?v=download-contrast-2">
-  <script type="module" src="main.js?v=beta-0.1.0-1-published"></script>
+  <link rel="stylesheet" href="style.css?v=downloads-3">
+  <script type="module" src="main.js?v=beta-0.1.0-2"></script>
 </head>
 <body>
   <a class="skip" href="#main" data-i18n="skip">Skip to content</a>
@@ -33,7 +33,7 @@
   </header>
   <main id="main">
     <section class="hero wrap">
-      <h1><span class="hero-agent-line"><span class="sr-only" data-i18n="hero1">Switch agents.</span><span aria-hidden="true" data-i18n="hero1Prefix">Switch</span><span class="hero-agent" aria-hidden="true"><img class="is-active" src="assets/claude-code.svg" alt=""><img src="assets/codex.svg" alt=""><img src="assets/pi.svg" alt=""><img src="assets/dsh.svg" alt=""><img src="assets/antigravity.svg" alt=""></span><span aria-hidden="true" data-i18n="hero1Suffix">agents.</span></span><br><span class="accent typewriter"><span class="sr-only" data-i18n="hero2">Keep talking.</span><span id="hero-typed" aria-hidden="true">Keep talking.</span></span></h1>
+      <h1><span class="hero-agent-line"><span class="sr-only" data-i18n="hero1">Switch agents.</span><span aria-hidden="true" data-i18n="hero1Prefix">Switch</span><span class="hero-agent" aria-hidden="true"><img class="is-active" src="assets/claude-code.svg" alt=""><img src="assets/codex.svg" alt=""><img src="assets/pi.svg" alt=""><img src="assets/dsh.svg" alt=""><img src="assets/antigravity.svg" alt=""><img src="assets/opencode.svg" alt=""></span><span aria-hidden="true" data-i18n="hero1Suffix">agents.</span></span><br><span class="accent typewriter"><span class="sr-only" data-i18n="hero2">Keep talking.</span><span id="hero-typed" aria-hidden="true">Keep talking.</span></span></h1>
       <p class="lead"><span class="lead-line"><span data-i18n="lead1a">Copy conversations </span><span data-i18n="lead1b">without repeating yourself.</span></span><span class="lead-line"><span data-i18n="lead2a">Compare sessions </span><span data-i18n="lead2b">to see what changed.</span></span></p>
     </section>
 
@@ -65,7 +65,7 @@
     <section class="cli wrap" aria-labelledby="cli-title">
       <div class="cli-intro">
         <h2 id="cli-title"><span data-i18n="cliTitleLead">There’s also koto CLI.</span> <span class="cli-title-action"><span data-i18n="cliTitleActionIntro">Copy a session. </span><span data-i18n="cliTitleActionEnd">Just ask.</span></span></h2>
-        <p data-i18n="cliScope">Included with the app.</p>
+        <p data-i18n="cliScope">Download it separately.</p>
       </div>
       <figure class="cli-demo" aria-label="Example of copying a conversation with koto CLI">
         <blockquote class="cli-message cli-request"><span class="sr-only" data-i18n="cliRequest">Use koto to copy this session to pi.</span><span class="dialogue-typed" id="cli-request-typed" aria-hidden="true">Use koto to copy this session to pi.</span></blockquote>
@@ -81,6 +81,7 @@
         <span><img src="assets/pi.svg" alt="">pi</span>
         <span><img src="assets/dsh.svg" alt="">DeepSeek Harness</span>
         <span><img src="assets/antigravity.svg" alt="">Antigravity CLI</span>
+        <span><img src="assets/opencode.svg" alt="">OpenCode</span>
         <span class="agent-roadmap" data-i18n="moreAgents">More agents coming soon.</span>
       </div>
     </section>
@@ -88,6 +89,7 @@
     <section class="download wrap" id="get-koto">
       <h2 data-i18n="getTitle">Get koto</h2>
       <div class="download-status">
+        <div class="download-products" role="group" aria-label="Download" data-download-products><button type="button" data-product="app" aria-pressed="true">App</button><button type="button" data-product="cli" aria-pressed="false">CLI</button></div>
         <div class="download-controls"><label class="sr-only" for="release-asset" data-i18n="downloadPlatform">Platform and architecture</label><select id="release-asset"><option value="" disabled selected data-i18n="downloadChoose">Choose a version</option></select><a class="download-button" id="release-download" role="link" aria-disabled="true" data-i18n="downloadPending">Coming soon</a></div>
       </div>
     </section>

@@ -27,7 +27,7 @@ func sourceWitnessAt(ref core.NativeRef, now time.Time) (string, bool, error) {
 	h := sha256.New()
 	stable := true
 	paths := []string{ref.Path}
-	if ref.Harness == "antigravity" {
+	if ref.Harness == "antigravity" || ref.Harness == "opencode" {
 		paths = append(paths, ref.Path+"-wal")
 	}
 	for i, path := range paths {

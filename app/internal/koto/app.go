@@ -14,6 +14,7 @@ import (
 	"koto/internal/connectors/claudecode"
 	"koto/internal/connectors/codex"
 	"koto/internal/connectors/dsh"
+	"koto/internal/connectors/opencode"
 	"koto/internal/connectors/pi"
 	"koto/internal/core"
 	"koto/internal/engine"
@@ -23,7 +24,7 @@ import (
 
 // Config for New. Empty fields take the platform defaults.
 type Config struct {
-	DataDir, ClaudeRoot, PiRoot, CodexHome, CodexShadow, CodexBin, DshHome, AntigravityRoot string
+	DataDir, ClaudeRoot, PiRoot, CodexHome, CodexShadow, CodexBin, DshHome, AntigravityRoot, OpenCodeRoot string
 	// ClaudeDesktopDirs: nil = every existing profile (unless ClaudeRoot is given); NoDesktop disables.
 	ClaudeDesktopDirs []string
 	NoDesktop         bool
@@ -80,7 +81,7 @@ type ThreadListing struct {
 var rootEnv = map[string]string{"claude-code": "CLAUDE_CONFIG_DIR", "pi": "PI_CODING_AGENT_DIR", "codex": "CODEX_HOME", "dsh": "DSH_HOME"}
 
 // RootHarnesses accept an extra storage root.
-var RootHarnesses = []string{"claude-code", "pi", "codex", "dsh", "antigravity"}
+var RootHarnesses = []string{"claude-code", "pi", "codex", "dsh", "antigravity", "opencode"}
 
 type extraRoot struct {
 	ID      string `json:"id"`
@@ -171,6 +172,9 @@ func New(cfg Config) (*App, error) {
 	if on(cfg.Enable, "antigravity") {
 		_ = r.Register(antigravity.New(antigravity.Options{Root: or(cfg.AntigravityRoot, d.AntigravityRoot)}))
 	}
+	if on(cfg.Enable, "opencode") {
+		_ = r.Register(opencode.New(opencode.Options{Root: cfg.OpenCodeRoot}))
+	}
 	for _, c := range cfg.Extra {
 		_ = r.Register(c)
 	}
@@ -233,6 +237,8 @@ func (a *App) makeExtra(x extraRoot) (*engine.Connector, error) {
 		return dsh.New(dsh.Options{Home: x.Root, ID: x.ID}), nil
 	case "antigravity":
 		return antigravity.New(antigravity.Options{Root: x.Root, ID: x.ID}), nil
+	case "opencode":
+		return opencode.New(opencode.Options{Root: x.Root, ID: x.ID}), nil
 	}
 	return nil, fmt.Errorf("%s does not take extra roots; supported: %s", x.Harness, strings.Join(RootHarnesses, ", "))
 }
@@ -303,7 +309,7 @@ func (a *App) WithResume(b hub.Binding) BindingView {
 	if argv == nil {
 		return BindingView{Binding: b}
 	}
-	command := engine.ShellLine(argv)
+	command := engine.NativeShellLine(argv)
 	var cwd *string
 	if s, ok := b.Meta["cwd"].(string); ok && s != "" {
 		cwd = &s
@@ -317,20 +323,16 @@ func (a *App) WithResume(b hub.Binding) BindingView {
 			envs[v] = c.Root
 		}
 	}
-	var parts []string
+	if b.Harness == "opencode" && c != nil {
+		if db, ok := c.Source.(interface{ DatabasePath() string }); ok {
+			envs["OPENCODE_DB"] = db.DatabasePath()
+		}
+	}
+	dir := ""
 	if cwd != nil {
-		parts = append(parts, "cd "+engine.ShQ(*cwd)+" &&")
+		dir = *cwd
 	}
-	keys := make([]string, 0, len(envs))
-	for k := range envs {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for _, k := range keys {
-		parts = append(parts, k+"="+engine.ShQ(envs[k]))
-	}
-	parts = append(parts, command)
-	return BindingView{Binding: b, Resume: &Resume{Argv: argv, Command: command, Cwd: cwd, Env: envs, Shell: strings.Join(parts, " ")}}
+	return BindingView{Binding: b, Resume: &Resume{Argv: argv, Command: command, Cwd: cwd, Env: envs, Shell: engine.ShellCommand(argv, dir, envs)}}
 }
 
 // Bindings of a thread in a working copy, each with how to open it.
@@ -356,7 +358,7 @@ func (a *App) SearchThreads(query, scope, project string, limit int) []ThreadLis
 			query = strings.ToLower(filepath.Join(home, query[2:]))
 		}
 	}
-	names := map[string]string{"claude-code": "Claude Code", "pi": "Pi", "codex": "Codex", "dsh": "DeepSeek Harness", "antigravity": "Antigravity CLI"}
+	names := map[string]string{"claude-code": "Claude Code", "pi": "Pi", "codex": "Codex", "dsh": "DeepSeek Harness", "antigravity": "Antigravity CLI", "opencode": "OpenCode"}
 	trashed := map[string]bool{}
 	for _, e := range a.Store.Trash(false) {
 		for _, i := range e.Items {

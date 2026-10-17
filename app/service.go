@@ -223,22 +223,13 @@ func (s *AppService) SetPrefs(p Prefs) error {
 	return nil
 }
 
-// McpConfig is the mcpServers entry an agent needs to read koto sessions over MCP: the koto
-// command inside this app (Contents/Helpers/koto in the bundle).
+// McpConfig uses the separately installed CLI on the Agent's PATH.
 func (s *AppService) McpConfig() string {
 	cmd := "koto"
-	if exe, err := os.Executable(); err == nil {
-		if r, err := filepath.EvalSymlinks(exe); err == nil {
-			exe = r
-		}
-		if c := filepath.Join(filepath.Dir(exe), "..", "Helpers", "koto"); fileExists(c) {
-			cmd = filepath.Clean(c)
-		}
-	}
 	args := []string{"mcp"}
 	if sb := os.Getenv("KOTO_APP_SANDBOX"); sb != "" {
 		j := func(d string) string { return filepath.Join(sb, d) }
-		args = append(args, "--data", j("hub"), "--claude-root", j("claude"), "--pi-root", j("pi"), "--codex-home", j("codex"), "--dsh-home", j("dsh"), "--agy-root", j("antigravity"))
+		args = append(args, "--data", j("hub"), "--claude-root", j("claude"), "--pi-root", j("pi"), "--codex-home", j("codex"), "--dsh-home", j("dsh"), "--agy-root", j("antigravity"), "--opencode-root", j("opencode"))
 	}
 	b, _ := json.MarshalIndent(map[string]any{"mcpServers": map[string]any{"koto": map[string]any{"command": cmd, "args": args}}}, "", "  ")
 	return string(b)

@@ -69,11 +69,13 @@ Run the packaging command on its target OS. Use `amd64` instead of `arm64` for I
 ```sh
 app/scripts/package-mac.sh arm64
 app/scripts/linux-package.sh arm64
+app/scripts/package-windows.sh arm64
+app/scripts/package-cli.sh linux arm64
 ```
 
 macOS DMG packaging also needs Python 3 and `uv` (`KOTO_UV` can select a project-local executable). The script installs its pinned build dependencies in `app/.tools/dmgbuild` and caches downloads in `app/.cache/uv`; it does not change system packages.
 
-Packages go to `app/bin/release/`. macOS uses ad-hoc signing. Linux needs GTK3, WebKitGTK 4.1, GCC, pkg-config, and dpkg-deb. Windows build scripts are available but unverified.
+Packages go to `app/bin/release/`. macOS uses ad-hoc signing. Linux needs GTK3, WebKitGTK 4.1, GCC, pkg-config, and dpkg-deb. Windows produces separate App and CLI executables.
 
 The project page is buildless. Preview it with:
 
@@ -82,6 +84,6 @@ UV_CACHE_DIR="$PWD/app/.cache/uv" uv venv app/.cache/release-venv
 app/.cache/release-venv/bin/python -m http.server 4173 --bind 127.0.0.1 --directory site
 ```
 
-Pages deployment and [native CI](ci.md) are manual. CI records test, packaging, and WebView results separately; Windows jobs are disabled by default.
+Pages deployment and [native CI](ci.md) are manual. CI records test, packaging, and WebView results separately; All three platforms are enabled by default.
 
 For a Windows site preview, use `app\.cache\release-venv\Scripts\python.exe`.

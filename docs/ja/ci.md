@@ -4,7 +4,7 @@
 
 `.github/workflows/ci.yml` は手動実行のワークフローです。フロントエンドと Go パッケージをテストし、配布パッケージをビルドし、各ホストで実際のネイティブ WebView スモークテストを試みます。権限は `contents: read` のみです。CI 成果物をアップロードしますが、リリース作成、コードの push、サイト公開は行いません。
 
-標準のマトリクスは macOS と Linux です。Windows ジョブは `include_windows` を明示的に有効にした場合だけ実行します。
+標準では macOS、Linux、Windows の arm64 と amd64 をテストします。個別の調査では `include_windows` で Windows ジョブを無効にできます。
 
 | 対象 | ネイティブ runner ラベル |
 | --- | --- |
@@ -17,7 +17,7 @@
 
 Runner ラベルは [GitHub のホスト型 runner 一覧](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)に基づきます。ワークフローは実際のホストとツールのアーキテクチャを確認します。利用できないネイティブ runner をクロスコンパイルで代用しません。
 
-Go、Node、Wails、NSIS は `app/.tools`、キャッシュとテスト記録は `app/.cache` を使います。ダウンロードは SHA-256 で確認し、Linux のシステム依存関係は一時 runner 内にのみインストールします。
+Go、Node、Wails、Codex、OpenCode は `app/.tools`、キャッシュとテスト記録は `app/.cache` を使います。ダウンロードは SHA-256 で確認し、Linux のシステム依存関係は一時 runner 内にのみインストールします。
 
 ## 結果の意味
 
@@ -26,3 +26,5 @@ Go、Node、Wails、NSIS は `app/.tools`、キャッシュとテスト記録は
 macOS は app バンドルと DMG を確認し、合成セッションでネイティブ WebView を実行します。Linux は DEB を展開し、GTK3/WebKitGTK アプリを Xvfb 上で実行します。テスト結果には、`passed: true`、一致する OS とアーキテクチャ、アプリの検証完了を示す JSON が必要です。プロセスの終了コードが 0 だけでは不十分です。
 
 Windows の GUI 検証には [WebView2 Runtime](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/distribution) と操作可能なデスクトップが必要です。どちらかが欠けると検証は失敗します。作成済みパッケージと段階ごとの結果は調査用に残ります。
+
+App と CLI は別々の成果物です。CLI を App なしで実行し、デスクトップパッケージに含まれないことを確認します。Windows では空白と Unicode を含むパスで両方の exe を直接テストします。インストーラーや PATH の変更は使いません。

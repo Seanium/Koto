@@ -46,8 +46,8 @@ func appInstalled(program string) bool { _, err := exec.LookPath(program); retur
 func terminalPresets() []Opener {
 	if runtime.GOOS == "windows" {
 		return []Opener{
-			{ID: "system", Name: "系统默认", argv: []string{"cmd", "/c", "start", "", "cmd", "/k", "{cmd}"}},
-			{ID: "wt", Name: "Windows Terminal", detect: "wt", argv: []string{"wt", "-d", "{cwd}", "cmd", "/k", "{cmd}"}},
+			{ID: "system", Name: "系统默认", argv: []string{"powershell.exe", "-NoLogo", "-NoProfile", "-NoExit", "-EncodedCommand", "{cmd_ps}"}},
+			{ID: "wt", Name: "Windows Terminal", detect: "wt", argv: []string{"wt", "-d", "{cwd}", "powershell.exe", "-NoLogo", "-NoProfile", "-NoExit", "-EncodedCommand", "{cmd_ps}"}},
 		}
 	}
 	keep := "{cmd}; exec \"${SHELL:-/bin/sh}\""

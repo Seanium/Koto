@@ -29,9 +29,8 @@ mkdir -p "$OUT" "$APP_DIR/.cache"
 STAGE=$(mktemp -d "$APP_DIR/.cache/linux-package-$ARCH.XXXXXX")
 trap 'rm -rf "$STAGE"' EXIT HUP INT TERM
 ROOT="$STAGE/root"
-mkdir -p "$ROOT/usr/lib/koto" "$ROOT/usr/bin" "$ROOT/usr/share/applications" "$ROOT/usr/share/icons/hicolor/1024x1024/apps" "$ROOT/DEBIAN"
+mkdir -p "$ROOT/usr/lib/koto" "$ROOT/usr/share/applications" "$ROOT/usr/share/icons/hicolor/1024x1024/apps" "$ROOT/DEBIAN"
 "$GO" build -tags production,gtk3 -trimpath -buildvcs=false -ldflags='-w -s' -o "$ROOT/usr/lib/koto/koto-desktop" .
-CGO_ENABLED=0 "$GO" build -trimpath -buildvcs=false -ldflags="-w -s -X main.version=$VERSION" -o "$ROOT/usr/bin/koto" ./cmd/koto
 cp build/linux/desktop "$ROOT/usr/share/applications/koto.desktop"
 cp brand/appicon.png "$ROOT/usr/share/icons/hicolor/1024x1024/apps/koto.png"
 mkdir -p "$ROOT/usr/share/doc/koto"
@@ -50,35 +49,14 @@ Priority: optional
 Installed-Size: $SIZE
 Depends: libc6 (>= $LIBC_VERSION), libgtk-3-0, libwebkit2gtk-4.1-0, libayatana-appindicator3-1
 Description: Copy coding-agent conversations between harnesses
- koto is a local desktop app and command-line tool for reading, comparing,
- and copying coding-agent sessions.
+ koto is a desktop app for reading, comparing, and copying coding-agent sessions.
+ The command-line tool is distributed separately.
 EOF
 cp build/linux/nfpm/scripts/postinstall.sh "$ROOT/DEBIAN/postinst"
 chmod 0755 "$ROOT/DEBIAN/postinst"
-dpkg-deb --root-owner-group --build "$ROOT" "$OUT/koto-$VERSION-linux-$ARCH.deb"
-cp "$ROOT/usr/lib/koto/koto-desktop" "$OUT/koto-$VERSION-linux-$ARCH"
-cp "$ROOT/usr/bin/koto" "$OUT/koto-cli-$VERSION-linux-$ARCH"
-PORTABLE="$STAGE/koto-$VERSION-linux-$ARCH"
-mkdir -p "$PORTABLE"
-cp "$ROOT/usr/lib/koto/koto-desktop" "$PORTABLE/koto-desktop"
-cp "$ROOT/usr/bin/koto" "$PORTABLE/koto"
-cp "$ROOT/usr/share/applications/koto.desktop" "$PORTABLE/"
-cp brand/appicon.png "$PORTABLE/koto.png"
-cp -R "$ROOT/usr/share/doc/koto" "$PORTABLE/legal"
-cat > "$PORTABLE/README.txt" <<EOF
-koto $VERSION / Linux $ARCH
-
-Run ./koto-desktop to open the app, or ./koto --help for the CLI.
-Requires glibc $LIBC_VERSION or newer, GTK3, WebKitGTK 4.1, and Ayatana
-AppIndicator3. On a compatible Debian/Ubuntu system:
-  sudo apt install libgtk-3-0 libwebkit2gtk-4.1-0 libayatana-appindicator3-1
-
-The .deb package installs the desktop launcher and the koto command.
-This archive does not install anything automatically.
-The CLI includes instructions for AI agents in ./koto --help.
-No separate Skill setup is required.
-EOF
-tar -C "$STAGE" -czf "$OUT/koto-$VERSION-linux-$ARCH.tar.gz" "koto-$VERSION-linux-$ARCH"
-dpkg-deb --info "$OUT/koto-$VERSION-linux-$ARCH.deb"
-(cd "$OUT" && sha256sum "koto-$VERSION-linux-$ARCH.deb" "koto-$VERSION-linux-$ARCH.tar.gz" > "koto-$VERSION-linux-$ARCH.sha256")
-printf '%s\n' "$OUT/koto-$VERSION-linux-$ARCH.deb" "$OUT/koto-$VERSION-linux-$ARCH.tar.gz"
+dpkg-deb --root-owner-group --build "$ROOT" "$OUT/koto-linux-$ARCH.deb"
+cp "$ROOT/usr/lib/koto/koto-desktop" "$OUT/koto-linux-$ARCH"
+dpkg-deb --info "$OUT/koto-linux-$ARCH.deb"
+(cd "$OUT" && sha256sum "koto-linux-$ARCH.deb" "koto-linux-$ARCH" > "koto-linux-$ARCH.sha256")
+KOTO_GO="$GO" sh scripts/package-cli.sh linux "$ARCH"
+printf '%s\n' "$OUT/koto-linux-$ARCH.deb" "$OUT/koto-linux-$ARCH"

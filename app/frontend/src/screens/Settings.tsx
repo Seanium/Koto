@@ -37,6 +37,7 @@ function General({ hub }: { hub: Hub }) {
   const [error, setError] = useState<string>()
   const [info, setInfo] = useState<AppInfo>()
   const [infoError, setInfoError] = useState<string>()
+  const [noticesOpen, setNoticesOpen] = useState(false)
   useEffect(() => { void shell.prefs().then(setPrefs) }, [])
   useEffect(() => { void shell.appInfo().then(setInfo).catch(e => setInfoError(String(e))) }, [])
   const save = async (p: Prefs) => {
@@ -64,6 +65,7 @@ function General({ hub }: { hub: Hub }) {
       </div>
       {error && <div className="note" title={error}>{tr("没能保存")}</div>}
       <div className="group">
+        <Line title={tr("开源许可")}><Button variant="ghost" onClick={() => setNoticesOpen(true)}>{tr("查看许可")}</Button></Line>
         <Line title={tr("版本")}><span className="t-3 selectable">{info?.version ?? '—'}</span></Line>
         <Line title={tr("项目地址")}>
           <Button variant="ghost" disabled={!info} title={info?.projectURL} onClick={() => {
@@ -71,9 +73,28 @@ function General({ hub }: { hub: Hub }) {
           }}>github.com/Seanium/koto</Button>
         </Line>
       </div>
+      {noticesOpen && <LicenseSheet onClose={() => setNoticesOpen(false)} />}
       {infoError && <div className="note" title={infoError}>{tr(info ? "无法打开链接" : "无法读取应用信息")}</div>}
     </div>
   )
+}
+
+function LicenseSheet({ onClose }: { onClose: () => void }) {
+  const [text, setText] = useState<string>()
+  const [error, setError] = useState(false)
+  useEffect(() => {
+    let active = true
+    void shell.licenseNotices().then(text => { if (active) setText(text) }).catch(() => { if (active) setError(true) })
+    return () => { active = false }
+  }, [])
+  return <Sheet open onClose={onClose} label={tr("开源许可")}>
+    <div className="sheet-head"><div className="t-head">{tr("开源许可")}</div></div>
+    <div className="sheet-body scroll selectable" tabIndex={0} style={{ height: 'min(55vh, 480px)', minHeight: 120 }}>
+      {error ? <div className="note">{tr("无法读取许可信息")}</div> : text === undefined ? <span className="t-3">{tr("加载中…")}</span> :
+        <pre style={{ margin: 0, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', fontFamily: 'inherit', fontSize: 12, lineHeight: 1.6 }}>{text}</pre>}
+    </div>
+    <div className="sheet-foot"><Button onClick={onClose}>{tr("关闭")}</Button></div>
+  </Sheet>
 }
 
 /** A dropdown of the installed presets plus 「自定义命令…」, which reveals a template field. */

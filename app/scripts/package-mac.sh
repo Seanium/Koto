@@ -1,13 +1,11 @@
 #!/bin/sh
-# Builds the installer: bin/koto.app (production build) with the koto CLI in Contents/Helpers/koto
-# (for MCP and scripts; not beside koto in MacOS/, which a case-insensitive disk takes for the same
-# name), then bin/koto-<version>.dmg. One Go binary each, no runtime to bundle. Ad-hoc signed, not
+# Builds the desktop DMG and a separate CLI executable. Ad-hoc signed, not
 # notarized: on another Mac, open it once with right-click › 打开. Nothing is installed on this machine; the build uses the project-local Go (env.sh).
 #
 #   app/scripts/package-mac.sh                  # native build, original output paths
 #   app/scripts/package-mac.sh arm64            # bin/release/darwin-arm64/koto.app
 #   app/scripts/package-mac.sh amd64            # bin/release/darwin-amd64/koto.app
-# Explicit architectures produce bin/release/koto-<version>-macos-<arch>.dmg.
+# Explicit architectures produce bin/release/koto-darwin-<arch>.dmg.
 # Set KOTO_SKIP_FRONTEND_BUILD=1 only after building frontend/dist once, when
 # packaging multiple architectures from exactly the same frontend assets.
 # uv creates a pinned build-only environment in .tools/dmgbuild. Finder layout
@@ -44,10 +42,10 @@ fi
 
 if [ "$#" -eq 0 ]; then
   OUT="$APP_DIR/bin/koto.app"
-  DMG="$APP_DIR/bin/koto-$VERSION.dmg"
+  DMG="$APP_DIR/bin/koto.dmg"
 else
   OUT="$APP_DIR/bin/release/darwin-$ARCH/koto.app"
-  DMG="$APP_DIR/bin/release/koto-$VERSION-macos-$ARCH.dmg"
+  DMG="$APP_DIR/bin/release/koto-darwin-$ARCH.dmg"
 fi
 mkdir -p "$APP_DIR/.cache" "$(dirname "$OUT")" "$(dirname "$DMG")"
 STAGE=$(mktemp -d "$APP_DIR/.cache/mac-package-$ARCH.XXXXXX")
@@ -62,13 +60,12 @@ if [ ! -x "$APP_DIR/.tools/dmgbuild/bin/python" ]; then
 fi
 "$UV" pip sync --python "$APP_DIR/.tools/dmgbuild/bin/python" "$APP_DIR/scripts/dmg-requirements.txt"
 BUNDLE="$STAGE/koto.app"
-mkdir -p "$BUNDLE/Contents/MacOS" "$BUNDLE/Contents/Helpers" "$BUNDLE/Contents/Resources"
+mkdir -p "$BUNDLE/Contents/MacOS" "$BUNDLE/Contents/Resources"
 export GOOS=darwin GOARCH="$ARCH" CGO_ENABLED=1
 export CGO_CFLAGS="${CGO_CFLAGS:-} -mmacosx-version-min=12.0"
 export CGO_LDFLAGS="${CGO_LDFLAGS:-} -mmacosx-version-min=12.0"
 export MACOSX_DEPLOYMENT_TARGET=12.0
 go build -tags production -trimpath -buildvcs=false -ldflags="-w -s" -o "$BUNDLE/Contents/MacOS/koto" .
-CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags="-w -s -X main.version=$VERSION" -o "$BUNDLE/Contents/Helpers/koto" ./cmd/koto
 cp build/darwin/icons.icns "$BUNDLE/Contents/Resources/"
 mkdir -p "$BUNDLE/Contents/Resources/legal"
 cp "$APP_DIR/../LICENSE" "$APP_DIR/../THIRD_PARTY_NOTICES.md" "$BUNDLE/Contents/Resources/legal/"
@@ -83,7 +80,6 @@ cp build/darwin/Info.plist "$BUNDLE/Contents/Info.plist"
 
 plutil -lint "$BUNDLE/Contents/Info.plist"
 lipo "$BUNDLE/Contents/MacOS/koto" -verify_arch "$MACH_ARCH"
-lipo "$BUNDLE/Contents/Helpers/koto" -verify_arch "$MACH_ARCH"
 codesign --force --deep --sign - "$BUNDLE"
 codesign --verify --deep --strict "$BUNDLE"
 
@@ -99,3 +95,4 @@ mv "$BUNDLE" "$OUT"
 mv -f "$STAGE/koto.dmg" "$DMG"
 (cd "$(dirname "$DMG")" && shasum -a 256 "$(basename "$DMG")") > "$DMG.sha256"
 printf '%s\n' "$OUT" "$DMG"
+sh scripts/package-cli.sh darwin "$ARCH"

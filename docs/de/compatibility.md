@@ -11,17 +11,20 @@ Die Tabellen zeigen unterstützte Speicherformate. Agent-Updates können diese �
 | Codex | rollout JSONL / zstd | Neuer nativer Rollout, danach Leseprüfung über app-server |
 | DeepSeek Harness | v4 JSONL / zstd | Neues Verzeichnis und natives komprimiertes Protokoll |
 | Antigravity CLI | SQLite und Protobuf-Verläufe | Neue Gesprächsdatenbank und Zusammenfassungseintrag |
+| OpenCode | SQLite v1 (`session`, `message`, `part`) | Neue Sitzungszeilen in der nativen Datenbank |
 
-Jede Kopie erstellt eine neue native Sitzung. Das Schreiben des Ziels wird verweigert, wenn der Pfad bereits existiert. Der Ziel-Agent lädt seine eigenen Einstellungen; System-, Entwickler-, Umgebungs-, Konfigurations- und Berechtigungskontext der Quelle werden nicht kopiert. Werkzeuge und Denkprotokolle können in lesbaren Text umgewandelt werden, wenn das Ziel keine passende native Darstellung bietet.
+Unterstützt wird das v1-Format von OpenCode 1.19.3. v2-Speicher wird ausdrücklich abgelehnt. Kopien nach OpenCode benötigen dessen CLI und ein konfiguriertes Standardmodell; beim Fortsetzen wird das Zielmodell verwendet.
+
+Jede Kopie erstellt eine neue native Sitzung; bestehende Sitzungs-IDs und einzelne Dateien werden nicht überschrieben. Der Ziel-Agent lädt seine eigenen Einstellungen; System-, Entwickler-, Umgebungs-, Konfigurations- und Berechtigungskontext der Quelle werden nicht kopiert. Werkzeuge und Denkprotokolle können in lesbaren Text umgewandelt werden, wenn das Ziel keine passende native Darstellung bietet.
 
 ## Anhänge
 
-| Material | Claude Code | pi | Codex | DeepSeek Harness | Antigravity CLI |
-| --- | --- | --- | --- | --- | --- |
-| PNG, JPEG, GIF, WebP | Natives Bild | Natives Bild | Natives Bild | Nativer Bildanhang | Native Media |
-| PDF, UTF-8-Text | Natives Dokument | Vollständige Datei | Vollständige Datei | Nativer Dateianhang | Native Media |
-| Audio | Vollständige Datei | Vollständige Datei | Natives Audio | Nativer Dateianhang | Native Media |
-| DOCX, ZIP, JSON, andere Binärdateien | Vollständige Datei | Vollständige Datei | Vollständige Datei | Nativer Dateianhang | Native Media |
+| Material | Claude Code | pi | Codex | DeepSeek Harness | Antigravity CLI | OpenCode |
+| --- | --- | --- | --- | --- | --- | --- |
+| PNG, JPEG, GIF, WebP | Natives Bild | Natives Bild | Natives Bild | Nativer Bildanhang | Native Media | Native Datei |
+| PDF, UTF-8-Text | Natives Dokument | Vollständige Datei | Vollständige Datei | Nativer Dateianhang | Native Media | Native Datei |
+| Audio | Vollständige Datei | Vollständige Datei | Natives Audio | Nativer Dateianhang | Native Media | Native Datei |
+| DOCX, ZIP, JSON, andere Binärdateien | Vollständige Datei | Vollständige Datei | Vollständige Datei | Nativer Dateianhang | Native Media | Native Datei |
 
 Wenn eine Rolle oder ein Ziel eine Datei nicht einbetten kann, speichert koto die vollständigen Bytes im Anhangsverzeichnis der neuen Sitzung und fügt eine Dateireferenz hinzu. Anhänge aus Werkzeugergebnissen bleiben auch dann erhalten, wenn das Werkzeugprotokoll in Text umgewandelt wird.
 

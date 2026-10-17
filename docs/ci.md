@@ -4,7 +4,7 @@
 
 `.github/workflows/ci.yml` is a manually dispatched workflow. It tests the frontend and Go packages, builds packages, and attempts an actual native WebView smoke test on each host. It has only `contents: read` permission and uploads CI artifacts; it does not create a release, push code, or deploy the site.
 
-The default matrix covers macOS and Linux. Windows jobs run only when `include_windows` is explicitly enabled.
+The default matrix covers macOS, Linux, and Windows, each on arm64 and amd64. Use `include_windows` to disable Windows jobs for a focused run.
 
 | Target | Native runner label |
 | --- | --- |
@@ -17,7 +17,7 @@ The default matrix covers macOS and Linux. Windows jobs run only when `include_w
 
 Runner labels follow the [GitHub hosted-runner list](https://docs.github.com/en/actions/reference/runners/github-hosted-runners). The workflow checks actual host and tool architectures; cross-compilation does not replace an unavailable native runner.
 
-Go, Node, Wails, and NSIS use `app/.tools`; caches and evidence use `app/.cache`. Downloads are SHA-256 checked. Linux system dependencies are installed only on the disposable runner.
+Go, Node, Wails, Codex, and OpenCode use `app/.tools`; caches and evidence use `app/.cache`. Downloads are SHA-256 checked. Linux system dependencies are installed only on the disposable runner.
 
 ## What a result means
 
@@ -26,3 +26,5 @@ Each artifact includes `stages.json`, which records frontend tests, Go tests, pa
 macOS checks the app bundle and DMG, then runs the native WebView against synthetic sessions. Linux extracts the DEB and runs its GTK3/WebKitGTK application under Xvfb. The smoke contract requires JSON with `passed: true`, the matching OS and architecture, and completion of the application checks; a zero process exit alone is insufficient.
 
 Windows GUI checks require the [WebView2 Runtime](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/distribution) and an interactive desktop. Missing either fails the GUI check. Built packages and stage results remain available for diagnosis.
+
+App and CLI are separate artifacts. Tests run the CLI independently and ensure desktop packages do not bundle it. Windows checks run both executables directly from paths containing spaces and Unicode, with no installer or PATH changes.

@@ -1,7 +1,7 @@
 import { locales, resolveLocale, watchAppearance } from './preferences.mjs';
-import { translations } from './translations.mjs?v=beta-0.1.0-1';
-import { createTypewriter, cycleAgentLogos, createDialogue } from './motion.mjs?v=beta-0.1.0-1';
-import { publication, releaseAssets, downloadURL } from './publication.mjs?v=beta-0.1.0-1-published';
+import { translations } from './translations.mjs?v=beta-0.1.0-2';
+import { createTypewriter, cycleAgentLogos, createDialogue } from './motion.mjs?v=beta-0.1.0-2';
+import { publication, releaseAssets, downloadURL, matchingAsset } from './publication.mjs?v=beta-0.1.0-2';
 import { detectSystem } from './detection.mjs';
 
 const languageSelect = document.getElementById('language-select');
@@ -12,21 +12,37 @@ cycleAgentLogos([...document.querySelectorAll('.hero-agent img')], reducedMotion
 const dialogue = createDialogue(['cli-request-typed', 'cli-response-typed', 'cli-instruction-typed', 'cli-command-typed'].map(id => document.getElementById(id)), reducedMotion);
 const releaseSelect = document.getElementById('release-asset');
 const releaseLink = document.getElementById('release-download');
-for (const asset of releaseAssets) {
-  const option = document.createElement('option');
-  option.value = asset.id;
-  option.textContent = asset.label;
-  releaseSelect.append(option);
-}
-releaseSelect.selectedIndex = 0;
+let activeProduct = 'app';
+let detectedSystem = null;
+const productChoices = new Map();
 let releaseManuallySelected = false;
+function renderAssets() {
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.disabled = true;
+  placeholder.textContent = translations[activeLocale].downloadChoose;
+  releaseSelect.replaceChildren(placeholder);
+  for (const asset of releaseAssets.filter(asset => asset.product === activeProduct)) {
+    const option = document.createElement('option');
+    option.value = asset.id;
+    option.textContent = asset.label;
+    releaseSelect.append(option);
+  }
+  releaseSelect.value = productChoices.get(activeProduct) || matchingAsset(detectedSystem, activeProduct) || '';
+  for (const button of document.querySelectorAll('[data-product]')) button.setAttribute('aria-pressed', String(button.dataset.product === activeProduct));
+}
+for (const button of document.querySelectorAll('[data-product]')) button.addEventListener('click', () => {
+  activeProduct = button.dataset.product;
+  renderAssets();
+  renderDownload();
+});
 function renderDownload(text = translations[activeLocale]) {
   const url = downloadURL(releaseSelect.value);
   releaseLink.textContent = url ? text.download : publication.published ? text.downloadChoose : text.downloadPending;
   if (url) { releaseLink.href = url; releaseLink.removeAttribute('aria-disabled'); }
   else { releaseLink.removeAttribute('href'); releaseLink.setAttribute('aria-disabled', 'true'); }
 }
-releaseSelect.addEventListener('change', () => { releaseManuallySelected = true; renderDownload(); });
+releaseSelect.addEventListener('change', () => { releaseManuallySelected = true; productChoices.set(activeProduct, releaseSelect.value); renderDownload(); });
 const screenshots = [...document.querySelectorAll('.screenshot')];
 // Refresh this content revision whenever screenshot assets are replaced.
 const screenshotRevision = 'a74f43570a16';
@@ -85,6 +101,7 @@ function setLanguage(preference) {
   }
   storage.write('koto-site-language', languagePreference);
   renderScreenshots();
+  renderAssets();
   renderDownload(text);
   document.querySelector('.cli-demo').setAttribute('aria-label', text.cliDemo);
   dialogue.play([text.cliRequest, text.cliResponse, text.cliInstruction, text.cliCommand], locale);
@@ -142,6 +159,7 @@ document.addEventListener("keydown", event => {
 
 // Detection stays in memory and never replaces a user's explicit choice.
 detectSystem(navigator).then(result => {
-  if (!releaseManuallySelected && result.assetId) releaseSelect.value = result.assetId;
+  detectedSystem = result;
+  if (!releaseManuallySelected) renderAssets();
   renderDownload();
 });

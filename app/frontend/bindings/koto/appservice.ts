@@ -77,6 +77,13 @@ export function Image(selector: string, sha: string): $CancellablePromise<string
 }
 
 /**
+ * LicenseNotices returns the complete notices embedded in the standalone app.
+ */
+export function LicenseNotices(): $CancellablePromise<string> {
+    return $Call.ByID(3746161494);
+}
+
+/**
  * Mark is a development hook: the frontend reports UI milestones (used by the screenshot walk).
  */
 export function Mark(name: string): $CancellablePromise<void> {
@@ -84,8 +91,7 @@ export function Mark(name: string): $CancellablePromise<void> {
 }
 
 /**
- * McpConfig is the mcpServers entry an agent needs to read koto sessions over MCP: the koto
- * command inside this app (Contents/Helpers/koto in the bundle).
+ * McpConfig uses the separately installed CLI on the Agent's PATH.
  */
 export function McpConfig(): $CancellablePromise<string> {
     return $Call.ByID(4185971360);

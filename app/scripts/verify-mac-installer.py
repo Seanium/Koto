@@ -68,7 +68,7 @@ def verify(image):
             assert tiff_dimensions(mount / ".background.tiff") == {(660, 410), (1320, 820)}
             bundle = mount / "koto.app"
             run("/usr/bin/codesign", "--verify", "--deep", "--strict", str(bundle))
-            assert (bundle / "Contents/Helpers/koto").is_file()
+            assert not (bundle / "Contents/Helpers/koto").exists(), "CLI is distributed separately"
             assert (bundle / "Contents/Resources/legal/LICENSE").is_file()
             return {"image": image.name, "window": [660, 410], "icons": {"koto": [186, 226], "Applications": [474, 226]}, "background": "standard + Retina", "signature": "valid"}
         finally:

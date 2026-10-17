@@ -28,15 +28,15 @@ const (
 )
 
 type sandbox struct {
-	t                                               *testing.T
-	Root, Data, Claude, Pi, Codex, Shadow, Dsh, Agy string
+	t                                                         *testing.T
+	Root, Data, Claude, Pi, Codex, Shadow, Dsh, Agy, OpenCode string
 }
 
 func newSandbox(t *testing.T) *sandbox {
 	t.Helper()
 	root, _ := filepath.EvalSymlinks(t.TempDir())
 	s := &sandbox{t: t, Root: root, Data: filepath.Join(root, "hub"), Claude: filepath.Join(root, "claude"), Pi: filepath.Join(root, "pi"),
-		Codex: filepath.Join(root, "codex"), Shadow: filepath.Join(root, "shadow"), Dsh: filepath.Join(root, "dsh"), Agy: filepath.Join(root, "agy")}
+		Codex: filepath.Join(root, "codex"), Shadow: filepath.Join(root, "shadow"), Dsh: filepath.Join(root, "dsh"), Agy: filepath.Join(root, "agy"), OpenCode: filepath.Join(root, "opencode")}
 	for _, d := range []string{s.Claude, s.Pi, s.Codex, s.Shadow, s.Dsh} {
 		must(t, os.MkdirAll(d, 0o755))
 	}
@@ -48,7 +48,7 @@ var zero int64
 // app opens an App on the sandbox; edit tweaks the config (Enable, LiveMs…).
 func (s *sandbox) app(edit ...func(*Config)) *App {
 	s.t.Helper()
-	cfg := Config{DataDir: s.Data, ClaudeRoot: s.Claude, PiRoot: s.Pi, CodexHome: s.Codex, CodexShadow: s.Shadow, DshHome: s.Dsh, AntigravityRoot: s.Agy, NoDesktop: true, LiveMs: &zero}
+	cfg := Config{DataDir: s.Data, ClaudeRoot: s.Claude, PiRoot: s.Pi, CodexHome: s.Codex, CodexShadow: s.Shadow, DshHome: s.Dsh, AntigravityRoot: s.Agy, OpenCodeRoot: s.OpenCode, NoDesktop: true, LiveMs: &zero}
 	for _, e := range edit {
 		e(&cfg)
 	}

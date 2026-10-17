@@ -22,17 +22,18 @@ A saved comparison contains only session references. You can edit its name and s
 
 ## Copy with your Agent
 
-The CLI comes with the app. Its `--help` explains the workflow to your Agent.
+App and CLI are separate downloads from [Releases](https://github.com/Seanium/koto/releases). The CLI works without the app or a WebView. Its `--help` tells your Agent how to copy a session.
 
-| Package | CLI |
+| Platform | CLI setup |
 | --- | --- |
-| macOS | `/Applications/koto.app/Contents/Helpers/koto` |
-| Linux DEB | `koto` |
-| Linux archive | `./koto` in the extracted folder |
+| macOS / Linux | Download `koto-cli-<os>-<arch>`, rename it to `koto`, and run `chmod +x koto`. |
+| Windows | Download `koto-cli-windows-<arch>.exe` and rename it to `koto.exe`. |
 
-On macOS, the installer does not add the CLI to PATH. If your Agent cannot find it, give it the path above; adjust it if you installed the app elsewhere.
+Put the CLI in a folder on PATH, or give your Agent its full path. Run Windows continuation commands in PowerShell. Windows App downloads are standalone `.exe` files; Linux App downloads are a binary or DEB. Neither includes the CLI.
 
 Ask: **“Use koto to copy this session to pi.”**
+
+OpenCode verifies the running shell-tool invocation when no host session ID is available. No Skill installation is needed.
 
 Current-session detection uses `CODEX_THREAD_ID`, `PI_SESSION_ID`, `DSH_SESSION_ID`, `ANTIGRAVITY_CONVERSATION_ID`, or `CLAUDE_CODE_SESSION_ID` when the host provides one. Otherwise, supply the exact `agent:session-id` directly or through `KOTO_SESSION`. An explicit `KOTO_SESSION` takes priority; conflicting host IDs are rejected. koto never chooses a session by recency or project folder.
 

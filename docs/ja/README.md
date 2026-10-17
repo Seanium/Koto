@@ -16,7 +16,7 @@
   <img src="../../site/assets/screenshots/ja-light-tree.png" alt="koto：共通の履歴と分岐をツリーで確認" width="1120">
 </picture>
 
-Claude Code（Desktop Code を含む）、Codex、pi、DeepSeek Harness、Antigravity CLI に対応。さらに多くの Agent に近日対応。
+Claude Code（Desktop Code を含む）、Codex、pi、DeepSeek Harness、Antigravity CLI、OpenCode に対応。さらに多くの Agent に近日対応。
 
 koto CLI も。<br>
 コピーは、ひと言で。

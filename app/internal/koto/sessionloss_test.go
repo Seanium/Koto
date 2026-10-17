@@ -377,8 +377,14 @@ func TestSessionLossResumeAndOpenReason(t *testing.T) {
 			cc = &b
 		}
 	}
-	jsonEq(t, cc.Resume, map[string]any{"argv": []string{"claude", "--resume", CCSession}, "command": "claude --resume " + CCSession, "cwd": "/work/proj",
-		"env": map[string]string{"CLAUDE_CONFIG_DIR": s.Claude}, "shell": "cd /work/proj && CLAUDE_CONFIG_DIR=" + s.Claude + " claude --resume " + CCSession})
+	command := "claude --resume " + CCSession
+	shell := "cd /work/proj && CLAUDE_CONFIG_DIR=" + engine.ShQ(s.Claude) + " " + command
+	if runtime.GOOS == "windows" {
+		command = "& 'claude' '--resume' '" + CCSession + "'"
+		shell = "Set-Location -LiteralPath '/work/proj' -ErrorAction Stop; $env:CLAUDE_CONFIG_DIR=" + engine.PowerShellQ(s.Claude) + "; " + command
+	}
+	jsonEq(t, cc.Resume, map[string]any{"argv": []string{"claude", "--resume", CCSession}, "command": command, "cwd": "/work/proj",
+		"env": map[string]string{"CLAUDE_CONFIG_DIR": s.Claude}, "shell": shell})
 
 	// a copy, then pi continues while CC has the session open: a copy back waits, with the reason
 	toPi := carry(t, a, engine.CarryOptions{Selector: thread, To: "pi"})

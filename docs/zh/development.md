@@ -69,11 +69,13 @@ seed 工具创建带有 `.koto-sandbox` 标记的 `.sandbox`。重新生成时�
 ```sh
 app/scripts/package-mac.sh arm64
 app/scripts/linux-package.sh arm64
+app/scripts/package-windows.sh arm64
+app/scripts/package-cli.sh linux arm64
 ```
 
 macOS DMG 打包还需要 Python 3 和 `uv`（可用 `KOTO_UV` 指定项目内的程序）。脚本将固定版本的构建依赖安装在 `app/.tools/dmgbuild`，下载缓存放在 `app/.cache/uv`，不会修改系统依赖。
 
-产物放在 `app/bin/release/`。macOS 使用 ad-hoc 签名。Linux 需要 GTK3、WebKitGTK 4.1、GCC、pkg-config 与 dpkg-deb。Windows 构建脚本尚未验收。
+产物放在 `app/bin/release/`。macOS 使用 ad-hoc 签名。Linux 需要 GTK3、WebKitGTK 4.1、GCC、pkg-config 与 dpkg-deb。Windows 分别生成可直接运行的 App 与 CLI。
 
 项目主页无需构建，可这样预览：
 
@@ -82,6 +84,6 @@ UV_CACHE_DIR="$PWD/app/.cache/uv" uv venv app/.cache/release-venv
 app/.cache/release-venv/bin/python -m http.server 4173 --bind 127.0.0.1 --directory site
 ```
 
-Pages 部署和[原生 CI](ci.md)均手动触发。CI 分别记录测试、打包和 WebView 结果，默认关闭 Windows 任务。
+Pages 部署和[原生 CI](ci.md)均手动触发。CI 分别记录测试、打包和 WebView 结果，默认包含三个平台。
 
 Windows 预览网站时使用 `app\.cache\release-venv\Scripts\python.exe`。

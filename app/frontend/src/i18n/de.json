@@ -345,5 +345,8 @@
   "版本": "Version",
   "项目地址": "Projekt",
   "无法打开链接": "Link konnte nicht geöffnet werden",
-  "无法读取应用信息": "App-Informationen konnten nicht geladen werden"
+  "无法读取应用信息": "App-Informationen konnten nicht geladen werden",
+  "开源许可": "Open-Source-Lizenzen",
+  "查看许可": "Lizenzen anzeigen",
+  "无法读取许可信息": "Lizenzhinweise konnten nicht geladen werden"
 }

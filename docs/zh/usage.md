@@ -22,17 +22,18 @@ koto 读取设置中已启用的 Agent 目录。搜索支持已索引的标题�
 
 ## 让 Agent 帮你复制
 
-CLI 随 App 提供，`--help` 内含 Agent 操作说明。
+App 和 CLI 从 [Releases](https://github.com/Seanium/koto/releases) 分别下载。CLI 不依赖 App 或 WebView，`--help` 内含 Agent 操作说明。
 
-| 安装包 | CLI |
+| 平台 | CLI 配置 |
 | --- | --- |
-| macOS | `/Applications/koto.app/Contents/Helpers/koto` |
-| Linux DEB | `koto` |
-| Linux 压缩包 | 解压目录内的 `./koto` |
+| macOS / Linux | 下载 `koto-cli-<系统>-<架构>`，改名为 `koto`，执行 `chmod +x koto`。 |
+| Windows | 下载 `koto-cli-windows-<架构>.exe`，改名为 `koto.exe`。 |
 
-macOS 安装包不会把 CLI 加入 PATH。Agent 找不到命令时，告诉它上面的路径；App 装在其他位置时，调整路径即可。
+将 CLI 放到 PATH 中的目录，或把完整路径告诉 Agent。Windows 续聊命令在 PowerShell 中执行。Windows App 是直接运行的 `.exe`；Linux App 提供二进制和 DEB，均不捆绑 CLI。
 
 直接说：**「用 koto 复制当前会话到 pi」**
+
+OpenCode 未提供宿主会话 ID 时，koto 通过正在运行的工具调用确认当前会话，无需安装 Skill。
 
 自动识别使用宿主提供的 `CODEX_THREAD_ID`、`PI_SESSION_ID`、`DSH_SESSION_ID`、`ANTIGRAVITY_CONVERSATION_ID` 或 `CLAUDE_CODE_SESSION_ID`。没有这些信息时，需要准确的 `agent:session-id`，可直接指定或通过 `KOTO_SESSION` 提供。明确设置的 `KOTO_SESSION` 优先；多个宿主 ID 冲突时会报错。koto 不按时间或项目目录猜测会话。
 

@@ -71,6 +71,7 @@ export const api = {
 // ---------------------------------------------------------------- shell
 
 export const shell = {
+  licenseNotices: () => AppService.LicenseNotices(),
   appInfo: () => AppService.AppInfo() as Promise<AppInfo>,
   /** Wails validates the URL and opens the system browser, keeping the app view in place. */
   openExternal: (url: string) => Browser.OpenURL(url),

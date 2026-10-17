@@ -128,7 +128,7 @@ tasks:
       - task: create:app:bundle
 
   package:dmg:
-    summary: Builds the app, bundled CLI, and release installer
+    summary: Builds the desktop DMG and separate CLI executable
     cmds:
       - task: create:dmg
         vars:

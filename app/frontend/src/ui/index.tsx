@@ -10,6 +10,7 @@ import codex from '../assets/harness/codex.svg'
 import piSvg from '../assets/harness/pi.svg?raw'
 import dsh from '../assets/harness/dsh.svg'
 import antigravity from '../assets/harness/antigravity.svg'
+import opencodeSvg from '../assets/harness/opencode.svg?raw'
 
 // ---------------------------------------------------------------- keeping panels inside the window
 
@@ -87,6 +88,7 @@ const MARKS: Record<string, { src?: string; svg?: string }> = {
   pi: { svg: piSvg }, // monochrome: inlined so it takes the text colour in light and dark
   dsh: { src: dsh },
   antigravity: { src: antigravity },
+  opencode: { svg: opencodeSvg },
 }
 
 export { agentName }

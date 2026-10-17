@@ -35,7 +35,7 @@ func normalizeAssets(parts []core.Part, role string, raw bool, o Options, loss f
 			name = "附件"
 		}
 		if uri := core.S(p["uri"]); uri != "" {
-			if (o.SinkHarness == "claude-code" || o.SinkHarness == "antigravity" || o.SinkHarness == "codex" && (typ == "image" || strings.HasPrefix(media, "audio/"))) && role != "assistant" {
+			if (o.SinkHarness == "opencode" && role == "user" || o.SinkHarness == "claude-code" || o.SinkHarness == "antigravity" || o.SinkHarness == "codex" && (typ == "image" || strings.HasPrefix(media, "audio/"))) && role != "assistant" {
 				out = append(out, p)
 			} else {
 				out = append(out, core.Part{"type": "text", "text": fmt.Sprintf("[附件：%s](%s)", name, uri)})

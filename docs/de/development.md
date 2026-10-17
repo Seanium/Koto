@@ -69,11 +69,13 @@ Den Paketbefehl auf dem Zielbetriebssystem ausführen. Für Intel/x64 `arm64` du
 ```sh
 app/scripts/package-mac.sh arm64
 app/scripts/linux-package.sh arm64
+app/scripts/package-windows.sh arm64
+app/scripts/package-cli.sh linux arm64
 ```
 
 Für macOS-DMGs sind außerdem Python 3 und `uv` nötig (`KOTO_UV` kann auf eine projektlokale Datei zeigen). Das Skript installiert festgelegte Build-Abhängigkeiten in `app/.tools/dmgbuild` und nutzt `app/.cache/uv` als Download-Cache. Systempakete bleiben unverändert.
 
-Die Ausgabe liegt in `app/bin/release/`. macOS nutzt Ad-hoc-Signaturen. Linux benötigt GTK3, WebKitGTK 4.1, GCC, pkg-config und dpkg-deb. Windows-Buildskripte sind vorhanden, aber ungeprüft.
+Die Ausgabe liegt in `app/bin/release/`. macOS nutzt Ad-hoc-Signaturen. Linux benötigt GTK3, WebKitGTK 4.1, GCC, pkg-config und dpkg-deb. Unter Windows entstehen separate ausführbare Dateien für App und CLI.
 
 Die Projektseite benötigt keinen Build. Vorschau starten:
 
@@ -82,6 +84,6 @@ UV_CACHE_DIR="$PWD/app/.cache/uv" uv venv app/.cache/release-venv
 app/.cache/release-venv/bin/python -m http.server 4173 --bind 127.0.0.1 --directory site
 ```
 
-Pages und [native CI](ci.md) werden manuell gestartet. CI erfasst Tests, Paketerstellung und WebView-Ergebnisse getrennt; Windows-Jobs sind standardmäßig deaktiviert.
+Pages und [native CI](ci.md) werden manuell gestartet. CI erfasst Tests, Paketerstellung und WebView-Ergebnisse getrennt; Alle drei Plattformen sind standardmäßig aktiviert.
 
 Für die Website-Vorschau unter Windows `app\.cache\release-venv\Scripts\python.exe` verwenden.

@@ -244,6 +244,7 @@ export const AGENTS: { id: string; name: string }[] = [
   { id: 'pi', name: 'Pi' },
   { id: 'dsh', name: 'DeepSeek Harness' },
   { id: 'antigravity', name: 'Antigravity CLI' },
+  { id: 'opencode', name: 'OpenCode' },
 ]
 const AGENT_NAMES = new Map(AGENTS.map(a => [a.id, a.name]))
 

@@ -27,6 +27,10 @@ func AttachmentName(name string) string {
 	if name == "" {
 		name = "attachment"
 	}
+	base := strings.ToUpper(strings.SplitN(name, ".", 2)[0])
+	if base == "CON" || base == "PRN" || base == "AUX" || base == "NUL" || (len(base) == 4 && (strings.HasPrefix(base, "COM") || strings.HasPrefix(base, "LPT")) && base[3] >= '1' && base[3] <= '9') {
+		name = "_" + name
+	}
 	for len(name) > 180 {
 		name = string([]rune(name)[:len([]rune(name))-1])
 	}
@@ -70,7 +74,7 @@ func PrepareAttachments(in engine.PlanInput, dir string, native func(core.Part, 
 					seen[path] = true
 					files = append(files, core.JsonObject{"path": path, "data": data})
 				}
-				u := strings.NewReplacer("(", "%28", ")", "%29").Replace((&url.URL{Scheme: "file", Path: filepath.ToSlash(path)}).String())
+				u := strings.NewReplacer("(", "%28", ")", "%29").Replace(FileURL(path).String())
 				label := strings.NewReplacer("[", "（", "]", "）").Replace(name)
 				p = core.Part{"type": "text", "text": "[附件：" + label + "](" + u + ")"}
 				changed = true
@@ -126,10 +130,13 @@ func DecodeAttachmentText(text string, dir string, put func([]byte) core.JsonObj
 	at := 0
 	for _, m := range attachmentLink.FindAllStringSubmatchIndex(text, -1) {
 		u, e := url.Parse(text[m[4]:m[5]])
-		if e != nil || u.Host != "" {
+		if e != nil {
 			continue
 		}
-		path := filepath.FromSlash(u.Path)
+		path, valid := FileURLPath(u)
+		if !valid {
+			continue
+		}
 		sha := filepath.Base(filepath.Dir(path))
 		rel, e := filepath.Rel(dir, path)
 		if e != nil || strings.HasPrefix(rel, "..") || !assetHash.MatchString(sha) || filepath.Dir(filepath.Dir(path)) != filepath.Clean(dir) {

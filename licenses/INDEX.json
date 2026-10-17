@@ -2,6 +2,12 @@
   "packages": [
     {
       "ecosystem": "go",
+      "name": "Go runtime",
+      "version": "go1.26.9",
+      "directory": "go/go"
+    },
+    {
+      "ecosystem": "go",
       "name": "github.com/klauspost/compress",
       "version": "v1.20.3",
       "directory": "go/github.com_klauspost_compress@v1.20.3"
@@ -305,6 +311,7 @@
     "go/github.com_wailsapp_wails_v3@v3.0.0-beta.24/internal/go-common-file-dialog/LICENSE": "2c09e92358414ef4da9739026acadfbd0663118e590238b306d70ccf60db3159",
     "go/github.com_wailsapp_wails_v3@v3.0.0-beta.24/internal/templates/ios/frontend/public/puppertino/LICENSE": "a82239687742375c71ef1cc05b9351f86db937b0dba8120c1f0a02e2b444508b",
     "go/github.com_wailsapp_wails_v3@v3.0.0-beta.24/internal/webview2/webviewloader/LICENSE": "e2c9290019954c3c3664428b73b34186b2bb8faad9b2c50605d7cdd9df5c7177",
+    "go/go/LICENSE": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
     "go/golang.org_x_sys@v0.48.0/LICENSE": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
     "go/golang.org_x_text@v0.43.0/LICENSE": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
     "go/modernc.org_libc@v1.77.1/LICENSE": "95ff867eb55a56935fa7492406cfa953fb7c13ca73f4c0a86ae05756b4605600",

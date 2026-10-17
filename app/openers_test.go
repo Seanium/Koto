@@ -1,12 +1,17 @@
 package main
 
 import (
+	"os"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 )
 
 func TestTerminalArgvKeepsWordsWhole(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX terminal presets")
+	}
 	list := []Opener{
 		{ID: "as", argv: []string{"osascript", "-e", `do script "{cmd_as}"`}},
 		{ID: "url", argv: []string{"open", "x://new?path={cwd_url}"}, clip: true},
@@ -60,16 +65,9 @@ func TestEditorArgv(t *testing.T) {
 	}
 }
 
-func TestShellQuote(t *testing.T) {
-	for in, want := range map[string]string{"/a/b": "/a/b", "a b": "'a b'", "it's": `'it'\''s'`, "": "''"} {
-		if got := shellQuote(in); got != want {
-			t.Errorf("%q → %q, want %q", in, got, want)
-		}
-	}
-}
-
 func TestMergePath(t *testing.T) {
-	if got := mergePath("/usr/bin:/bin", "/opt/homebrew/bin:/usr/bin::/x"); got != "/usr/bin:/bin:/opt/homebrew/bin:/x" {
+	sep := string(os.PathListSeparator)
+	if got := mergePath(strings.Join([]string{"/usr/bin", "/bin"}, sep), strings.Join([]string{"/opt/homebrew/bin", "/usr/bin", "", "/x"}, sep)); got != strings.Join([]string{"/usr/bin", "/bin", "/opt/homebrew/bin", "/x"}, sep) {
 		t.Fatal(got)
 	}
 	if between("motd\n__M__/a:/b__M__trailer", "__M__") != "/a:/b" || between("no marks", "__M__") != "" {

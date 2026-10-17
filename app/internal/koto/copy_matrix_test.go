@@ -9,12 +9,10 @@ import (
 // Exercise the app API, including same-Agent copies and repeating “new session”. Codex uses its
 // actual app-server in an isolated HOME; no model is called and no real Agent directory is used.
 func TestCopyAPIMatrix(t *testing.T) {
-	for _, from := range []string{"claude-code", "pi", "codex", "dsh", "antigravity"} {
-		for _, to := range []string{"claude-code", "pi", "codex", "dsh", "antigravity"} {
+	for _, from := range copyAgents {
+		for _, to := range copyAgents {
 			t.Run(from+"-to-"+to, func(t *testing.T) {
-				if to == "codex" && !hasCodex() {
-					t.Skip("codex CLI not installed")
-				}
+				requireCopyAgent(t, from, to)
 				s := newSandbox(t)
 				var file, session string
 				switch from {
@@ -30,9 +28,12 @@ func TestCopyAPIMatrix(t *testing.T) {
 				case "dsh":
 					file, session = writeDsh(t, s.Dsh, dshV4), "demo"
 				}
-				before := text(t, file)
-				a := s.app(enable("claude-code", "pi", "codex", "dsh", "antigravity"))
+				a := s.app(enable(copyAgents...))
 				api := &API{App: a}
+				if from == "opencode" {
+					file, session = openCodeLinearSource(t, s, api)
+				}
+				before := nativeSessionSnapshot(t, file, from, session)
 				api.Reindex(ctx)
 				v, err := a.OpenThread(ctx, from+":"+session)
 				must(t, err)
@@ -54,7 +55,7 @@ func TestCopyAPIMatrix(t *testing.T) {
 					ok(t, native != session || from != to, "source session must not be reused")
 					ok(t, !seen[native], "each new-session action creates a distinct session")
 					seen[native] = true
-					eq(t, text(t, file), before, "source bytes unchanged")
+					eq(t, nativeSessionSnapshot(t, file, from, session), before, "source session unchanged")
 					out, err := api.Thread(ctx, to+":"+native, 0, "")
 					must(t, err)
 					users, answers := 0, 0

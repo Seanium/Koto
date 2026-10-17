@@ -16,7 +16,7 @@
   <img src="../../site/assets/screenshots/zh-TW-light-tree.png" alt="koto：用樹狀檢視查看共同歷史與分支" width="1120">
 </picture>
 
-支援 Claude Code（含 Desktop Code）、Codex、pi、DeepSeek Harness 和 Antigravity CLI。還有更多，即將到來。
+支援 Claude Code（含 Desktop Code）、Codex、pi、DeepSeek Harness、Antigravity CLI 和 OpenCode。還有更多，即將到來。
 
 還有 koto CLI，<br>
 複製，一句話的事。

@@ -366,7 +366,7 @@ func (e *Engine) Plan(ctx context.Context, o CarryOptions) (*Planned, error) {
 }
 
 // HarnessNames for notes the model reads.
-var HarnessNames = map[string]string{"claude-code": "Claude Code", "pi": "pi", "codex": "Codex", "dsh": "DeepSeek Harness", "antigravity": "Antigravity CLI"}
+var HarnessNames = map[string]string{"claude-code": "Claude Code", "pi": "pi", "codex": "Codex", "dsh": "DeepSeek Harness", "antigravity": "Antigravity CLI", "opencode": "OpenCode"}
 
 func (e *Engine) planLocked(ctx context.Context, o CarryOptions) (*Planned, error) {
 	sink, err := e.Registry.Require(o.To)
@@ -567,7 +567,7 @@ func (e *Engine) ApplyPlan(ctx context.Context, sink *Connector, plan *DeliveryP
 	}
 	result := &CarryResult{Plan: plan, Applied: true, Receipt: receipt}
 	if argv := ResumeArgv(sink, plan.Harness, session); argv != nil {
-		result.Resume = ShellLine(argv)
+		result.Resume = NativeShellLine(argv)
 	}
 	return result, nil
 }

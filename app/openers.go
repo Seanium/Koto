@@ -14,12 +14,17 @@ package main
 // A "custom" preset takes the user's own template from the preferences, split on whitespace.
 
 import (
+	"encoding/base64"
+	"encoding/binary"
 	"net/url"
 	"os"
 	"os/exec"
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf16"
+
+	"koto/internal/engine"
 )
 
 type Opener struct {
@@ -94,16 +99,6 @@ func openersInfo(p Prefs) OpenersInfo {
 	return OpenersInfo{Terminals: t, Editors: e, Terminal: pick(t, p.Terminal, p.TerminalCustom), Editor: pick(e, p.Editor, p.EditorCustom), FileManager: fileManagerName}
 }
 
-// shellQuote quotes s for a POSIX shell when it needs it.
-func shellQuote(s string) string {
-	if s != "" && strings.IndexFunc(s, func(r rune) bool {
-		return !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || strings.ContainsRune("@%+=:,./-_", r))
-	}) < 0 {
-		return s
-	}
-	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
-}
-
 // expand substitutes the placeholders into each word of a template.
 func expand(argv []string, vars map[string]string) []string {
 	out := make([]string, len(argv))
@@ -118,19 +113,19 @@ func expand(argv []string, vars map[string]string) []string {
 
 // terminalArgv: what to run to open the command in the chosen terminal (nil = nothing to run).
 func terminalArgv(list []Opener, id, custom, command, cwd string) (argv []string, clip bool) {
-	line := command
-	if cwd != "" {
-		line = "cd " + shellQuote(cwd) + " && " + command
-		if command == "" {
-			line = "cd " + shellQuote(cwd)
-		}
-	}
+	line := engine.CommandInDirectory(command, cwd)
 	dir := cwd
 	if dir == "" {
 		dir = homeDir()
 	}
 	as := strings.NewReplacer(`\`, `\\`, `"`, `\"`)
 	vars := map[string]string{"cwd": dir, "cwd_as": as.Replace(dir), "cwd_url": url.QueryEscape(dir), "cmd": line, "cmd_as": as.Replace(line)}
+	encoded := utf16.Encode([]rune(line))
+	bytes := make([]byte, len(encoded)*2)
+	for i, code := range encoded {
+		binary.LittleEndian.PutUint16(bytes[i*2:], code)
+	}
+	vars["cmd_ps"] = base64.StdEncoding.EncodeToString(bytes)
 	for _, o := range list {
 		if o.ID != id {
 			continue

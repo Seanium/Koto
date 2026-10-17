@@ -19,7 +19,7 @@ mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_CACHE_HOME"
 CGO_ENABLED=0 GOARCH="$ARCH" "$GO" run ./cmd/seed "$KOTO_APP_SANDBOX"
 printf '%s\n' '{"liveMinutes":0,"language":"zh","appearance":"light"}' > "$KOTO_APP_SANDBOX/app-prefs.json"
 export GDK_BACKEND=x11 LIBGL_ALWAYS_SOFTWARE=1 WEBKIT_DISABLE_DMABUF_RENDERER=1
-BIN=${KOTO_LINUX_BINARY:-"$APP_DIR/bin/release/koto-$VERSION-linux-$ARCH"}
+BIN=${KOTO_LINUX_BINARY:-"$APP_DIR/bin/release/koto-linux-$ARCH"}
 printf 'Linux smoke binary: %s\nEvidence: %s\n' "$BIN" "$EVIDENCE"
 timeout 120s dbus-run-session -- xvfb-run -a -s '-screen 0 1440x1000x24' sh -c '
   openbox >"$KOTO_APP_SANDBOX/../openbox.log" 2>&1 &

@@ -229,8 +229,10 @@ func (c *agy) Tail(ctx context.Context, ref core.NativeRef, from *core.SourceOff
 	var m []byte
 	if db.QueryRow("SELECT data FROM trajectory_metadata_blob WHERE id = 'main'").Scan(&m) == nil {
 		if uri, ok := core.NewPb(m).Str(7); ok && strings.HasPrefix(uri, "file://") {
-			if d, err := url.PathUnescape(uri[7:]); err == nil {
-				cwd = d
+			if u, err := url.Parse(uri); err == nil {
+				if d, ok := shared.FileURLPath(u); ok {
+					cwd = d
+				}
 			}
 		}
 	}

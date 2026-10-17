@@ -345,5 +345,8 @@
   "版本": "Version",
   "项目地址": "Project",
   "无法打开链接": "Could not open the link",
-  "无法读取应用信息": "Could not read app information"
+  "无法读取应用信息": "Could not read app information",
+  "开源许可": "Open-source licenses",
+  "查看许可": "View licenses",
+  "无法读取许可信息": "Unable to read license notices"
 }

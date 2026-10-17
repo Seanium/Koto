@@ -29,6 +29,16 @@ def notice_files(directory: Path):
 def collect(target: Path):
     target.mkdir(parents=True, exist_ok=True)
     packages = []
+    # The linked Go runtime is redistributed with every executable.
+    go_root = ROOT / "app/.tools/go"
+    runtime_license = go_root / "LICENSE"
+    if not runtime_license.is_file():
+        raise SystemExit("Missing project-local Go runtime license")
+    runtime_output = target / "go/go"
+    runtime_output.mkdir(parents=True)
+    shutil.copyfile(runtime_license, runtime_output / "LICENSE")
+    go_version = (go_root / "VERSION").read_text().splitlines()[0]
+    packages.append({"ecosystem": "go", "name": "Go runtime", "version": go_version, "directory": "go/go"})
     go_mod = (ROOT / "app/go.mod").read_text()
     for module, version in re.findall(r"^\s*([^\s()]+) (v[^\s]+)", go_mod, re.M):
         escaped = re.sub(r"[A-Z]", lambda match: "!" + match[0].lower(), module)

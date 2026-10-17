@@ -9,9 +9,9 @@ import (
 )
 
 // Defaults are the per-platform locations; each can be overridden by the harness's own env var
-// and by explicit config. Only macOS is tested; the others follow each harness's documented defaults.
+// and by explicit config.
 type Defaults struct {
-	DataDir, ClaudeRoot, PiRoot, CodexHome, DshHome, AntigravityRoot string
+	DataDir, ClaudeRoot, PiRoot, CodexHome, DshHome, AntigravityRoot, OpenCodeRoot string
 	// ClaudeDesktopDirs: every Claude Desktop profile (signed in, and third-party gateway "-3p").
 	ClaudeDesktopDirs []string
 }
@@ -45,6 +45,7 @@ func PlatformDefaults() Defaults {
 		CodexHome:         env("CODEX_HOME", filepath.Join(home, ".codex")),
 		DshHome:           env("DSH_HOME", filepath.Join(home, ".dsh")),
 		AntigravityRoot:   filepath.Join(home, ".gemini", "antigravity-cli"),
+		OpenCodeRoot:      filepath.Join(env("XDG_DATA_HOME", filepath.Join(home, ".local", "share")), "opencode"),
 		ClaudeDesktopDirs: []string{desktop, desktop + "-3p"},
 	}
 }

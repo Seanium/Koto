@@ -2,7 +2,10 @@ package engine
 
 import (
 	"os"
+	"os/exec"
 	"regexp"
+	"runtime"
+	"sort"
 	"strings"
 )
 
@@ -52,4 +55,77 @@ func ShellLine(argv []string) string {
 		q[i] = ShQ(a)
 	}
 	return strings.Join(q, " ")
+}
+
+// PowerShellQ quotes a literal without allowing interpolation or expressions.
+func PowerShellQ(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "''") + "'"
+}
+
+// NativeShellLine matches the shell opened by the desktop on this platform.
+func NativeShellLine(argv []string) string {
+	return shellCommand(argv, "", nil, runtime.GOOS)
+}
+
+// ShellCommand includes a session's working directory and storage overrides.
+// Windows uses PowerShell 5.1 syntax, which is also accepted by PowerShell 7.
+func ShellCommand(argv []string, cwd string, envs map[string]string) string {
+	return shellCommand(argv, cwd, envs, runtime.GOOS)
+}
+
+func shellCommand(argv []string, cwd string, envs map[string]string, goos string) string {
+	keys := make([]string, 0, len(envs))
+	for key := range envs {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	var parts []string
+	if goos == "windows" {
+		for _, key := range keys {
+			// Names are connector-owned constants; quoting values keeps paths literal.
+			parts = append(parts, "$env:"+key+"="+PowerShellQ(envs[key])+";")
+		}
+		if len(argv) > 0 {
+			parts = append(parts, "&")
+			for i, arg := range argv {
+				// npm installs both .ps1 and .cmd launchers. Resolve a native
+				// executable/command file so a default PowerShell execution
+				// policy cannot silently choose the blocked .ps1 launcher.
+				if i == 0 && runtime.GOOS == "windows" {
+					if resolved, err := exec.LookPath(arg); err == nil {
+						arg = resolved
+					}
+				}
+				parts = append(parts, PowerShellQ(arg))
+			}
+		}
+	} else {
+		for _, key := range keys {
+			parts = append(parts, key+"="+ShQ(envs[key]))
+		}
+		parts = append(parts, ShellLine(argv))
+	}
+	return commandInDirectory(strings.Join(parts, " "), cwd, goos)
+}
+
+func CommandInDirectory(command, cwd string) string {
+	return commandInDirectory(command, cwd, runtime.GOOS)
+}
+
+func commandInDirectory(command, cwd, goos string) string {
+	if cwd == "" {
+		return command
+	}
+	if goos == "windows" {
+		line := "Set-Location -LiteralPath " + PowerShellQ(cwd) + " -ErrorAction Stop"
+		if command != "" {
+			line += "; " + command
+		}
+		return line
+	}
+	line := "cd " + ShQ(cwd)
+	if command != "" {
+		line += " && " + command
+	}
+	return line
 }

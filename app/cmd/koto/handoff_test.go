@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -172,7 +173,11 @@ func TestCopyCurrentPreviewNativeReadbackAndSourceUnchanged(t *testing.T) {
 		t.Fatal("preview created native target")
 	}
 	r, code, raw = s.run(t, []string{"copy"}, []string{"--current", "--to", "pi"}, env)
-	if code != 0 || r.State != "copied" || !r.OK || r.Resume == nil || r.Resume.Cwd == nil || *r.Resume.Cwd != s.cwd || !strings.HasPrefix(r.Resume.Shell, "cd "+engine.ShQ(s.cwd)+" && ") {
+	prefix := "cd " + engine.ShQ(s.cwd) + " && "
+	if runtime.GOOS == "windows" {
+		prefix = "Set-Location -LiteralPath " + engine.PowerShellQ(s.cwd) + " -ErrorAction Stop; "
+	}
+	if code != 0 || r.State != "copied" || !r.OK || r.Resume == nil || r.Resume.Cwd == nil || *r.Resume.Cwd != s.cwd || !strings.HasPrefix(r.Resume.Shell, prefix) {
 		t.Fatalf("copy: %d %s", code, raw)
 	}
 	if !strings.Contains(r.Instructions, "resume.shell exactly as returned") || !strings.Contains(r.Instructions, "Do not launch") {

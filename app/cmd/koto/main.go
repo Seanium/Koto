@@ -17,6 +17,7 @@ import (
 	"koto/internal/engine"
 	"koto/internal/hub"
 	"koto/internal/koto"
+	"koto/internal/legal"
 	"koto/internal/store"
 )
 
@@ -41,6 +42,7 @@ commands
   mcp                        stdio MCP server: list_sessions / get_session, so any MCP-capable harness can pull a session
   connectors                 list connectors and capabilities
   version                    print the version
+  licenses                   show complete license and third-party notices
 
 options
   --data <dir>          data dir (default $KOTO_HOME or ~/.local/share/koto)
@@ -50,6 +52,7 @@ options
   --codex-shadow <dir>  isolated working directory for Codex imports
   --dsh-home <dir>      dsh home (default $DSH_HOME or ~/.dsh)
   --agy-root <dir>      Antigravity CLI dir (default ~/.gemini/antigravity-cli)
+  --opencode-root <dir> OpenCode data directory (default $XDG_DATA_HOME/opencode)
   --only <ids>          comma-separated connector ids to enable
   --level L0|L1|L2|L3   projection level for carry
   --max-tokens <n>      token budget for carry (older turns summarized)
@@ -82,6 +85,7 @@ func main() {
 	s := func(n string) *string { return fs.String(n, "", "") }
 	b := func(n string) *bool { return fs.Bool(n, false, "") }
 	data, claude, piRoot, codexHome, codexShadow, codexBin, dshHome, agy := s("data"), s("claude-root"), s("pi-root"), s("codex-home"), s("codex-shadow"), s("codex-bin"), s("dsh-home"), s("agy-root")
+	opencodeRoot := s("opencode-root")
 	only, to, level, maxTokens, harness, liveMs, limit, cwd, title := s("only"), s("to"), s("level"), s("max-tokens"), s("harness"), s("live-ms"), s("limit"), s("cwd"), s("title")
 	dry, asJSON, h := b("dry-run"), b("json"), b("help")
 	if err := fs.Parse(flags); err != nil {
@@ -95,11 +99,24 @@ func main() {
 		fmt.Println("koto", version)
 		return
 	}
+	if pos[0] == "licenses" {
+		text, err := legal.Notices()
+		if err != nil {
+			fatal(err)
+		}
+		if *asJSON {
+			b, _ := json.Marshal(map[string]string{"notices": text})
+			fmt.Println(string(b))
+		} else {
+			fmt.Print(text)
+		}
+		return
+	}
 	cmd, sel := pos[0], ""
 	if len(pos) > 1 {
 		sel = pos[1]
 	}
-	cfg := koto.Config{DataDir: *data, ClaudeRoot: *claude, PiRoot: *piRoot, CodexHome: *codexHome, CodexShadow: *codexShadow, CodexBin: *codexBin, DshHome: *dshHome, AntigravityRoot: *agy, Log: stderrLog{}}
+	cfg := koto.Config{DataDir: *data, ClaudeRoot: *claude, PiRoot: *piRoot, CodexHome: *codexHome, CodexShadow: *codexShadow, CodexBin: *codexBin, DshHome: *dshHome, AntigravityRoot: *agy, OpenCodeRoot: *opencodeRoot, Log: stderrLog{}}
 	if *liveMs != "" {
 		n, _ := strconv.ParseInt(*liveMs, 10, 64)
 		cfg.LiveMs = &n

@@ -19,7 +19,7 @@ import (
 	"koto/internal/koto"
 )
 
-var matrixAgents = []string{"claude-code", "pi", "codex", "dsh", "antigravity"}
+var matrixAgents = []string{"claude-code", "pi", "codex", "dsh", "antigravity", "opencode"}
 
 // This is a CLI native-write/readback matrix. Codex destinations use the real app-server in
 // an isolated HOME; no test runs a model or claims that a generated resume command was run.
@@ -28,8 +28,8 @@ func TestHandoffCLINativeMatrix(t *testing.T) {
 	for _, from := range matrixAgents {
 		t.Run(from, func(t *testing.T) {
 			s := newHandoffSandbox(t)
-			cfg := koto.Config{DataDir: filepath.Join(s.root, "bootstrap"), ClaudeRoot: filepath.Join(s.root, "cc"), PiRoot: s.pi, CodexHome: s.codex, CodexShadow: filepath.Join(s.root, "shadow"), CodexBin: codexBin, DshHome: filepath.Join(s.root, "dsh"), AntigravityRoot: filepath.Join(s.root, "agy"), NoDesktop: true, Enable: matrixAgents}
-			s.flags = append(s.flags, "--only", strings.Join(matrixAgents, ","), "--claude-root", cfg.ClaudeRoot, "--dsh-home", cfg.DshHome, "--agy-root", cfg.AntigravityRoot, "--codex-shadow", cfg.CodexShadow)
+			cfg := koto.Config{DataDir: filepath.Join(s.root, "bootstrap"), ClaudeRoot: filepath.Join(s.root, "cc"), PiRoot: s.pi, CodexHome: s.codex, CodexShadow: filepath.Join(s.root, "shadow"), CodexBin: codexBin, DshHome: filepath.Join(s.root, "dsh"), AntigravityRoot: filepath.Join(s.root, "agy"), OpenCodeRoot: filepath.Join(s.root, "opencode"), NoDesktop: true, Enable: matrixAgents}
+			s.flags = append(s.flags, "--only", strings.Join(matrixAgents, ","), "--claude-root", cfg.ClaudeRoot, "--dsh-home", cfg.DshHome, "--agy-root", cfg.AntigravityRoot, "--opencode-root", cfg.OpenCodeRoot, "--codex-shadow", cfg.CodexShadow)
 			if codexBin != "" {
 				s.flags = append(s.flags, "--codex-bin", codexBin)
 			}
@@ -56,10 +56,7 @@ func TestHandoffCLINativeMatrix(t *testing.T) {
 			}
 			app.Close()
 			appendMatrixHandoff(t, native.ref)
-			before, err := os.ReadFile(native.ref.Path)
-			if err != nil {
-				t.Fatal(err)
-			}
+			before := matrixSourceBytes(t, native.ref)
 			env := map[string]string{"KOTO_SESSION": sel}
 			if key := map[string]string{"claude-code": "CLAUDE_CODE_SESSION_ID", "codex": "CODEX_THREAD_ID", "pi": "PI_SESSION_ID", "dsh": "DSH_SESSION_ID", "antigravity": "ANTIGRAVITY_CONVERSATION_ID"}[from]; key != "" {
 				env = map[string]string{key: strings.TrimPrefix(sel, from+":")}
@@ -81,7 +78,7 @@ func TestHandoffCLINativeMatrix(t *testing.T) {
 					if code != 0 || !result.OK || result.State != "copied" || result.Counts.Turns != 2 || result.Resume == nil || result.Resume.Shell == "" || result.Resume.Cwd == nil || *result.Resume.Cwd != s.cwd || result.Destination.Selector == sel {
 						t.Fatalf("copy: %d %s", code, raw)
 					}
-					if raw, _ := os.ReadFile(native.ref.Path); !bytes.Equal(raw, before) {
+					if raw := matrixSourceBytes(t, native.ref); !bytes.Equal(raw, before) {
 						t.Fatal("source native session changed")
 					}
 					readCfg := cfg
@@ -172,6 +169,9 @@ func appendMatrixHandoff(t *testing.T, ref core.NativeRef) {
 		for i, row := range rows {
 			row["seq"], row["time"], row["surfaceOp"] = state.Seq+i, time.Now().UnixMilli(), "append"
 		}
+	case "opencode":
+		appendOpenCodeHandoff(t, ref, texts, ids)
+		return
 	case "antigravity":
 		db, err := sql.Open("sqlite", "file:"+ref.Path+"?mode=rw")
 		if err != nil {

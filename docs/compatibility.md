@@ -11,17 +11,20 @@ The tables describe supported storage formats. Agent updates can change those fo
 | Codex | rollout JSONL / zstd | New native rollout, then app-server read validation |
 | DeepSeek Harness | v4 JSONL / zstd | New directory and native compressed log |
 | Antigravity CLI | SQLite and protobuf trajectories | New conversation database and summary entry |
+| OpenCode | SQLite v1 (`session`, `message`, `part`) | New session rows in the native database |
 
-All copies create a new native session. Target publication refuses an existing path. The target agent loads its own settings; source system/developer/environment/configuration and permission context are not copied. Tools and reasoning may be converted to readable text where the target has no compatible native representation.
+OpenCode 1.19.3 uses the supported v1 schema. v2 session storage is rejected explicitly. OpenCode copies require its CLI and a configured default model; continuation uses the destination model.
+
+All copies create a new native session; existing session IDs and standalone files are not overwritten. The target agent loads its own settings; source system/developer/environment/configuration and permission context are not copied. Tools and reasoning may be converted to readable text where the target has no compatible native representation.
 
 ## Attachments
 
-| Material | Claude Code | pi | Codex | DeepSeek Harness | Antigravity CLI |
-| --- | --- | --- | --- | --- | --- |
-| PNG, JPEG, GIF, WebP | Native image | Native image | Native image | Native image attachment | Native Media |
-| PDF, UTF-8 text | Native document | Complete file | Complete file | Native file attachment | Native Media |
-| Audio | Complete file | Complete file | Native audio | Native file attachment | Native Media |
-| DOCX, ZIP, JSON, other binary | Complete file | Complete file | Complete file | Native file attachment | Native Media |
+| Material | Claude Code | pi | Codex | DeepSeek Harness | Antigravity CLI | OpenCode |
+| --- | --- | --- | --- | --- | --- | --- |
+| PNG, JPEG, GIF, WebP | Native image | Native image | Native image | Native image attachment | Native Media | Native file |
+| PDF, UTF-8 text | Native document | Complete file | Complete file | Native file attachment | Native Media | Native file |
+| Audio | Complete file | Complete file | Native audio | Native file attachment | Native Media | Native file |
+| DOCX, ZIP, JSON, other binary | Complete file | Complete file | Complete file | Native file attachment | Native Media | Native file |
 
 When a role or destination cannot embed a file, koto keeps the complete bytes in the new session's attachment directory and adds a file reference. Tool-result attachments are preserved even when the tool transcript is converted to text.
 

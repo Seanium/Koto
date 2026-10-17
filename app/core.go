@@ -45,6 +45,7 @@ func configFromEnv(live *int64) koto.Config {
 	if s := os.Getenv("KOTO_APP_SANDBOX"); s != "" {
 		j := func(d string) string { return filepath.Join(s, d) }
 		cfg.DataDir, cfg.ClaudeRoot, cfg.PiRoot, cfg.CodexHome = j("hub"), j("claude"), j("pi"), j("codex")
+		cfg.OpenCodeRoot = j("opencode")
 		cfg.CodexShadow, cfg.DshHome, cfg.AntigravityRoot, cfg.NoDesktop = j("codex-shadow"), j("dsh"), j("antigravity"), true
 	}
 	return cfg

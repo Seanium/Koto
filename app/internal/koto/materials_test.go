@@ -61,12 +61,42 @@ func materialSource(t *testing.T, s *sandbox, items []material) string {
 	}
 	return writeAgy(t, s.Agy, "materials", []agyStep{{14, 3, []pbf{agyTS(1), {19, parts}}}, modelStep(2, "所有素材均应保留原始字节。")})
 }
-func TestMaterialCopyMatrix(t *testing.T) {
-	for _, to := range []string{"claude-code", "pi", "codex", "dsh", "antigravity"} {
-		t.Run(to, func(t *testing.T) {
-			if to == "codex" && !hasCodex() {
-				t.Skip("codex not installed")
+
+func assertMaterialBytes(t *testing.T, a *App, harness, session string, items []material) {
+	t.Helper()
+	report := a.Sessions.Scan(ctx, nil, nil)
+	eq(t, len(report.Errors), 0, "material readback discovery: ", report.Errors)
+	v, err := a.OpenThread(ctx, harness+":"+session)
+	must(t, err)
+	b := binding(t, v.Hub, harness, session)
+	found := map[string]bool{}
+	var walk func([]core.Part)
+	walk = func(ps []core.Part) {
+		for _, p := range ps {
+			if p["type"] == "tool_result" {
+				walk(core.Parts(p["parts"]))
 			}
+			sha := core.S(core.Obj(p["blob"])["sha256"])
+			if sha != "" {
+				data, yes := v.Hub.Blob(sha)
+				ok(t, yes)
+				eq(t, core.SHA256Hex(data), sha)
+				found[sha] = true
+			}
+		}
+	}
+	for _, ev := range v.Hub.Path(b.Leaf) {
+		walk(ev.Parts)
+	}
+	for _, m := range items {
+		ok(t, found[core.SHA256Hex(m.data)], "missing bytes for ", m.name)
+	}
+}
+
+func TestMaterialCopyMatrix(t *testing.T) {
+	for _, to := range copyAgents {
+		t.Run(to, func(t *testing.T) {
+			requireCopyAgent(t, "antigravity", to)
 			s := newSandbox(t)
 			items := materials(t)
 			source := materialSource(t, s, items)
@@ -78,7 +108,6 @@ func TestMaterialCopyMatrix(t *testing.T) {
 			for _, l := range r.Plan.Losses {
 				ok(t, l.Kind != "dropped" && l.Kind != "truncated", "material must not be discarded: ", l)
 			}
-			a.Sessions.Scan(ctx, nil, nil)
 			if to == "dsh" {
 				dshVerify(t, r.Plan.Target.Path)
 			}
@@ -86,32 +115,7 @@ func TestMaterialCopyMatrix(t *testing.T) {
 			if sid == "" {
 				sid = r.Plan.Target.Session
 			}
-			v, e := a.OpenThread(ctx, to+":"+sid)
-			must(t, e)
-			b := binding(t, v.Hub, to, sid)
-			found := map[string]bool{}
-			var walk func([]core.Part)
-			walk = func(ps []core.Part) {
-				for _, p := range ps {
-					if p["type"] == "tool_result" {
-						walk(core.Parts(p["parts"]))
-						continue
-					}
-					sha := core.S(core.Obj(p["blob"])["sha256"])
-					if sha != "" {
-						data, yes := v.Hub.Blob(sha)
-						ok(t, yes)
-						eq(t, core.SHA256Hex(data), sha)
-						found[sha] = true
-					}
-				}
-			}
-			for _, ev := range v.Hub.Path(b.Leaf) {
-				walk(ev.Parts)
-			}
-			for _, m := range items {
-				ok(t, found[core.SHA256Hex(m.data)], "missing bytes for ", m.name)
-			}
+			assertMaterialBytes(t, a, to, sid, items)
 			eq(t, text(t, source), before, "source unchanged")
 			// An independent subsequent copy must also retain assets after re-reading the target format.
 			again := carry(t, a, engine.CarryOptions{Selector: to + ":" + sid, To: to, Cwd: s.Root})
@@ -119,18 +123,18 @@ func TestMaterialCopyMatrix(t *testing.T) {
 			for _, l := range again.Plan.Losses {
 				ok(t, l.Kind != "dropped" && l.Kind != "truncated", "second copy lost material: ", l)
 			}
-			_, e = os.Stat(filepath.Join(s.Root, "危险:文件.bin"))
+			ok(t, again.Plan.Target.Session != sid, "second copy must be a new session")
+			assertMaterialBytes(t, a, to, again.Plan.Target.Session, items)
+			_, e := os.Stat(filepath.Join(s.Root, "危险:文件.bin"))
 			ok(t, os.IsNotExist(e), "attachment filename must never escape its target directory")
 		})
 	}
 }
 
 func TestToolMaterialsAndMissingFile(t *testing.T) {
-	for _, to := range []string{"claude-code", "pi", "codex", "dsh", "antigravity"} {
+	for _, to := range copyAgents {
 		t.Run(to, func(t *testing.T) {
-			if to == "codex" && !hasCodex() {
-				t.Skip("codex not installed")
-			}
+			requireCopyAgent(t, "antigravity", to)
 			s := newSandbox(t)
 			im := materials(t)[0]
 			sid := CCSession

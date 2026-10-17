@@ -69,11 +69,13 @@ seed ツールは `.koto-sandbox` マーカーを持つ `.sandbox` を作成し�
 ```sh
 app/scripts/package-mac.sh arm64
 app/scripts/linux-package.sh arm64
+app/scripts/package-windows.sh arm64
+app/scripts/package-cli.sh linux arm64
 ```
 
 macOS の DMG 作成には Python 3 と `uv` も必要です（`KOTO_UV` でプロジェクト内の実行ファイルを指定できます）。スクリプトは固定バージョンのビルド依存を `app/.tools/dmgbuild` に、ダウンロードキャッシュを `app/.cache/uv` に置きます。システムのパッケージは変更しません。
 
-出力先は `app/bin/release/` です。macOS は ad-hoc 署名を使います。Linux には GTK3、WebKitGTK 4.1、GCC、pkg-config、dpkg-deb が必要です。Windows のビルドスクリプトは未検証です。
+出力先は `app/bin/release/` です。macOS は ad-hoc 署名を使います。Linux には GTK3、WebKitGTK 4.1、GCC、pkg-config、dpkg-deb が必要です。Windows では App と CLI を別々の実行ファイルとして作成します。
 
 プロジェクトページにビルドは不要です。以下でプレビューできます。
 
@@ -82,6 +84,6 @@ UV_CACHE_DIR="$PWD/app/.cache/uv" uv venv app/.cache/release-venv
 app/.cache/release-venv/bin/python -m http.server 4173 --bind 127.0.0.1 --directory site
 ```
 
-Pages の公開と[ネイティブ CI](ci.md)は手動実行です。CI はテスト、パッケージ作成、WebView の結果を分けて記録し、Windows ジョブは標準では無効です。
+Pages の公開と[ネイティブ CI](ci.md)は手動実行です。CI はテスト、パッケージ作成、WebView の結果を分けて記録し、標準で 3 つのプラットフォームを有効にしています。
 
 Windows でサイトをプレビューする場合は `app\.cache\release-venv\Scripts\python.exe` を使います。

@@ -22,7 +22,7 @@ import (
 	"koto/internal/planner"
 )
 
-const handoffHelp = `koto current [--json]
+const handoffHelp = `koto current [--json] [--proof <token>]
 koto copy --current --to <agent> [--dry-run] [--json]
 koto copy <agent:exact-session-id> --to <agent> [--dry-run] [--json]
 
@@ -30,16 +30,19 @@ Current session: KOTO_SESSION (an explicit agent:session selector), otherwise
 the host's CLAUDE_CODE_SESSION_ID, CODEX_THREAD_ID, PI_SESSION_ID, DSH_SESSION_ID or
 ANTIGRAVITY_CONVERSATION_ID.
 No newest-session or working-directory guess.
-Targets: claude-code, pi, codex, dsh, antigravity.
+Targets: claude-code, pi, codex, dsh, antigravity, opencode.
 Options: --cwd <folder>, --title <text>, --data <folder>, --only <agents>,
 --claude-root, --pi-root, --codex-home, --codex-shadow, --codex-bin,
---dsh-home, --agy-root. All copies create a new native session.
+--dsh-home, --agy-root, --opencode-root. All copies create a new native session.
 ` + "\n" + agentGuide
 
 const agentGuide = `For an AI Agent asked "用 koto 复制当前会话到 pi" (no Skill required):
   1. Run koto current --json to resolve the exact source.
+     If OpenCode has no host session ID, follow the proof command in error.hint.
+     Use the exact source.selector returned by that command; no manual Skill is needed.
   2. Run koto copy --current --to <agent> --json for the requested destination.
-     Targets: claude-code, pi, codex, dsh, antigravity. Same-Agent copies work.
+     After proof resolution, use koto copy <source.selector> --to <agent> --json.
+     Targets: claude-code, pi, codex, dsh, antigravity, opencode. Same-Agent copies work.
      Use --dry-run only for a preview; it does not create a session.
   3. Report success only when ok is true and state is "copied". Report counts,
      warnings and any deferred.events. Return resume.shell exactly as provided;
@@ -158,12 +161,14 @@ func runHandoff(pos, flags []string, stdout, stderr io.Writer, getenv func(strin
 	fs.StringVar(&o.config.CodexBin, "codex-bin", "", "")
 	fs.StringVar(&o.config.DshHome, "dsh-home", "", "")
 	fs.StringVar(&o.config.AntigravityRoot, "agy-root", "", "")
+	fs.StringVar(&o.config.OpenCodeRoot, "opencode-root", "", "")
 	fs.BoolVar(&o.current, "current", false, "")
 	fs.BoolVar(&o.dryRun, "dry-run", false, "")
 	fs.BoolVar(&asJSON, "json", asJSON, "")
 	fs.StringVar(&o.to, "to", "", "")
 	fs.StringVar(&o.cwd, "cwd", "", "")
 	fs.StringVar(&o.title, "title", "", "")
+	proof := fs.String("proof", "", "")
 	only := fs.String("only", "", "")
 	helpFlag := fs.Bool("help", false, "")
 	if err := fs.Parse(flags); err != nil {
@@ -182,8 +187,15 @@ func runHandoff(pos, flags []string, stdout, stderr io.Writer, getenv func(strin
 	if pos[0] == "current" && (o.to != "" || o.dryRun || o.cwd != "" || o.title != "") {
 		return fail(handoffErr("USAGE", "Copy options cannot be used with current.", handoffHelp), 2)
 	}
+	if *proof != "" && pos[0] != "current" {
+		return fail(handoffErr("USAGE", "Use --proof with current, then copy its exact source.selector.", handoffHelp), 2)
+	}
 	selector, resolvedBy, err := sourceSelector(pos, o.current, getenv)
-	if err != nil {
+	if err != nil && *proof == "" {
+		var known *handoffError
+		if errors.As(err, &known) && known.Code == "CURRENT_SESSION_UNKNOWN" {
+			known.Hint = currentProofHint()
+		}
 		return fail(err, 1)
 	}
 	app, err := koto.New(o.config)
@@ -193,6 +205,13 @@ func runHandoff(pos, flags []string, stdout, stderr io.Writer, getenv func(strin
 	defer app.Close()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
+	if *proof != "" {
+		selector, err = resolveCurrentProof(ctx, app, *proof)
+		if err != nil {
+			return fail(err, 1)
+		}
+		resolvedBy = "opencode-running-tool"
+	}
 	result, err := performHandoff(ctx, app, pos[0], selector, resolvedBy, o)
 	if err != nil {
 		return fail(err, 1)

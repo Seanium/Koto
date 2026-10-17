@@ -1,15 +1,14 @@
 name: Native builds and checks
 
-# Prepared for review. This workflow is manual until the repository is published
-# and its maintainers choose to enable push / pull_request triggers.
+# Native packaging is manual; publishing is a separate operation.
 on:
   workflow_dispatch:
     inputs:
       include_windows:
-        description: 'Also test Windows (outside the initial beta scope)'
+        description: 'Include native Windows checks'
         type: boolean
         required: false
-        default: false
+        default: true
 
 permissions:
   contents: read
@@ -22,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Explicit opt-in keeps unverified Windows builds out of the initial beta.
+        # Every supported architecture uses its native runner.
         include: ${{ fromJSON(inputs.include_windows && '[{"os":"darwin","arch":"arm64","runner":"macos-15","runner_arch":"ARM64","python":"python3"},{"os":"darwin","arch":"amd64","runner":"macos-15-intel","runner_arch":"X64","python":"python3"},{"os":"linux","arch":"arm64","runner":"ubuntu-24.04-arm","runner_arch":"ARM64","python":"python3"},{"os":"linux","arch":"amd64","runner":"ubuntu-24.04","runner_arch":"X64","python":"python3"},{"os":"windows","arch":"arm64","runner":"windows-11-arm","runner_arch":"ARM64","python":"python"},{"os":"windows","arch":"amd64","runner":"windows-2025","runner_arch":"X64","python":"python"}]' || '[{"os":"darwin","arch":"arm64","runner":"macos-15","runner_arch":"ARM64","python":"python3"},{"os":"darwin","arch":"amd64","runner":"macos-15-intel","runner_arch":"X64","python":"python3"},{"os":"linux","arch":"arm64","runner":"ubuntu-24.04-arm","runner_arch":"ARM64","python":"python3"},{"os":"linux","arch":"amd64","runner":"ubuntu-24.04","runner_arch":"X64","python":"python3"}]') }}
     defaults:
       run:
@@ -128,31 +127,52 @@ jobs:
           test "$(node -p process.arch)" = "$NODE_ARCH"
           go version
           node --version
+          node app/scripts/prepare-notices.mjs --check
+
+      - name: Install native Agent tools for copy and readback tests
+        run: |
+          node - <<'JS'
+          const fs = require('node:fs');
+          fs.mkdirSync('app/.tools/agents', { recursive: true });
+          fs.writeFileSync('app/.tools/agents/package.json', JSON.stringify({private:true,allowScripts:{'opencode-ai':true}})+'\n');
+          JS
+          npm --prefix app/.tools/agents install --no-save opencode-ai@1.19.3 @openai/codex@0.163.0
+          node - <<'JS'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const modules = path.resolve('app/.tools/agents/node_modules');
+          const directories = [path.join(modules, '.bin')];
+          if (process.platform === 'win32') {
+            // Go executes native binaries directly; npm's .cmd wrappers need a shell.
+            for (const [pkg, name] of [[`@openai/codex-win32-${process.arch}`, 'codex.exe'], [`opencode-windows-${process.arch}`, 'opencode.exe']]) {
+              const root = path.join(modules, pkg);
+              const found = [];
+              const visit = directory => {
+                for (const entry of fs.readdirSync(directory, {withFileTypes:true})) {
+                  const file = path.join(directory, entry.name);
+                  if (entry.isDirectory()) visit(file);
+                  else if (entry.isFile() && entry.name === name) found.push(file);
+                }
+              };
+              visit(root);
+              if (found.length !== 1) throw new Error(`Expected one native ${name}, found ${found.length}`);
+              directories.unshift(path.dirname(found[0]));
+            }
+          }
+          fs.appendFileSync(process.env.GITHUB_PATH, directories.join('\n')+'\n');
+          JS
+
+      - name: Require native Agent tools before the test matrix
+        run: |
+          codex --version
+          opencode --version
 
       - name: Prepare GTK3 and WebKitGTK 4.1 on the disposable Linux runner
         if: matrix.os == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev xvfb xauth dbus-x11 openbox imagemagick dpkg-dev
+          sudo apt-get install -y --no-install-recommends build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev xvfb xauth dbus-x11 openbox imagemagick dpkg-dev desktop-file-utils desktop-file-utils
           pkg-config --modversion gtk+-3.0 webkit2gtk-4.1
-
-      - name: Copy the runner's NSIS distribution into project tools
-        if: matrix.os == 'windows'
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $candidates = @()
-          $command = Get-Command makensis.exe -ErrorAction SilentlyContinue
-          if ($command) { $candidates += Split-Path $command.Source }
-          $candidates += "${env:ProgramFiles(x86)}\NSIS", "$env:ProgramFiles\NSIS"
-          $source = $candidates | Where-Object { Test-Path (Join-Path $_ 'makensis.exe') } | Select-Object -First 1
-          if (-not $source) { throw 'NSIS is absent from this runner image; no global installer will be run.' }
-          $target = Join-Path $env:GITHUB_WORKSPACE 'app/.tools/nsis'
-          New-Item -ItemType Directory -Path $target -Force | Out-Null
-          Copy-Item (Join-Path $source '*') $target -Recurse -Force
-          "NSISDIR=$target" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
-          & (Join-Path $target 'makensis.exe') /VERSION
-          if ($LASTEXITCODE -ne 0) { throw 'Project-local NSIS cannot run.' }
 
       - name: Install the pinned Wails CLI into project tools
         if: matrix.os == 'windows'
@@ -167,9 +187,12 @@ jobs:
           npm --prefix app/frontend ci
           npm --prefix app/frontend run build
           node --experimental-strip-types --test app/frontend/tests/*.test.ts 2>&1 | tee app/.cache/ci/frontend-tests.txt
+          node --test site/*.test.mjs
 
       - name: Run native Go tests
         id: core
+        env:
+          OPENCODE_CONFIG_CONTENT: '{"model":"fixture/model","provider":{"fixture":{"npm":"@ai-sdk/openai-compatible","models":{"model":{"name":"fixture"}},"options":{"baseURL":"http://127.0.0.1:9/v1","apiKey":"fixture"}}}}'
         run: |
           case "$KOTO_CI_OS" in
             linux)
@@ -192,21 +215,21 @@ jobs:
               ;;
             linux)
               KOTO_GO="$PWD/app/.tools/go/bin/go" app/scripts/linux-package.sh "$KOTO_CI_ARCH"
-              VERSION=$(cat app/VERSION)
-              DEB="app/bin/release/koto-$VERSION-linux-$KOTO_CI_ARCH.deb"
-              test "$(dpkg-deb -f "$DEB" Architecture)" = "$KOTO_CI_ARCH"
+              app/scripts/test-linux-package.sh "$KOTO_CI_ARCH"
+              DEB="app/bin/release/koto-linux-$KOTO_CI_ARCH.deb"
               dpkg-deb -x "$DEB" app/.cache/ci/deb-root
               test -x app/.cache/ci/deb-root/usr/lib/koto/koto-desktop
-              app/.cache/ci/deb-root/usr/bin/koto --help
+              test ! -e app/.cache/ci/deb-root/usr/bin/koto
               ;;
             windows)
               KOTO_GO="$PWD/app/.tools/go/bin/go.exe" \
               KOTO_WAILS="$PWD/app/.tools/bin/wails3.exe" \
-              KOTO_MAKENSIS="$PWD/app/.tools/nsis/makensis.exe" \
                 app/scripts/package-windows.sh "$KOTO_CI_ARCH"
-              "app/bin/release/windows-$KOTO_CI_ARCH/koto-cli.exe" --help
               ;;
           esac
+          CLI_SUFFIX=
+          if [ "$KOTO_CI_OS" = windows ]; then CLI_SUFFIX=.exe; fi
+          "app/bin/release/koto-cli-$KOTO_CI_OS-$KOTO_CI_ARCH$CLI_SUFFIX" --help
 
       - name: Exercise the native macOS WebView with synthetic sessions
         if: matrix.os == 'darwin'
@@ -255,15 +278,15 @@ jobs:
           if ($versions.Count -eq 0) { throw 'WebView2 Runtime is missing. Edge Stable is not a substitute; GUI verification has not run.' }
           if (-not [Environment]::UserInteractive) { throw 'This hosted runner has no interactive Windows desktop. GUI verification has not run; use an interactive native runner.' }
 
-      - name: Exercise the native Windows WebView2 with synthetic sessions
+      - name: Exercise separate portable Windows App and CLI executables
         if: matrix.os == 'windows'
         id: windows_smoke
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $binary = Join-Path $env:GITHUB_WORKSPACE "app/bin/release/windows-$env:KOTO_CI_ARCH/koto.exe"
-          & ./app/scripts/test-windows.ps1 -Executable $binary -Go $env:KOTO_CI_GO
-          if ($LASTEXITCODE -ne 0) { throw 'Windows native WebView2 smoke failed.' }
+          $app = Join-Path $env:GITHUB_WORKSPACE "app/bin/release/koto-windows-$env:KOTO_CI_ARCH.exe"
+          $cli = Join-Path $env:GITHUB_WORKSPACE "app/bin/release/koto-cli-windows-$env:KOTO_CI_ARCH.exe"
+          & ./app/scripts/test-windows-packages.ps1 -AppExecutable $app -CLIExecutable $cli -Go $env:KOTO_CI_GO
           $result = Get-Content "app/.cache/platform-smoke-windows-$env:KOTO_CI_ARCH.json" -Raw | ConvertFrom-Json
           if ($result.passed -ne $true -or $result.os -ne 'windows' -or $result.arch -ne $env:KOTO_CI_ARCH) { throw 'Windows smoke JSON contract did not pass on this native architecture.' }
 
@@ -301,12 +324,19 @@ jobs:
           if-no-files-found: warn
           include-hidden-files: true
           path: |
-            app/bin/release/*.dmg
-            app/bin/release/*.deb
-            app/bin/release/*.tar.gz
-            app/bin/release/*.exe
-            app/bin/release/*.sha256
-            app/bin/release/windows-*/*.exe
+            app/bin/release/koto-darwin-${{ matrix.arch }}.dmg
+            app/bin/release/koto-darwin-${{ matrix.arch }}.dmg.sha256
+            app/bin/release/koto-cli-darwin-${{ matrix.arch }}
+            app/bin/release/koto-cli-darwin-${{ matrix.arch }}.sha256
+            app/bin/release/koto-linux-${{ matrix.arch }}
+            app/bin/release/koto-linux-${{ matrix.arch }}.deb
+            app/bin/release/koto-linux-${{ matrix.arch }}.sha256
+            app/bin/release/koto-cli-linux-${{ matrix.arch }}
+            app/bin/release/koto-cli-linux-${{ matrix.arch }}.sha256
+            app/bin/release/koto-windows-${{ matrix.arch }}.exe
+            app/bin/release/koto-windows-${{ matrix.arch }}.exe.sha256
+            app/bin/release/koto-cli-windows-${{ matrix.arch }}.exe
+            app/bin/release/koto-cli-windows-${{ matrix.arch }}.exe.sha256
             app/.cache/ci/*.json
             app/.cache/ci/*.jsonl
             app/.cache/ci/*.txt
@@ -321,3 +351,4 @@ jobs:
             app/.cache/windows-smoke-*-result.json
             app/.cache/windows-smoke-*-stdout.log
             app/.cache/windows-smoke-*-stderr.log
+            app/.cache/windows-packages-*/result.json

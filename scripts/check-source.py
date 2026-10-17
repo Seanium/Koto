@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # Every tracked or unignored candidate must belong to a reviewed source tree.
 # The current worktree is the release source; there is no parallel export tree.
 EXACT = {
+    "app/internal/legal/notices.txt.gz",
     ".gitignore", "README.md", "CONTRIBUTING.md", "LICENSE", "THIRD_PARTY_NOTICES.md",
     "app/README.md", "scripts/README.md", "scripts/check-source.py", "scripts/collect-licenses.py",
     "app/ASSETS.md", "app/Taskfile.yml", "app/VERSION",

@@ -16,7 +16,7 @@
   <img src="../../site/assets/screenshots/zh-light-tree.png" alt="koto：用会话树查看共同历史与分叉" width="1120">
 </picture>
 
-支持 Claude Code（含 Desktop Code）、Codex、pi、DeepSeek Harness 和 Antigravity CLI。还有更多，即将到来。
+支持 Claude Code（含 Desktop Code）、Codex、pi、DeepSeek Harness、Antigravity CLI 和 OpenCode。还有更多，即将到来。
 
 还有 koto CLI，<br>
 复制，一句话的事。

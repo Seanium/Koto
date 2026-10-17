@@ -4,7 +4,7 @@
 
 `.github/workflows/ci.yml` wird manuell gestartet. Der Workflow testet Frontend und Go-Pakete, baut Pakete und versucht auf jedem Host einen echten nativen WebView-Smoke-Test. Er hat ausschließlich die Berechtigung `contents: read` und lädt CI-Artefakte hoch. Er erstellt keine Releases, pusht keinen Code und veröffentlicht die Website nicht.
 
-Die Standardmatrix umfasst macOS und Linux. Windows-Jobs laufen nur mit ausdrücklich aktiviertem `include_windows`.
+Standardmäßig werden macOS, Linux und Windows jeweils auf arm64 und amd64 getestet. Für gezielte Läufe lassen sich Windows-Jobs mit `include_windows` ausschalten.
 
 | Ziel | Nativer Runner-Label |
 | --- | --- |
@@ -17,7 +17,7 @@ Die Standardmatrix umfasst macOS und Linux. Windows-Jobs laufen nur mit ausdrüc
 
 Die Runner-Bezeichnungen folgen der [GitHub-Liste gehosteter Runner](https://docs.github.com/en/actions/reference/runners/github-hosted-runners). Der Workflow prüft die tatsächliche Host- und Werkzeugarchitektur; Cross-Kompilierung ersetzt keinen fehlenden nativen Runner.
 
-Go, Node, Wails und NSIS liegen in `app/.tools`, Caches und Testnachweise in `app/.cache`. Downloads werden per SHA-256 geprüft. Linux-Systemabhängigkeiten werden nur auf dem temporären Runner installiert.
+Go, Node, Wails sowie Codex und OpenCode liegen in `app/.tools`, Caches und Testnachweise in `app/.cache`. Downloads werden per SHA-256 geprüft. Linux-Systemabhängigkeiten werden nur auf dem temporären Runner installiert.
 
 ## Bedeutung der Ergebnisse
 
@@ -26,3 +26,5 @@ Jedes Artefakt enthält `stages.json` mit getrennten Ergebnissen für Frontendte
 macOS prüft App-Bundle und DMG und startet anschließend die native WebView mit synthetischen Sitzungen. Linux entpackt das DEB und führt die GTK3/WebKitGTK-App unter Xvfb aus. Das Testergebnis muss JSON enthalten mit `passed: true`, passendem Betriebssystem und passender Architektur sowie abgeschlossenen App-Prüfungen. Ein Prozessende mit Status 0 reicht allein nicht aus.
 
 Windows-GUI-Tests benötigen die [WebView2 Runtime](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/distribution) und einen interaktiven Desktop. Fehlt eine Voraussetzung, schlägt die GUI-Prüfung fehl. Gebaute Pakete und Teilergebnisse bleiben zur Diagnose verfügbar.
+
+App und CLI sind getrennte Downloads. Die Tests führen die CLI ohne App aus und prüfen, dass Desktop-Pakete sie nicht enthalten. Unter Windows laufen beide exe-Dateien direkt aus Pfaden mit Leerzeichen und Unicode, ohne Installer oder PATH-Änderungen.

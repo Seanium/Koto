@@ -250,7 +250,7 @@ func main() {
 		}
 	}
 	must(os.RemoveAll(root))
-	for _, d := range []string{"hub", "claude", "pi", "codex", "codex-shadow", "dsh", "antigravity"} {
+	for _, d := range []string{"hub", "claude", "pi", "codex", "codex-shadow", "dsh", "antigravity", "opencode"} {
 		must(os.MkdirAll(j(d), 0o755))
 	}
 	must(os.WriteFile(j(".koto-sandbox"), []byte("synthetic fixtures\n"), 0600))
@@ -413,7 +413,7 @@ func main() {
 	// ---------------------------------------------------------------- copies
 	zero := int64(0)
 	app, err := koto.New(koto.Config{DataDir: j("hub"), ClaudeRoot: j("claude"), PiRoot: j("pi"), CodexHome: j("codex"), CodexShadow: j("codex-shadow"),
-		DshHome: j("dsh"), AntigravityRoot: j("antigravity"), NoDesktop: true, LiveMs: &zero, Enable: []string{"claude-code", "pi", "codex", "dsh"}})
+		DshHome: j("dsh"), AntigravityRoot: j("antigravity"), OpenCodeRoot: j("opencode"), NoDesktop: true, LiveMs: &zero, Enable: []string{"claude-code", "pi", "codex", "dsh"}})
 	must(err)
 	defer app.Close()
 	api := &koto.API{App: app}

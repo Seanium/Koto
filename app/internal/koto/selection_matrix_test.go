@@ -10,11 +10,9 @@ import (
 
 // A selection may start with an answer or end with a question. Native formats, including Codex rollout records, must preserve the selected content without silently bringing omitted turns back.
 func TestCopySelectionTargets(t *testing.T) {
-	for _, to := range []string{"claude-code", "pi", "codex", "dsh", "antigravity"} {
+	for _, to := range copyAgents {
 		t.Run(to, func(t *testing.T) {
-			if to == "codex" && !hasCodex() {
-				t.Skip("codex CLI not installed")
-			}
+			requireCopyAgent(t, "claude-code", to)
 			s := newSandbox(t)
 			file := filepath.Join(ccDir(s.Claude), CCA+".jsonl")
 			writeLines(t, file, ccLinear(CCA, 4, ""))
@@ -60,11 +58,9 @@ func TestCopySelectionTargets(t *testing.T) {
 }
 
 func TestCopyExcludedTailTargets(t *testing.T) {
-	for _, to := range []string{"claude-code", "pi", "codex", "dsh", "antigravity"} {
+	for _, to := range copyAgents {
 		t.Run(to, func(t *testing.T) {
-			if to == "codex" && !hasCodex() {
-				t.Skip("codex CLI not installed")
-			}
+			requireCopyAgent(t, "claude-code", to)
 			s := newSandbox(t)
 			file := filepath.Join(ccDir(s.Claude), CCA+".jsonl")
 			writeLines(t, file, ccLinear(CCA, 4, ""))

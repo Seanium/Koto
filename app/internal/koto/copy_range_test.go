@@ -11,11 +11,9 @@ import (
 // Copy the second turn of a four-turn session through the same preview/apply API as the UI.
 // Read the target back from its native file: a success receipt alone cannot prove the boundary.
 func TestCopyPrefixStopsAtSelectedTurn(t *testing.T) {
-	for _, to := range []string{"claude-code", "pi", "codex", "dsh", "antigravity"} {
+	for _, to := range copyAgents {
 		t.Run(to, func(t *testing.T) {
-			if to == "codex" && !hasCodex() {
-				t.Skip("codex CLI not installed")
-			}
+			requireCopyAgent(t, "claude-code", to)
 			s := newSandbox(t)
 			file := filepath.Join(ccDir(s.Claude), CCA+".jsonl")
 			writeLines(t, file, ccLinear(CCA, 4, ""))

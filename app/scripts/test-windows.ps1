@@ -5,7 +5,7 @@ param(
 )
 $ErrorActionPreference = "Stop"
 $appDir = Split-Path $PSScriptRoot -Parent
-$binary = (Resolve-Path $Executable).Path
+$binary = (Resolve-Path -LiteralPath $Executable).Path
 $sandbox = Join-Path $appDir (".cache/windows-smoke-" + [guid]::NewGuid().ToString("N"))
 $report = "$sandbox-result.json"
 $savedSandbox = $env:KOTO_APP_SANDBOX
@@ -24,10 +24,11 @@ try {
     $process.Kill()
     throw "WebView2 smoke timed out; logs: $sandbox-*.log"
   }
-  if (-not (Test-Path $report)) { throw "Application exited without a smoke result: $report" }
-  $result = Get-Content -Raw $report | ConvertFrom-Json
-  if (-not $result.passed) { throw "Native smoke failed: $($result.error)" }
-  Copy-Item $report (Join-Path $appDir ".cache/platform-smoke-windows-$($result.arch).json")
+  if ($process.ExitCode -ne 0) { throw "Application failed with exit code $($process.ExitCode)." }
+  if (-not (Test-Path -LiteralPath $report)) { throw "Application exited without a smoke result: $report" }
+  $result = Get-Content -LiteralPath $report -Raw | ConvertFrom-Json
+  if (-not $result.passed -or $result.os -ne 'windows' -or -not $result.webviewReady -or -not $result.nativeCopyReadback -or -not $result.trashRestore) { throw "Native smoke failed: $($result.error)" }
+  Copy-Item -LiteralPath $report -Destination (Join-Path $appDir ".cache/platform-smoke-windows-$($result.arch).json")
   Write-Output "Native Windows/$($result.arch) WebView2 copy, view, trash and restore passed."
 } finally {
   $env:KOTO_APP_SANDBOX = $savedSandbox
