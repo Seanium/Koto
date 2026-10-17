@@ -1,4 +1,5 @@
 import { tr } from '../i18n/core.ts'
+import { shortcut } from '../ui/shortcut'
 // Paginated native conversation with inline content selection and quick turn navigation.
 
 import { createPortal } from 'react-dom'
@@ -179,9 +180,9 @@ export const Timeline = forwardRef<TimelineHandle, {
           ) : (
             <>
               <span className="t-meta grow">{tr("第 ")}{atBottom ? visible.last : visible.first} / {totalTurns} {tr(" 轮")}</span>
-              <Button variant="ghost" disabled={visible.first <= 1 && !hasEarlier} onClick={prev} title={tr("上一条你的消息（⌘↑）")}>{Icon.up}{tr("上一条")}</Button>
-              <Button variant="ghost" disabled={atBottom} onClick={next} title={tr("下一条你的消息（⌘↓）")}>{Icon.down}{tr("下一条")}</Button>
-              <Button variant="ghost" onClick={() => { setSearch({ q: '', i: 0 }); requestAnimationFrame(() => document.getElementById('tl-search')?.focus()) }} title={tr("在这个会话里搜索（⌘F）")}>{Icon.search}{tr("搜索")}</Button>
+              <Button variant="ghost" disabled={visible.first <= 1 && !hasEarlier} onClick={prev} title={shortcut(tr("上一条你的消息（⌘↑）"))}>{Icon.up}{tr("上一条")}</Button>
+              <Button variant="ghost" disabled={atBottom} onClick={next} title={shortcut(tr("下一条你的消息（⌘↓）"))}>{Icon.down}{tr("下一条")}</Button>
+              <Button variant="ghost" onClick={() => { setSearch({ q: '', i: 0 }); requestAnimationFrame(() => document.getElementById('tl-search')?.focus()) }} title={shortcut(tr("在这个会话里搜索（⌘F）"))}>{Icon.search}{tr("搜索")}</Button>
             </>
           )}
         </div>

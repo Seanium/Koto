@@ -87,6 +87,13 @@ waitReady:
 	js(`(async()=>{window.platformSource=()=>[...document.querySelectorAll('#sessions [role=option]')].find(e=>e.id.slice(2)==='claude-code:6b1f2a40-1c2d-4e3f-8a4b-5c6d7e8f9a01');await window.platformWait(window.platformSource);window.platformSource().click();})()`)
 	js(`window.platformWait(()=>window.platformSource()?.getAttribute('aria-selected')==='true'&&document.querySelector('.session-heading h1')?.textContent==='把 CAS 打包改成按天分片'&&document.getElementById('copy-main')&&!document.getElementById('copy-main').disabled)`)
 	sourceID := js(`document.querySelector('#sessions [aria-selected="true"]').id.slice(2)`)
+	modifier := "Ctrl+"
+	enter := "Enter"
+	if runtime.GOOS == "darwin" {
+		modifier, enter = "⌘", "↵"
+	}
+	searchHint, _ := json.Marshal(modifier + "K")
+	js(`if(document.querySelector('.session-list-pane .search .kbd')?.textContent!==` + string(searchHint) + `)throw Error('search shortcut does not match desktop platform')`)
 	js(`document.getElementById('copy-main').click()`)
 	js(`window.platformWait(()=>document.querySelector('.copy-range'))`)
 	result["selectionAtStart"] = js(`JSON.stringify({range:document.querySelector('.copy-range')?.textContent,buttonText:document.getElementById('copy-main')?.textContent,disabled:document.getElementById('copy-main')?.disabled,checked:document.querySelectorAll('.message-check input:checked').length})`)
@@ -95,6 +102,9 @@ waitReady:
 	js(`window.platformScrollBefore=[...document.querySelectorAll('.scroll')].map(el=>({el,style:el.getAttribute('style'),top:el.scrollTop,width:el.clientWidth-parseFloat(getComputedStyle(el).paddingLeft)-parseFloat(getComputedStyle(el).paddingRight)}))`)
 	js(`document.getElementById('copy-main').click()`)
 	js(`(async()=>{const target=()=>[...document.querySelectorAll('.sheet [role=option]')].find(e=>e.querySelector('.grow')?.textContent.trim().toLowerCase()==='pi');await window.platformWait(target);target().click();await window.platformWait(()=>target()?.getAttribute('aria-selected')==='true'&&document.querySelector('.sheet-foot .btn-primary:not(:disabled)'));})()`)
+	copyHint, _ := json.Marshal(modifier + enter)
+	js(`if(document.querySelector('.sheet-foot .kbd')?.textContent!==` + string(copyHint) + `)throw Error('copy shortcut does not match desktop platform')`)
+	result["nativeShortcuts"] = true
 	js(`for(const before of window.platformScrollBefore){const style=getComputedStyle(before.el);if(style.overflowY!=='hidden')throw Error('dialog background is still scrollable');const width=before.el.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight);if(Math.abs(width-before.width)>1)throw Error('opening dialog changed background content width')}
 const body=document.querySelector('.sheet-body');if(!body||getComputedStyle(body).overflowY!=='auto')throw Error('dialog content scrolling was locked');const height=body.style.maxHeight;body.style.maxHeight='80px';body.scrollTop=32;if(body.scrollTop===0)throw Error('dialog content cannot scroll');body.scrollTop=0;body.style.maxHeight=height;
 document.querySelector('.sheet-foot button').click()`)

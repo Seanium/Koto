@@ -11,6 +11,7 @@ import piSvg from '../assets/harness/pi.svg?raw'
 import dsh from '../assets/harness/dsh.svg'
 import antigravity from '../assets/harness/antigravity.svg'
 import opencodeSvg from '../assets/harness/opencode.svg?raw'
+import { shortcut } from './shortcut'
 
 // ---------------------------------------------------------------- keeping panels inside the window
 
@@ -357,7 +358,7 @@ export const SearchField = forwardRef<HTMLInputElement, { value: string; onChang
   })
 
 export function Kbd({ children }: { children: ReactNode }) {
-  return <kbd className="kbd">{children}</kbd>
+  return <kbd className="kbd">{typeof children === 'string' ? shortcut(children) : children}</kbd>
 }
 
 export function Skeleton({ w, h = 12 }: { w: number | string; h?: number }) {

@@ -1,4 +1,5 @@
 import { tr } from '../i18n/core.ts'
+import { shortcut } from '../ui/shortcut'
 // One native session: a linear turn list or the full conversation, with explicit copy selection.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { api, shell, useOpeners } from '../api/client'
@@ -121,7 +122,7 @@ function TrashConfirm({ onTrash, ask }: { onTrash: () => Promise<string | undefi
   }
   return (
     <Popover open={open} setOpen={setOpen} width={300} align="right" label={tr("移到回收站")}
-      trigger={p => <Button className="btn-square" aria-label={tr("移到回收站")} title={tr("移到回收站（⌘⌫）")} aria-pressed={open} {...p}>{Icon.trash}</Button>}>
+      trigger={p => <Button className="btn-square" aria-label={tr("移到回收站")} title={shortcut(tr("移到回收站（⌘⌫）"))} aria-pressed={open} {...p}>{Icon.trash}</Button>}>
       <div className="col g2" style={{ padding: '8px 10px 10px' }} onKeyDown={e => { if (e.key === 'Enter' && !busy) { e.preventDefault(); void go() } }}>
         <span className="t-medium">{tr("把这个会话移到回收站？")}</span>
         <span className="t-meta">{tr("只移动当前会话。之后可以在回收站里恢复。")}</span>
@@ -161,7 +162,7 @@ function ProjectButton({ cwd }: { cwd: string }) {
         <Menu trigger="tint" align="under" label={tr("项目 {0}", [name])} title={tr("项目操作")}
           header={<><span className="t-medium ellipsis">{name}</span><span className="mono t-3 selectable" style={{ wordBreak: 'break-all' }}>{cwd}</span>{gone && <span className="t-amber">{gone}</span>}</>}
           items={[
-            { label: revealLabel(info?.fileManager ?? 'Finder'), hint: '⌥⌘R', hintMono: true, disabled: !exists, title: gone, onClick: reveal },
+            { label: revealLabel(info?.fileManager ?? 'Finder'), hint: shortcut('⌥⌘R'), hintMono: true, disabled: !exists, title: gone, onClick: reveal },
             ...(terminal ? [{ label: tr("在终端中打开"), hint: terminal, hintMono: true, disabled: !exists, title: gone, onClick: () => { void shell.openInTerminal('', cwd).then(fail(tr("打开终端"))) } }] : []),
             ...(editor ? [{ label: tr("在编辑器中打开"), hint: editor, hintMono: true, disabled: !exists, title: gone, onClick: () => { void shell.openInEditor(cwd).then(fail(tr("打开编辑器"))) } }] : []),
             { separator: true },

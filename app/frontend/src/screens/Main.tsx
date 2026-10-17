@@ -1,4 +1,5 @@
 import { tr } from '../i18n/core.ts'
+import { shortcut } from '../ui/shortcut'
 // Sidebar selects a product workspace; Agent and project filters narrow session copying.
 
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
@@ -237,7 +238,7 @@ export function MainWindow({ hub }: { hub: Hub }) {
           <div className="drag row g1" style={{ minHeight: 28 }}>
             <span className="t-head grow ellipsis" style={{ paddingLeft: 4, minWidth: '5.5em' }} title={scopeTitle}>{scopeTitle}</span>
             <Button id="refresh-sessions" variant="ghost" icon disabled={refreshing || hub.status.state !== 'ready'} onClick={() => void refresh()} aria-label={tr("刷新会话数据")} aria-busy={refreshing}
-              title={tr("刷新会话数据（⌘R）。后台每 3 秒自动检查变化，不会自动复制。")}>{Icon.refresh}</Button>
+              title={shortcut(tr("刷新会话数据（⌘R）。后台每 3 秒自动检查变化，不会自动复制。"))}>{Icon.refresh}</Button>
           </div>
           <SearchField ref={search} value={query} onChange={setQuery} placeholder={inTrash ? tr("搜索回收站") : tr("搜索会话")} />
           {!inTrash && <div className="row g1 list-filters">
@@ -330,7 +331,7 @@ function Sidebar({ hub, mode, scope, pickScope, openTrash, openSettings, openAna
       )}
       <div className="col no-drag" style={{ padding: '6px 8px 8px', gap: 1, borderTop: issue ? undefined : '1px solid var(--divider)' }}>
         <SideItem icon={Icon.trash} label={tr("回收站")} selected={mode.kind === 'trash'} onClick={openTrash} />
-        <SideItem icon={Icon.gear} label={tr("设置")} selected={mode.kind === 'settings'} onClick={openSettings} title="⌘," />
+        <SideItem icon={Icon.gear} label={tr("设置")} selected={mode.kind === 'settings'} onClick={openSettings} title={shortcut('⌘,')} />
       </div>
     </nav>
   )
