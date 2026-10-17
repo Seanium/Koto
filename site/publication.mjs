@@ -1,6 +1,6 @@
 // Enable only after these assets are available on the GitHub release.
 export const publication = Object.freeze({
-  published: false,
+  published: true,
   version: '0.1.0-beta.1',
   repository: 'https://github.com/Seanium/koto'
 });
