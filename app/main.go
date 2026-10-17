@@ -7,7 +7,6 @@ import (
 	"embed"
 	"log"
 	"os"
-	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -59,13 +58,18 @@ func withFrame(o application.WebviewWindowOptions, f *WindowFrame) application.W
 }
 
 // sessionMenu is the native right-click menu on a session row (CSS --custom-contextmenu: session,
-// --custom-contextmenu-data: <thread id>). Items are handled by the frontend via "app:context".
+// --custom-contextmenu-data: <JSON string>). Quoting prevents CSS token serialization
+// from inserting comments into IDs that contain numbers. The frontend handles actions.
 func sessionMenu(ui *UI) {
 	app := ui.app
 	m := application.NewContextMenu("session")
 	item := func(label, action string) {
 		ui.localizedItem(m.Add(label).OnClick(func(ctx *application.Context) {
-			app.Event.Emit("app:context", navJSON(map[string]string{"action": action, "thread": strings.TrimSpace(ctx.ContextMenuData())}))
+			thread, err := contextSessionID(ctx.ContextMenuData())
+			if err != nil {
+				return
+			}
+			app.Event.Emit("app:context", navJSON(map[string]string{"action": action, "thread": thread}))
 		}), label, "")
 	}
 	item("复制会话 ID", "copy-id")
@@ -118,6 +122,9 @@ func main() {
 		Assets:      application.AssetOptions{Handler: application.AssetFileServerFS(assets)},
 		Mac:         application.MacOptions{ApplicationShouldTerminateAfterLastWindowClosed: false},
 	})
+	if !platformRuntimeReady(app, prefs.Get().Language) {
+		return
+	}
 	ui.app = app
 	ui.prefs = prefs
 	core.OnEvent = func(raw string) { app.Event.Emit("koto:event", raw) }

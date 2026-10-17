@@ -1,0 +1,10 @@
+# Keep source scripts portable and generated hashes stable across checkout hosts.
+* text=auto eol=lf
+# Third-party notices are checked against the original byte-for-byte hashes.
+licenses/** -text
+*.gz -text
+*.png -text
+*.webp -text
+*.ico -text
+*.icns -text
+*.car -text

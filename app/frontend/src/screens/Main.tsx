@@ -466,7 +466,7 @@ function SessionList({ hub, items, selected, onSelect, query, filters, clear, op
     <div id="sessions" className="col scroll grow" role="listbox" aria-label={tr("会话")} onWheel={stopLocating} onPointerDown={stopLocating} onKeyDown={stopLocating} style={{ padding: '0 8px 8px', gap: 2 }}>
       {items.map(s => (
         <ListRow key={s.id} id={`s-${s.id}`} selected={s.id === selected} onClick={() => onSelect(s.id)}
-          style={{ alignItems: 'flex-start', '--custom-contextmenu': 'session', '--custom-contextmenu-data': s.id, '--stack-bg': s.id === selected ? 'var(--bg-selected)' : 'var(--bg-list)' } as React.CSSProperties}>
+          style={{ alignItems: 'flex-start', '--custom-contextmenu': 'session', '--custom-contextmenu-data': JSON.stringify(s.id), '--stack-bg': s.id === selected ? 'var(--bg-selected)' : 'var(--bg-list)' } as React.CSSProperties}>
           <span className="col grow g1" style={{ padding: '2px 0', minWidth: 0 }}>
             <span className="row g2">
               {filters.scope === 'all' && <AgentDisc harness={s.harness} size={16} />}<span className="grow ellipsis t-medium" title={s.title}>{s.title}</span>

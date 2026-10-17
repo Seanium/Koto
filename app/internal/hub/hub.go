@@ -85,6 +85,7 @@ type Hub struct {
 	byEvent  map[core.EventID][]nativeKey
 	bindings map[sessKey]*Binding
 	offsets  map[[2]string]core.SourceOffset
+	pending  map[sessKey][]pendingRecord
 
 	cas map[string][]byte
 
@@ -102,6 +103,7 @@ func New() *Hub {
 		idmap: map[nativeKey]*IDRow{}, byNative: map[[2]string][]nativeKey{}, byEvent: map[core.EventID][]nativeKey{},
 		bindings: map[sessKey]*Binding{},
 		offsets:  map[[2]string]core.SourceOffset{},
+		pending:  map[sessKey][]pendingRecord{},
 		cas:      map[string][]byte{},
 	}
 }
@@ -119,6 +121,11 @@ func (h *Hub) RetainedBytes() int64 {
 	}
 	for _, blob := range h.cas {
 		n += int64(len(blob))
+	}
+	for _, records := range h.pending {
+		for _, record := range records {
+			n += int64(record.record.Bytes) + 1024
+		}
 	}
 	return n
 }
@@ -251,7 +258,7 @@ func (h *Hub) Ingest(batch core.SourceBatch, conn ConnectorInfo) IngestResult {
 	}
 	edited := false
 	holder := harness + "/" + ref.Session
-	for _, rec := range batch.Records {
+	for _, rec := range h.causalRecords(batch, drafts, blobBytes) {
 		d := drafts[rec.NativeID]
 		key := nativeKey{harness, ref.Session, rec.NativeID}
 		existing := h.idmap[key]

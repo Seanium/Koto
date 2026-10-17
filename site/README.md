@@ -21,4 +21,4 @@ The hero and CLI dialogue animate in loops, pause while hidden, and show complet
 
 Release version, repository, and publication state live in `publication.mjs`. Enable `published` after all listed assets exist; otherwise no download URLs are generated. The Pages workflow is manual.
 
-Download suggestions use browser-provided OS and CPU hints in memory only. Reduced Mac/Linux user agents never determine architecture; unknown CPUs require a choice. Linux suggestions use tar.gz because the distribution is unknown. Detection never overrides a manual selection or starts a download.
+App and CLI are separate downloads. Suggestions use browser-provided OS and CPU hints in memory only; unknown CPUs require a choice. Linux defaults to the standalone binary because the distribution is unknown. Detection never overrides a manual selection or starts a download.

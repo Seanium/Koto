@@ -171,7 +171,7 @@ jobs:
         if: matrix.os == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev xvfb xauth dbus-x11 openbox imagemagick dpkg-dev desktop-file-utils desktop-file-utils
+          sudo apt-get install -y --no-install-recommends build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev xvfb xauth dbus-x11 openbox imagemagick dpkg-dev desktop-file-utils
           pkg-config --modversion gtk+-3.0 webkit2gtk-4.1
 
       - name: Install the pinned Wails CLI into project tools

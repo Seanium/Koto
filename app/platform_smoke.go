@@ -64,7 +64,7 @@ waitReady:
 		prefix := fmt.Sprintf("platform-smoke:%d:", step)
 		encoded, _ := json.Marshal(code)
 		marker, _ := json.Marshal(prefix)
-		ui.main.ExecJS(`(async()=>{let result;try{result='ok:'+String(await(0,eval)(` + string(encoded) + `))}catch(e){result='error:'+String(e)+' DOM:'+JSON.stringify({title:document.querySelector('.session-heading h1')?.textContent,selected:document.querySelector('#sessions [aria-selected="true"]')?.style.getPropertyValue('--custom-contextmenu-data'),rows:[...document.querySelectorAll('#sessions [role=option]')].slice(0,20).map(e=>({id:e.style.getPropertyValue('--custom-contextmenu-data'),text:e.querySelector('.t-medium')?.textContent})),sheet:document.querySelector('.sheet')?.textContent})}await fetch('/wails/runtime',{method:'POST',headers:{'Content-Type':'application/json','x-wails-client-id':'koto-platform-smoke'},body:JSON.stringify({object:0,method:0,args:{methodID:2524806435,'call-id':` + string(marker) + `,args:[` + string(marker) + `+result]}})})})()`)
+		ui.main.ExecJS(`(async()=>{let result;try{result='ok:'+String(await(0,eval)(` + string(encoded) + `))}catch(e){result='error:'+String(e)+' DOM:'+JSON.stringify({title:document.querySelector('.session-heading h1')?.textContent,selected:document.querySelector('#sessions [aria-selected="true"]')?.id.slice(2),rows:[...document.querySelectorAll('#sessions [role=option]')].slice(0,20).map(e=>({id:e.id.slice(2),text:e.querySelector('.t-medium')?.textContent})),sheet:document.querySelector('.sheet')?.textContent})}await fetch('/wails/runtime',{method:'POST',headers:{'Content-Type':'application/json','x-wails-client-id':'koto-platform-smoke'},body:JSON.stringify({object:0,method:0,args:{methodID:2524806435,'call-id':` + string(marker) + `,args:[` + string(marker) + `+result]}})})})()`)
 		timer := time.NewTimer(20 * time.Second)
 		defer timer.Stop()
 		for {
@@ -84,9 +84,9 @@ waitReady:
 	}
 	js(`window.platformWait=async(test)=>{const end=Date.now()+12000;while(Date.now()<end){if(test())return;await new Promise(r=>setTimeout(r,100))}throw Error('UI condition timed out')}`)
 	js(`(async()=>{window.platformNav=(text)=>[...document.querySelectorAll('nav [role=option]')].find(e=>e.textContent.trim()===text);await window.platformWait(()=>window.platformNav('会话复制'));if(window.platformNav('会话复制').getAttribute('aria-expanded')!=='true')window.platformNav('会话复制').click();await window.platformWait(()=>window.platformNav('全部会话'));window.platformNav('全部会话').click();await window.platformWait(()=>window.platformNav('全部会话')?.getAttribute('aria-selected')==='true');})()`)
-	js(`(async()=>{window.platformSource=()=>[...document.querySelectorAll('#sessions [role=option]')].find(e=>e.style.getPropertyValue('--custom-contextmenu-data').trim()==='claude-code:6b1f2a40-1c2d-4e3f-8a4b-5c6d7e8f9a01');await window.platformWait(window.platformSource);window.platformSource().click();})()`)
+	js(`(async()=>{window.platformSource=()=>[...document.querySelectorAll('#sessions [role=option]')].find(e=>e.id.slice(2)==='claude-code:6b1f2a40-1c2d-4e3f-8a4b-5c6d7e8f9a01');await window.platformWait(window.platformSource);window.platformSource().click();})()`)
 	js(`window.platformWait(()=>window.platformSource()?.getAttribute('aria-selected')==='true'&&document.querySelector('.session-heading h1')?.textContent==='把 CAS 打包改成按天分片'&&document.getElementById('copy-main')&&!document.getElementById('copy-main').disabled)`)
-	sourceID := js(`document.querySelector('#sessions [aria-selected="true"]').style.getPropertyValue('--custom-contextmenu-data').trim()`)
+	sourceID := js(`document.querySelector('#sessions [aria-selected="true"]').id.slice(2)`)
 	js(`document.getElementById('copy-main').click()`)
 	js(`window.platformWait(()=>document.querySelector('.copy-range'))`)
 	result["selectionAtStart"] = js(`JSON.stringify({range:document.querySelector('.copy-range')?.textContent,buttonText:document.getElementById('copy-main')?.textContent,disabled:document.getElementById('copy-main')?.disabled,checked:document.querySelectorAll('.message-check input:checked').length})`)
@@ -102,10 +102,12 @@ document.querySelector('.sheet-foot button').click()`)
 	result["modalScrollIsolation"] = true
 	js(`document.querySelector('.sheet-foot .btn-primary').click()`)
 	js(`(async()=>{await window.platformWait(()=>[...document.querySelectorAll('.sheet button')].some(e=>e.textContent.includes('查看新会话')));[...document.querySelectorAll('.sheet button')].find(e=>e.textContent.includes('查看新会话')).click();await window.platformWait(()=>!document.querySelector('.sheet')&&document.querySelector('#sessions [aria-selected="true"]'));})()`)
-	destinationID := js(`document.querySelector('#sessions [aria-selected="true"]').style.getPropertyValue('--custom-contextmenu-data').trim()`)
+	destinationID := js(`document.querySelector('#sessions [aria-selected="true"]').id.slice(2)`)
 	if sourceID == destinationID || !strings.HasPrefix(destinationID, "pi:") {
 		panic("UI did not select a new pi session: " + destinationID)
 	}
+	js(`{const row=document.querySelector('#sessions [aria-selected="true"]');if(JSON.parse(getComputedStyle(row).getPropertyValue('--custom-contextmenu-data'))!==row.id.slice(2))throw Error('native context menu changed session ID')}`)
+	result["contextMenuSessionID"] = true
 	thread, err := core.API().Thread(context.Background(), destinationID, 0, "")
 	if err != nil {
 		panic(fmt.Sprintf("native session readback: %v", err))
@@ -129,8 +131,8 @@ document.querySelector('.sheet-foot button').click()`)
 	result["nativeCopyReadback"] = true
 	destinationJSON, _ := json.Marshal(destinationID)
 	js(`window.platformDestination=` + string(destinationJSON) + `;window.platformDestinationTitle=document.querySelector('.session-heading h1')?.textContent;document.querySelector('button[aria-label="移到回收站"]').click()`)
-	js(`(async()=>{await window.platformWait(()=>document.getElementById('trash-go'));document.getElementById('trash-go').click();await window.platformWait(()=>![...document.querySelectorAll('#sessions [role=option]')].some(e=>e.style.getPropertyValue('--custom-contextmenu-data').trim()===window.platformDestination));await new Promise(r=>setTimeout(r,800));if([...document.querySelectorAll('#sessions [role=option]')].some(e=>e.style.getPropertyValue('--custom-contextmenu-data').trim()===window.platformDestination))throw Error('deleted copy reappeared');if(document.querySelector('#sessions [aria-selected="true"]')?.style.getPropertyValue('--custom-contextmenu-data').trim()===window.platformDestination)throw Error('deleted copy remains selected');if(window.platformDestinationTitle&&document.querySelector('.session-heading h1')?.textContent===window.platformDestinationTitle)throw Error('deleted copy detail remains visible');})()`)
-	js(`(async()=>{[...document.querySelectorAll('nav [role=option]')].find(e=>e.textContent.includes('回收站')).click();await window.platformWait(()=>document.querySelector('[role=list][aria-label="回收站"] [role=listitem]'));const row=[...document.querySelectorAll('[role=list][aria-label="回收站"] [role=listitem]')].find(e=>e.textContent.includes('把 CAS 打包改成按天分片'));if(!row)throw Error('copied session absent from trash');row.querySelector('button').click();await window.platformWait(()=>document.querySelector('#sessions [aria-selected="true"]')?.style.getPropertyValue('--custom-contextmenu-data').trim()===window.platformDestination);await window.platformWait(()=>document.getElementById('copy-main'));})()`)
+	js(`(async()=>{await window.platformWait(()=>document.getElementById('trash-go'));document.getElementById('trash-go').click();await window.platformWait(()=>![...document.querySelectorAll('#sessions [role=option]')].some(e=>e.id.slice(2)===window.platformDestination));await new Promise(r=>setTimeout(r,800));if([...document.querySelectorAll('#sessions [role=option]')].some(e=>e.id.slice(2)===window.platformDestination))throw Error('deleted copy reappeared');if(document.querySelector('#sessions [aria-selected="true"]')?.id.slice(2)===window.platformDestination)throw Error('deleted copy remains selected');if(window.platformDestinationTitle&&document.querySelector('.session-heading h1')?.textContent===window.platformDestinationTitle)throw Error('deleted copy detail remains visible');})()`)
+	js(`(async()=>{[...document.querySelectorAll('nav [role=option]')].find(e=>e.textContent.includes('回收站')).click();await window.platformWait(()=>document.querySelector('[role=list][aria-label="回收站"] [role=listitem]'));const row=[...document.querySelectorAll('[role=list][aria-label="回收站"] [role=listitem]')].find(e=>e.textContent.includes('把 CAS 打包改成按天分片'));if(!row)throw Error('copied session absent from trash');row.querySelector('button').click();await window.platformWait(()=>document.querySelector('#sessions [aria-selected="true"]')?.id.slice(2)===window.platformDestination);await window.platformWait(()=>document.getElementById('copy-main'));})()`)
 	if _, err := core.API().Thread(context.Background(), destinationID, 0, ""); err != nil {
 		panic(fmt.Sprintf("restored native session readback: %v", err))
 	}

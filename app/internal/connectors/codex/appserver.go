@@ -30,6 +30,7 @@ type AppServer struct {
 	pending map[int]chan rpcMsg
 	idle    *time.Timer
 	stderr  []byte
+	process *serverProcess
 }
 
 type rpcMsg struct {
@@ -43,11 +44,38 @@ type rpcMsg struct {
 	} `json:"error,omitempty"`
 }
 
+// Each launch owns its pipes and a completion channel. Stop waits for this exact
+// generation, including descendants and readers, before a replacement can start.
+type serverProcess struct {
+	stdin    io.WriteCloser
+	stdout   *os.File
+	stderr   *os.File
+	tree     *serverProcessTree
+	done     chan struct{}
+	stopOnce sync.Once
+	stopping bool // protected by AppServer.mu
+}
+
+func (p *serverProcess) stop() {
+	p.stopOnce.Do(func() {
+		_ = p.stdin.Close()
+		p.tree.kill()
+	})
+}
+
 func (s *AppServer) start() error {
-	s.mu.Lock()
-	if s.ready {
+	for {
+		s.mu.Lock()
+		if s.process == nil {
+			break
+		}
+		if s.ready && !s.process.stopping {
+			s.mu.Unlock()
+			return nil
+		}
+		done := s.process.done
 		s.mu.Unlock()
-		return nil
+		<-done
 	}
 	if s.pending == nil {
 		s.pending = map[int]chan rpcMsg{}
@@ -58,19 +86,19 @@ func (s *AppServer) start() error {
 		env = append(env, k+"="+v)
 	}
 	cmd.Env = env
-	stdin, _ := cmd.StdinPipe()
-	stdout, _ := cmd.StdoutPipe()
-	stderr, _ := cmd.StderrPipe()
-	if err := cmd.Start(); err != nil {
+	p, err := launchServer(cmd)
+	if err != nil {
 		s.mu.Unlock()
-		// Not on PATH (an app started from Finder gets a bare PATH) or not executable: fail the call.
 		return fmt.Errorf("cannot start %s app-server: %w", s.Bin, err)
 	}
-	s.cmd, s.stdin, s.stderr = cmd, stdin, nil
+	s.cmd, s.stdin, s.stderr, s.process = cmd, p.stdin, nil, p
+	var readers sync.WaitGroup
+	readers.Add(2)
 	go func() {
+		defer readers.Done()
 		b := make([]byte, 4096)
 		for {
-			n, err := stderr.Read(b)
+			n, err := p.stderr.Read(b)
 			s.mu.Lock()
 			s.stderr = append(s.stderr, b[:n]...)
 			if len(s.stderr) > 8192 {
@@ -83,7 +111,8 @@ func (s *AppServer) start() error {
 		}
 	}()
 	go func() {
-		sc := bufio.NewScanner(stdout)
+		defer readers.Done()
+		sc := bufio.NewScanner(p.stdout)
 		sc.Buffer(make([]byte, 1<<20), 64<<20)
 		for sc.Scan() {
 			var m rpcMsg
@@ -99,33 +128,87 @@ func (s *AppServer) start() error {
 			}
 			s.mu.Unlock()
 		}
+		// A broken/closed protocol stream cannot serve further requests.
+		p.stop()
+	}()
+	go func() {
+		// Do not wait for stdout EOF before reaping the launcher: descendants
+		// may inherit its pipe handles and keep them open after it exits.
 		_ = cmd.Wait()
 		s.mu.Lock()
-		if s.cmd == cmd {
-			why := "codex app-server exited: " + tail(string(s.stderr), 500)
-			for id, ch := range s.pending {
-				msg := rpcMsg{}
-				msg.Error = &struct {
-					Code    int    `json:"code"`
-					Message string `json:"message"`
-				}{-1, why}
-				ch <- msg
-				delete(s.pending, id)
-			}
-			s.cmd, s.ready = nil, false
+		p.stopping = true
+		s.mu.Unlock()
+		p.stop()
+		p.tree.wait()
+		readers.Wait()
+		_ = p.stdout.Close()
+		_ = p.stderr.Close()
+		s.mu.Lock()
+		why := "codex app-server exited: " + tail(string(s.stderr), 500)
+		for id, ch := range s.pending {
+			msg := rpcMsg{}
+			msg.Error = &struct {
+				Code    int    `json:"code"`
+				Message string `json:"message"`
+			}{-1, why}
+			ch <- msg
+			delete(s.pending, id)
 		}
+		s.cmd, s.stdin, s.process, s.ready = nil, nil, nil, false
+		close(p.done)
 		s.mu.Unlock()
 	}()
 	s.ready = true
 	s.mu.Unlock()
 	r, err := s.raw("initialize", map[string]any{"clientInfo": map[string]any{"name": "koto", "version": "0.1.0"}, "capabilities": map[string]any{"experimentalApi": true}})
+	if err == nil && r.Error != nil {
+		err = fmt.Errorf("codex app-server initialize: %s", r.Error.Message)
+	}
+	if err == nil {
+		err = s.write(map[string]any{"method": "initialized", "params": map[string]any{}})
+	}
 	if err != nil {
-		return err
+		s.Stop()
 	}
-	if r.Error != nil {
-		return fmt.Errorf("codex app-server initialize: %s", r.Error.Message)
+	return err
+}
+
+func launchServer(cmd *exec.Cmd) (_ *serverProcess, err error) {
+	var pipes []io.Closer
+	defer func() {
+		if err != nil {
+			for _, pipe := range pipes {
+				_ = pipe.Close()
+			}
+		}
+	}()
+	inRead, stdin, err := os.Pipe()
+	if err != nil {
+		return nil, err
 	}
-	return s.write(map[string]any{"method": "initialized", "params": map[string]any{}})
+	pipes = append(pipes, inRead, stdin)
+	cmd.Stdin = inRead
+	// Own these pipes rather than StdoutPipe/StderrPipe: cmd.Wait must be
+	// independent of readers and must not close them before replies drain.
+	stdout, outWrite, err := os.Pipe()
+	if err != nil {
+		return nil, err
+	}
+	pipes = append(pipes, stdout, outWrite)
+	stderr, errWrite, err := os.Pipe()
+	if err != nil {
+		return nil, err
+	}
+	pipes = append(pipes, stderr, errWrite)
+	cmd.Stdout, cmd.Stderr = outWrite, errWrite
+	tree, err := startServerProcessTree(cmd)
+	if err != nil {
+		return nil, err
+	}
+	_ = inRead.Close()
+	_ = outWrite.Close()
+	_ = errWrite.Close()
+	return &serverProcess{stdin: stdin, stdout: stdout, stderr: stderr, tree: tree, done: make(chan struct{})}, nil
 }
 
 func tail(s string, n int) string {
@@ -203,6 +286,9 @@ func (s *AppServer) touch() {
 	if s.idle != nil {
 		s.idle.Stop()
 	}
+	if s.process == nil || s.process.stopping {
+		return
+	}
 	idle := time.Duration(s.IdleMs) * time.Millisecond
 	if idle == 0 {
 		idle = 60 * time.Second
@@ -221,30 +307,22 @@ func (s *AppServer) touch() {
 	})
 }
 
-// Stop ends the server process.
+// Stop ends only this launch's process tree and waits until it can no longer
+// write Agent data. A subsequent Call may start a fresh server.
 func (s *AppServer) Stop() {
 	s.mu.Lock()
-	cmd := s.cmd
+	s.idleSeq++
 	if s.idle != nil {
 		s.idle.Stop()
+		s.idle = nil
+	}
+	p := s.process
+	if p != nil {
+		p.stopping = true
 	}
 	s.mu.Unlock()
-	if cmd == nil || cmd.Process == nil {
-		return
+	if p != nil {
+		p.stop()
+		<-p.done
 	}
-	_ = cmd.Process.Kill()
-	done := make(chan struct{})
-	go func() {
-		for i := 0; i < 30; i++ {
-			s.mu.Lock()
-			gone := s.cmd != cmd
-			s.mu.Unlock()
-			if gone {
-				break
-			}
-			time.Sleep(100 * time.Millisecond)
-		}
-		close(done)
-	}()
-	<-done
 }
