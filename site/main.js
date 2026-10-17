@@ -1,7 +1,7 @@
 import { locales, resolveLocale, watchAppearance } from './preferences.mjs';
 import { translations } from './translations.mjs?v=beta-0.1.0-1';
 import { createTypewriter, cycleAgentLogos, createDialogue } from './motion.mjs?v=beta-0.1.0-1';
-import { publication, releaseAssets, downloadURL } from './publication.mjs?v=beta-0.1.0-1';
+import { publication, releaseAssets, downloadURL } from './publication.mjs?v=beta-0.1.0-1-published';
 import { detectSystem } from './detection.mjs';
 
 const languageSelect = document.getElementById('language-select');
