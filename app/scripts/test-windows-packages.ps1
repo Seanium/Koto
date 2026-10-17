@@ -23,8 +23,10 @@ try {
   $cli = Join-Path $binaryDir 'koto.exe'
   Copy-Item -LiteralPath $appSource -Destination $exe
   Copy-Item -LiteralPath $cliSource -Destination $cli
-  if ((& $cli version).Trim() -ne $version) { throw 'Standalone CLI version mismatch.' }
+  $cliVersion = (& $cli version).Trim()
   if ($LASTEXITCODE -ne 0) { throw 'Standalone CLI did not run.' }
+  if ($cliVersion -cne "koto $version") { throw "Standalone CLI version mismatch: $cliVersion" }
+  $result.cliVersion = $cliVersion
   $help = & $cli --help
   if ($LASTEXITCODE -ne 0 -or -not ($help -match 'copy')) { throw 'Standalone CLI help did not run.' }
   Set-Location -LiteralPath $appDir

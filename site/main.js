@@ -45,7 +45,7 @@ function renderDownload(text = translations[activeLocale]) {
 releaseSelect.addEventListener('change', () => { releaseManuallySelected = true; productChoices.set(activeProduct, releaseSelect.value); renderDownload(); });
 const screenshots = [...document.querySelectorAll('.screenshot')];
 // Refresh this content revision whenever screenshot assets are replaced.
-const screenshotRevision = 'a74f43570a16';
+const screenshotRevision = '28ac01627d11';
 let activeLocale = 'en';
 let activeTheme = document.documentElement.dataset.theme || 'light';
 function renderScreenshots() {

@@ -21,7 +21,7 @@ cmp "$TEST_DIR/deb/usr/lib/koto/koto-desktop" "$OUT/$NAME"
 cmp "$APP_DIR/../LICENSE" "$TEST_DIR/deb/usr/share/doc/koto/LICENSE"
 cmp "$APP_DIR/../licenses/INDEX.json" "$TEST_DIR/deb/usr/share/doc/koto/licenses/INDEX.json"
 desktop-file-validate "$TEST_DIR/deb/usr/share/applications/koto.desktop"
-"$OUT/koto-cli-linux-$ARCH" version
+[ "$("$OUT/koto-cli-linux-$ARCH" version)" = "koto $VERSION" ]
 readelf -h "$OUT/$NAME" | sed -n '/Class:/p; /Machine:/p'
 ldd "$OUT/$NAME" > "$TEST_DIR/ldd.txt"
 if grep -q 'not found' "$TEST_DIR/ldd.txt"; then
