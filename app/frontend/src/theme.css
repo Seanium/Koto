@@ -1,0 +1,120 @@
+/* Design tokens. Every colour, size, radius and duration used anywhere comes from here.
+   Spacing 4/8/12/16/24/32 · radius 6/8/12/14 · type 11/12/13/15/19. Dark follows the system. */
+
+:root {
+  color-scheme: light dark;
+
+  --bg-window: #ffffff;
+  --bg-sidebar: #f4f4f2;
+  --bg-list: #fcfcfb;
+  --bg-hover: rgba(23, 23, 26, 0.045);
+  --bg-selected: #efefed;
+  --selection-bg: #e8e8e2;
+  --bg-sunken: #f6f6f4;      /* tool lines, code boxes, inputs */
+  --bubble: #f2f2ef;         /* your messages in the timeline */
+  --bg-overlay: rgba(20, 20, 24, 0.28);
+  --bg-elevated: #ffffff;    /* sheets, popover */
+
+  --ink: #17171a;
+  --ink-2: #5e5e66;
+  --ink-3: #8a8a92;
+  --divider: #e7e7e4;
+  --border: #dcdcd8;
+  --focus: #3b6cf6;
+
+  --primary: #17171a;        /* the one black button */
+  --primary-ink: #ffffff;
+  --ghost-ink: #3a3a40;      /* ghost buttons: list filters, tabs, sidebar */
+  --pressed: #e6e6e3;        /* a pressed / selected ghost button */
+  --tint: #efefec;           /* the project button under a session title */
+
+  --amber-bg: #fbf3e6;
+  --row-picked: #efefed;     /* the selected row */
+  --amber-ink: #7a4a00;
+  --red-ink: #b42318;
+  --red-bg: #fdecea;
+  --line-other: #bdbdc2;     /* outline */
+  --line-faint: #d8d8dc;     /* separators */
+  --flash: #fff4c2;          /* a turn or row jumped to, for a moment */
+
+  --dot-ok: #2e8b57;
+  --dot-warn: #c98a1b;
+  --dot-idle: #a0a0a6;
+
+  --shadow-sheet: 0 24px 64px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.12);
+
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
+  --r1: 6px; --r2: 8px; --r3: 12px; --r4: 14px;
+  --t11: 11px; --t12: 12px; --t13: 13px; --t15: 15px; --t19: 19px;
+
+  --fast: 120ms;
+  --sheet: 150ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+
+  --font-ui: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Segoe UI", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-window: #1e1e20;
+    --bg-sidebar: #252527;
+    --bg-list: #212123;
+    --bg-hover: rgba(255, 255, 255, 0.05);
+    --bg-selected: #30302f;
+    --selection-bg: #3b3c38;
+    --bg-sunken: #29292c;
+    --bubble: #2f2f32;
+    --bg-overlay: rgba(0, 0, 0, 0.45);
+    --bg-elevated: #2a2a2d;
+
+    --ink: #ececef;
+    --ink-2: #a8a8b0;
+    --ink-3: #7c7c84;
+    --divider: #333336;
+    --border: #3d3d41;
+    --focus: #6f93f0;
+
+    --primary: #ececef;
+    --primary-ink: #17171a;
+    --ghost-ink: #c8c8ce;
+    --pressed: #3a3a3e;
+    --tint: #303033;
+
+    --amber-bg: #3a2e1a;
+    --row-picked: #30302f;
+    --amber-ink: #f0c987;
+    --red-ink: #f28b7d;
+    --red-bg: #3d2220;
+    --line-other: #5a5a60;
+    --line-faint: #3d3d41;
+    --flash: #4a4220;
+
+    --dot-ok: #4fbf7f;
+    --dot-warn: #e0a94a;
+    --dot-idle: #6a6a70;
+
+    --shadow-sheet: 0 24px 64px rgba(0, 0, 0, 0.5), 0 0 0 0.5px rgba(255, 255, 255, 0.1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --fast: 0ms; --sheet: 0ms; }
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+  background: var(--bg-window);
+  color: var(--ink);
+  font: var(--t13)/1.5 var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  -webkit-user-select: none;
+  overflow: hidden;
+  cursor: default;
+}
+button, input { font: inherit; color: inherit; }
+:focus { outline: none; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--r1); }
+::selection { background: color-mix(in srgb, var(--focus) 30%, transparent); }

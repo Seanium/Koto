@@ -1,0 +1,323 @@
+name: Native builds and checks
+
+# Prepared for review. This workflow is manual until the repository is published
+# and its maintainers choose to enable push / pull_request triggers.
+on:
+  workflow_dispatch:
+    inputs:
+      include_windows:
+        description: 'Also test Windows (outside the initial beta scope)'
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    name: ${{ matrix.os }} / ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        # Explicit opt-in keeps unverified Windows builds out of the initial beta.
+        include: ${{ fromJSON(inputs.include_windows && '[{"os":"darwin","arch":"arm64","runner":"macos-15","runner_arch":"ARM64","python":"python3"},{"os":"darwin","arch":"amd64","runner":"macos-15-intel","runner_arch":"X64","python":"python3"},{"os":"linux","arch":"arm64","runner":"ubuntu-24.04-arm","runner_arch":"ARM64","python":"python3"},{"os":"linux","arch":"amd64","runner":"ubuntu-24.04","runner_arch":"X64","python":"python3"},{"os":"windows","arch":"arm64","runner":"windows-11-arm","runner_arch":"ARM64","python":"python"},{"os":"windows","arch":"amd64","runner":"windows-2025","runner_arch":"X64","python":"python"}]' || '[{"os":"darwin","arch":"arm64","runner":"macos-15","runner_arch":"ARM64","python":"python3"},{"os":"darwin","arch":"amd64","runner":"macos-15-intel","runner_arch":"X64","python":"python3"},{"os":"linux","arch":"arm64","runner":"ubuntu-24.04-arm","runner_arch":"ARM64","python":"python3"},{"os":"linux","arch":"amd64","runner":"ubuntu-24.04","runner_arch":"X64","python":"python3"}]') }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      KOTO_CI_OS: ${{ matrix.os }}
+      KOTO_CI_ARCH: ${{ matrix.arch }}
+      KOTO_CI_RUNNER_ARCH: ${{ matrix.runner_arch }}
+      KOTO_NODE_VERSION: 24.22.0
+      KOTO_UV_VERSION: 0.11.14
+      KOTO_SKIP_FRONTEND_BUILD: '1'
+      GOTOOLCHAIN: local
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install verified toolchains inside the checkout
+        run: |
+          test "$RUNNER_ARCH" = "$KOTO_CI_RUNNER_ARCH"
+          ${{ matrix.python }} - <<'PY'
+          import hashlib, json, os, pathlib, re, shutil, tarfile, urllib.request, zipfile
+          root = pathlib.Path(os.environ['GITHUB_WORKSPACE']).resolve()
+          app = root / 'app'
+          tools = app / '.tools'
+          cache = app / '.cache'
+          downloads = cache / 'downloads'
+          for path in [tools, tools/'bin', downloads, cache/'ci', cache/'tmp', cache/'gopath', cache/'gomod', cache/'gobuild', cache/'npm']:
+              path.mkdir(parents=True, exist_ok=True)
+          target_os, arch = os.environ['KOTO_CI_OS'], os.environ['KOTO_CI_ARCH']
+          go_version = re.search(r'^go (\S+)$', (app/'go.mod').read_text(), re.M)[1]
+          node_version = os.environ['KOTO_NODE_VERSION']
+          def read(url):
+              with urllib.request.urlopen(url, timeout=60) as response:
+                  return response.read()
+          def download(url, name, expected):
+              destination = downloads / name
+              digest = hashlib.sha256()
+              with urllib.request.urlopen(url, timeout=120) as response, destination.open('wb') as output:
+                  while chunk := response.read(1024 * 1024):
+                      digest.update(chunk)
+                      output.write(chunk)
+              if digest.hexdigest() != expected:
+                  raise SystemExit('Checksum mismatch: ' + name)
+              return destination
+          def unpack(archive):
+              if archive.suffix == '.zip':
+                  with zipfile.ZipFile(archive) as source:
+                      source.extractall(tools)
+              else:
+                  with tarfile.open(archive) as source:
+                      source.extractall(tools, filter='data')
+          go_extension = 'zip' if target_os == 'windows' else 'tar.gz'
+          go_name = f'go{go_version}.{target_os}-{arch}.{go_extension}'
+          releases = json.loads(read('https://go.dev/dl/?mode=json&include=all'))
+          release = next(item for item in releases if item['version'] == 'go'+go_version)
+          go_sha = next(item['sha256'] for item in release['files'] if item['filename'] == go_name)
+          unpack(download('https://go.dev/dl/'+go_name, go_name, go_sha))
+          node_os = 'win' if target_os == 'windows' else target_os
+          node_arch = 'x64' if arch == 'amd64' else 'arm64'
+          node_stem = f'node-v{node_version}-{node_os}-{node_arch}'
+          node_name = node_stem + ('.zip' if target_os == 'windows' else '.tar.gz')
+          base = f'https://nodejs.org/dist/v{node_version}/'
+          checksums = dict(line.split()[::-1] for line in read(base+'SHASUMS256.txt').decode().splitlines())
+          unpack(download(base+node_name, node_name, checksums[node_name]))
+          (tools/node_stem).rename(tools/'node')
+          if target_os == 'darwin':
+              uv_arch = 'aarch64' if arch == 'arm64' else 'x86_64'
+              uv_stem = f'uv-{uv_arch}-apple-darwin'
+              uv_name = uv_stem+'.tar.gz'
+              uv_sha = {
+                  'arm64': '4333af5c0730d94323a7819bbdf87ce92dd07fc857d67fff0059e0fca31b5c02',
+                  'amd64': '9836c1440b0bd6aa5f81793648a339bd01d593b7b8f575de3b855dae4ab64654',
+              }[arch]
+              uv_url = 'https://github.com/astral-sh/uv/releases/download/'+os.environ['KOTO_UV_VERSION']+'/'+uv_name
+              unpack(download(uv_url, uv_name, uv_sha))
+              (tools/uv_stem/'uv').rename(tools/'bin/uv')
+              shutil.rmtree(tools/uv_stem)
+          suffix = '.exe' if target_os == 'windows' else ''
+          values = {
+              'GOROOT': tools/'go', 'GOPATH': cache/'gopath', 'GOMODCACHE': cache/'gomod',
+              'GOCACHE': cache/'gobuild', 'GOBIN': tools/'bin', 'npm_config_cache': cache/'npm',
+              'TMPDIR': cache/'tmp', 'TEMP': cache/'tmp', 'TMP': cache/'tmp',
+              'KOTO_CI_GO': tools/'go/bin'/('go'+suffix),
+          }
+          if target_os == 'darwin':
+              values['KOTO_UV'] = tools/'bin/uv'
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as output:
+              for key, value in values.items():
+                  output.write(f'{key}={value}\n')
+          with open(os.environ['GITHUB_PATH'], 'a', encoding='utf-8') as output:
+              for path in [tools/'go/bin', tools/'bin', tools/'node' if target_os == 'windows' else tools/'node/bin']:
+                  output.write(str(path)+'\n')
+          (cache/'ci/toolchains.json').write_text(json.dumps({'os':target_os,'arch':arch,'go':go_version,'go_sha256':go_sha,'node':node_version,'node_sha256':checksums[node_name]},indent=2)+'\n')
+          PY
+
+      - name: Confirm native compiler and Node architecture
+        run: |
+          test "$(go env GOHOSTOS)" = "$KOTO_CI_OS"
+          test "$(go env GOHOSTARCH)" = "$KOTO_CI_ARCH"
+          if [ "$KOTO_CI_ARCH" = amd64 ]; then NODE_ARCH=x64; else NODE_ARCH=arm64; fi
+          test "$(node -p process.arch)" = "$NODE_ARCH"
+          go version
+          node --version
+
+      - name: Prepare GTK3 and WebKitGTK 4.1 on the disposable Linux runner
+        if: matrix.os == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev xvfb xauth dbus-x11 openbox imagemagick dpkg-dev
+          pkg-config --modversion gtk+-3.0 webkit2gtk-4.1
+
+      - name: Copy the runner's NSIS distribution into project tools
+        if: matrix.os == 'windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $candidates = @()
+          $command = Get-Command makensis.exe -ErrorAction SilentlyContinue
+          if ($command) { $candidates += Split-Path $command.Source }
+          $candidates += "${env:ProgramFiles(x86)}\NSIS", "$env:ProgramFiles\NSIS"
+          $source = $candidates | Where-Object { Test-Path (Join-Path $_ 'makensis.exe') } | Select-Object -First 1
+          if (-not $source) { throw 'NSIS is absent from this runner image; no global installer will be run.' }
+          $target = Join-Path $env:GITHUB_WORKSPACE 'app/.tools/nsis'
+          New-Item -ItemType Directory -Path $target -Force | Out-Null
+          Copy-Item (Join-Path $source '*') $target -Recurse -Force
+          "NSISDIR=$target" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          & (Join-Path $target 'makensis.exe') /VERSION
+          if ($LASTEXITCODE -ne 0) { throw 'Project-local NSIS cannot run.' }
+
+      - name: Install the pinned Wails CLI into project tools
+        if: matrix.os == 'windows'
+        run: |
+          WAILS_VERSION=$(sed -n 's/^[[:space:]]*github.com\/wailsapp\/wails\/v3 \([^[:space:]]*\).*/\1/p' app/go.mod)
+          test -n "$WAILS_VERSION"
+          CGO_ENABLED=0 go install "github.com/wailsapp/wails/v3/cmd/wails3@$WAILS_VERSION"
+
+      - name: Build and test the frontend
+        id: frontend
+        run: |
+          npm --prefix app/frontend ci
+          npm --prefix app/frontend run build
+          node --experimental-strip-types --test app/frontend/tests/*.test.ts 2>&1 | tee app/.cache/ci/frontend-tests.txt
+
+      - name: Run native Go tests
+        id: core
+        run: |
+          case "$KOTO_CI_OS" in
+            linux)
+              KOTO_GO="$PWD/app/.tools/go/bin/go" app/scripts/test-linux-core.sh "$KOTO_CI_ARCH"
+              ;;
+            windows)
+              CGO_ENABLED=0 go -C app test -count=1 -json ./... | tee app/.cache/ci/go-tests.jsonl
+              ;;
+            darwin)
+              go -C app test -count=1 -json ./... | tee app/.cache/ci/go-tests.jsonl
+              ;;
+          esac
+
+      - name: Build the native package and verify its structure
+        id: package
+        run: |
+          case "$KOTO_CI_OS" in
+            darwin)
+              app/scripts/package-mac.sh "$KOTO_CI_ARCH"
+              ;;
+            linux)
+              KOTO_GO="$PWD/app/.tools/go/bin/go" app/scripts/linux-package.sh "$KOTO_CI_ARCH"
+              VERSION=$(cat app/VERSION)
+              DEB="app/bin/release/koto-$VERSION-linux-$KOTO_CI_ARCH.deb"
+              test "$(dpkg-deb -f "$DEB" Architecture)" = "$KOTO_CI_ARCH"
+              dpkg-deb -x "$DEB" app/.cache/ci/deb-root
+              test -x app/.cache/ci/deb-root/usr/lib/koto/koto-desktop
+              app/.cache/ci/deb-root/usr/bin/koto --help
+              ;;
+            windows)
+              KOTO_GO="$PWD/app/.tools/go/bin/go.exe" \
+              KOTO_WAILS="$PWD/app/.tools/bin/wails3.exe" \
+              KOTO_MAKENSIS="$PWD/app/.tools/nsis/makensis.exe" \
+                app/scripts/package-windows.sh "$KOTO_CI_ARCH"
+              "app/bin/release/windows-$KOTO_CI_ARCH/koto-cli.exe" --help
+              ;;
+          esac
+
+      - name: Exercise the native macOS WebView with synthetic sessions
+        if: matrix.os == 'darwin'
+        id: mac_smoke
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib, subprocess
+          root = pathlib.Path.cwd()
+          app = root/'app'
+          evidence = app/'.cache/ci'
+          sandbox = evidence/'mac-sandbox'
+          result_file = evidence/'platform-smoke-macos.json'
+          subprocess.run([os.environ['KOTO_CI_GO'],'run','./cmd/seed',str(sandbox)],cwd=app,check=True)
+          (sandbox/'app-prefs.json').write_text(json.dumps({'liveMinutes':0,'language':'zh','appearance':'light'}))
+          environment = dict(os.environ, KOTO_APP_SANDBOX=str(sandbox), KOTO_APP_PLATFORM_SMOKE=str(result_file), KOTO_APP_LIVE_MS='0')
+          binary = app/'bin/release'/('darwin-'+os.environ['KOTO_CI_ARCH'])/'koto.app/Contents/MacOS/koto'
+          with (evidence/'native-macos.log').open('w') as output:
+              subprocess.run([str(binary)],env=environment,stdout=output,stderr=subprocess.STDOUT,timeout=120,check=True)
+          result = json.loads(result_file.read_text())
+          assert result.get('passed') is True and result.get('os') == 'darwin' and result.get('arch') == os.environ['KOTO_CI_ARCH'], result
+          print(json.dumps(result,indent=2))
+          PY
+
+      - name: Exercise the packaged Linux GTK3 WebView under Xvfb
+        if: matrix.os == 'linux'
+        id: linux_smoke
+        run: |
+          KOTO_GO="$PWD/app/.tools/go/bin/go" \
+          KOTO_LINUX_BINARY="$PWD/app/.cache/ci/deb-root/usr/lib/koto/koto-desktop" \
+            app/scripts/test-linux.sh "$KOTO_CI_ARCH"
+
+      - name: Require a real WebView2 Runtime on Windows
+        if: matrix.os == 'windows'
+        id: webview2
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $keys = @(
+            'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}',
+            'HKLM:\SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}',
+            'HKCU:\Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+          )
+          $versions = @($keys | ForEach-Object { (Get-ItemProperty -Path $_ -Name pv -ErrorAction SilentlyContinue).pv } | Where-Object { $_ -and $_ -ne '0.0.0.0' })
+          $state = @{ runtimeVersions=$versions; interactive=[Environment]::UserInteractive; sessionId=(Get-Process -Id $PID).SessionId }
+          $state | ConvertTo-Json | Set-Content app/.cache/ci/windows-environment.json
+          if ($versions.Count -eq 0) { throw 'WebView2 Runtime is missing. Edge Stable is not a substitute; GUI verification has not run.' }
+          if (-not [Environment]::UserInteractive) { throw 'This hosted runner has no interactive Windows desktop. GUI verification has not run; use an interactive native runner.' }
+
+      - name: Exercise the native Windows WebView2 with synthetic sessions
+        if: matrix.os == 'windows'
+        id: windows_smoke
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $binary = Join-Path $env:GITHUB_WORKSPACE "app/bin/release/windows-$env:KOTO_CI_ARCH/koto.exe"
+          & ./app/scripts/test-windows.ps1 -Executable $binary -Go $env:KOTO_CI_GO
+          if ($LASTEXITCODE -ne 0) { throw 'Windows native WebView2 smoke failed.' }
+          $result = Get-Content "app/.cache/platform-smoke-windows-$env:KOTO_CI_ARCH.json" -Raw | ConvertFrom-Json
+          if ($result.passed -ne $true -or $result.os -ne 'windows' -or $result.arch -ne $env:KOTO_CI_ARCH) { throw 'Windows smoke JSON contract did not pass on this native architecture.' }
+
+      - name: Record each verification stage independently
+        if: always()
+        env:
+          FRONTEND_RESULT: ${{ steps.frontend.outcome }}
+          CORE_RESULT: ${{ steps.core.outcome }}
+          PACKAGE_RESULT: ${{ steps.package.outcome }}
+          MAC_GUI_RESULT: ${{ steps.mac_smoke.outcome }}
+          LINUX_GUI_RESULT: ${{ steps.linux_smoke.outcome }}
+          WINDOWS_RUNTIME_RESULT: ${{ steps.webview2.outcome }}
+          WINDOWS_GUI_RESULT: ${{ steps.windows_smoke.outcome }}
+        run: |
+          ${{ matrix.python }} - <<'PY'
+          import json, os, pathlib
+          directory = pathlib.Path('app/.cache/ci')
+          directory.mkdir(parents=True,exist_ok=True)
+          gui_key = {'darwin':'MAC_GUI_RESULT','linux':'LINUX_GUI_RESULT','windows':'WINDOWS_GUI_RESULT'}[os.environ['KOTO_CI_OS']]
+          result = {'os':os.environ['KOTO_CI_OS'],'arch':os.environ['KOTO_CI_ARCH'],'frontend':os.environ['FRONTEND_RESULT'],'go_tests':os.environ['CORE_RESULT'],'package':os.environ['PACKAGE_RESULT'],'native_gui':os.environ[gui_key],'webview2_preflight':os.environ['WINDOWS_RUNTIME_RESULT']}
+          (directory/'stages.json').write_text(json.dumps(result,indent=2)+'\n')
+          with open(os.environ['GITHUB_STEP_SUMMARY'],'a',encoding='utf-8') as output:
+              output.write('| Stage | Result |\n| --- | --- |\n')
+              for key,value in result.items():
+                  output.write(f'| {key} | {value or "not run"} |\n')
+              output.write('\nArtifacts are unsigned CI previews, not published releases. A build or package result does not replace a passing native WebView smoke JSON. Windows hosted desktop availability can prevent GUI verification.\n')
+          PY
+
+      - name: Retain CI packages and bounded test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: koto-${{ matrix.os }}-${{ matrix.arch }}-ci-${{ github.run_attempt }}
+          retention-days: 14
+          if-no-files-found: warn
+          include-hidden-files: true
+          path: |
+            app/bin/release/*.dmg
+            app/bin/release/*.deb
+            app/bin/release/*.tar.gz
+            app/bin/release/*.exe
+            app/bin/release/*.sha256
+            app/bin/release/windows-*/*.exe
+            app/.cache/ci/*.json
+            app/.cache/ci/*.jsonl
+            app/.cache/ci/*.txt
+            app/.cache/ci/*.log
+            app/.cache/linux-core-*/tests.jsonl
+            app/.cache/linux-core-*/build.log
+            app/.cache/linux-smoke-*/result.json
+            app/.cache/linux-smoke-*/native.log
+            app/.cache/linux-smoke-*/native-window.png
+            app/.cache/platform-smoke-windows-*.json
+            app/.cache/platform-smoke-windows-*.log
+            app/.cache/windows-smoke-*-result.json
+            app/.cache/windows-smoke-*-stdout.log
+            app/.cache/windows-smoke-*-stderr.log

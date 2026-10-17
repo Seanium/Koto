@@ -1,0 +1,50 @@
+# Feel free to remove those if you don't want/need to use them.
+# Make sure to check the documentation at https://nfpm.goreleaser.com
+#
+# The lines below are called `modelines`. See `:help modeline`
+
+name: "koto"
+arch: ${GOARCH}
+platform: "linux"
+version: "0.1.0"
+section: "utils"
+priority: "optional"
+maintainer: "Koto contributors"
+description: "Continue a coding-agent session in another agent"
+vendor: "koto"
+license: "MIT"
+release: "1"
+
+contents:
+  - src: "./bin/koto"
+    dst: "/usr/lib/koto/koto-desktop"
+  - src: "./brand/appicon.png"
+    dst: "/usr/share/icons/hicolor/1024x1024/apps/koto.png"
+  - src: "./build/linux/koto.desktop"
+    dst: "/usr/share/applications/koto.desktop"
+
+# Builds use -tags production,gtk3, matching this runtime dependency stack.
+depends:
+  - libgtk-3-0
+  - libwebkit2gtk-4.1-0
+  - libayatana-appindicator3-1
+
+# Distribution-specific overrides for different package formats
+overrides:
+  # RPM packages for Fedora / RHEL / AlmaLinux / Rocky Linux
+  rpm:
+    depends:
+      - gtk3
+      - webkit2gtk4.1
+      - libayatana-appindicator-gtk3
+
+  # Arch Linux packages
+  archlinux:
+    depends:
+      - gtk3
+      - webkit2gtk-4.1
+      - libayatana-appindicator
+
+# scripts section to ensure desktop database is updated after install
+scripts:
+  postinstall: "./build/linux/nfpm/scripts/postinstall.sh"

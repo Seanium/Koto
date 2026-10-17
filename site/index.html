@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Copy conversations without repeating yourself. Compare sessions to see what changed.">
+  <meta name="color-scheme" content="light dark">
+  <title>koto — copy sessions between agents</title>
+  <link rel="icon" href="favicon.svg?v=native-emoji" type="image/svg+xml">
+  <script>try{const p=localStorage.getItem("koto-site-appearance")||"system";document.documentElement.dataset.theme=p==="dark"||p!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}catch{document.documentElement.dataset.theme=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}</script>
+  <link rel="stylesheet" href="style.css?v=beta-0.1.0-1">
+  <script type="module" src="main.js?v=beta-0.1.0-1"></script>
+</head>
+<body>
+  <a class="skip" href="#main" data-i18n="skip">Skip to content</a>
+  <header class="header wrap">
+    <a class="wordmark" href="#" aria-label="koto home"><span class="wordmark-icon" aria-hidden="true">💬</span><span class="wordmark-name">koto<span class="wordmark-dot">.</span></span></a>
+    <nav aria-label="Main navigation">
+      <a class="github-link" href="https://github.com/Seanium/Koto" target="_blank" rel="noopener noreferrer" aria-label="GitHub repository" title="GitHub"><svg aria-hidden="true" fill="currentColor" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M6.766 11.328c-2.063-.25-3.516-1.734-3.516-3.656 0-.781.281-1.625.75-2.188-.203-.515-.172-1.609.063-2.062.625-.078 1.468.25 1.968.703.594-.187 1.219-.281 1.985-.281.765 0 1.39.094 1.953.265.484-.437 1.344-.765 1.969-.687.218.422.25 1.515.046 2.047.5.593.766 1.39.766 2.203 0 1.922-1.453 3.375-3.547 3.64.531.344.89 1.094.89 1.954v1.625c0 .468.391.734.86.547C13.781 14.359 16 11.53 16 8.03 16 3.61 12.406 0 7.984 0 3.563 0 0 3.61 0 8.031a7.88 7.88 0 0 0 5.172 7.422c.422.156.828-.125.828-.547v-1.25c-.219.094-.5.156-.75.156-1.031 0-1.64-.562-2.078-1.609-.172-.422-.36-.672-.719-.719-.187-.015-.25-.093-.25-.187 0-.188.313-.328.625-.328.453 0 .844.281 1.25.86.313.452.64.655 1.031.655s.641-.14 1-.5c.266-.265.47-.5.657-.656"/></svg></a>
+      <div class="preferences">
+        <label class="icon-control language-control" title="Language"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c5 5 5 13 0 18-5-5-5-13 0-18Z"/></svg>
+        <select id="language-select" aria-label="Language">
+          <option value="system" data-i18n="system">System</option><option value="en">English</option><option value="zh">简体中文</option><option value="zh-TW">繁體中文</option><option value="ja">日本語</option><option value="de">Deutsch</option>
+        </select>
+        </label>
+        <label class="icon-control appearance-control" title="Appearance"><svg data-appearance="system" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4"/></svg><svg data-appearance="light" hidden viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg><svg data-appearance="dark" hidden viewBox="0 0 24 24" aria-hidden="true"><path d="M20.3 15.2A9 9 0 0 1 8.8 3.7a9 9 0 1 0 11.5 11.5Z"/></svg>
+        <select id="appearance-select" aria-label="Appearance">
+          <option value="system" data-i18n="system">System</option><option value="light" data-i18n="light">Light</option><option value="dark" data-i18n="dark">Dark</option>
+        </select>
+        </label>
+      </div>
+    </nav>
+  </header>
+  <main id="main">
+    <section class="hero wrap">
+      <h1><span class="hero-agent-line"><span class="sr-only" data-i18n="hero1">Switch agents.</span><span aria-hidden="true" data-i18n="hero1Prefix">Switch</span><span class="hero-agent" aria-hidden="true"><img class="is-active" src="assets/claude-code.svg" alt=""><img src="assets/codex.svg" alt=""><img src="assets/pi.svg" alt=""><img src="assets/dsh.svg" alt=""><img src="assets/antigravity.svg" alt=""></span><span aria-hidden="true" data-i18n="hero1Suffix">agents.</span></span><br><span class="accent typewriter"><span class="sr-only" data-i18n="hero2">Keep talking.</span><span id="hero-typed" aria-hidden="true">Keep talking.</span></span></h1>
+      <p class="lead"><span class="lead-line"><span data-i18n="lead1a">Copy conversations </span><span data-i18n="lead1b">without repeating yourself.</span></span><span class="lead-line"><span data-i18n="lead2a">Compare sessions </span><span data-i18n="lead2b">to see what changed.</span></span></p>
+    </section>
+
+    <section class="showcase wrap" id="screenshots" aria-label="Application screenshots">
+      <div class="tabs" role="tablist" aria-label="Application views">
+        <button id="copy-tab" role="tab" type="button" aria-selected="true" aria-controls="copy-panel" aria-describedby="copy-description"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M7.024 3.75c0-.966.784-1.75 1.75-1.75H20.25c.966 0 1.75.784 1.75 1.75v11.498a1.75 1.75 0 0 1-1.75 1.75H8.774a1.75 1.75 0 0 1-1.75-1.75Zm1.75-.25a.25.25 0 0 0-.25.25v11.498c0 .139.112.25.25.25H20.25a.25.25 0 0 0 .25-.25V3.75a.25.25 0 0 0-.25-.25Z"/><path d="M1.995 10.749a1.75 1.75 0 0 1 1.75-1.751H5.25a.75.75 0 1 1 0 1.5H3.745a.25.25 0 0 0-.25.25L3.5 20.25c0 .138.111.25.25.25h9.5a.25.25 0 0 0 .25-.25v-1.51a.75.75 0 1 1 1.5 0v1.51A1.75 1.75 0 0 1 13.25 22h-9.5A1.75 1.75 0 0 1 2 20.25l-.005-9.501Z"/></svg><span data-i18n="copyTab">Session copy</span></button>
+        <button id="tree-tab" role="tab" type="button" aria-selected="false" aria-controls="tree-panel" aria-describedby="tree-description" tabindex="-1"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M15 4.75a3.25 3.25 0 1 1 6.5 0 3.25 3.25 0 0 1-6.5 0ZM2.5 19.25a3.25 3.25 0 1 1 6.5 0 3.25 3.25 0 0 1-6.5 0Zm0-14.5a3.25 3.25 0 1 1 6.5 0 3.25 3.25 0 0 1-6.5 0ZM5.75 6.5a1.75 1.75 0 1 0-.001-3.501A1.75 1.75 0 0 0 5.75 6.5Zm0 14.5a1.75 1.75 0 1 0-.001-3.501A1.75 1.75 0 0 0 5.75 21Zm12.5-14.5a1.75 1.75 0 1 0-.001-3.501A1.75 1.75 0 0 0 18.25 6.5Z"/><path d="M5.75 16.75A.75.75 0 0 1 5 16V8a.75.75 0 0 1 1.5 0v8a.75.75 0 0 1-.75.75Z"/><path d="M17.5 8.75v-1H19v1a3.75 3.75 0 0 1-3.75 3.75h-7a1.75 1.75 0 0 0-1.75 1.75H5A3.25 3.25 0 0 1 8.25 11h7a2.25 2.25 0 0 0 2.25-2.25Z"/></svg><span data-i18n="treeTab">Session tree</span></button>
+        <button id="diff-tab" role="tab" type="button" aria-selected="false" aria-controls="diff-panel" aria-describedby="diff-description" tabindex="-1"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M12.25 3.5a.75.75 0 0 1 .75.75V8.5h4.25a.75.75 0 0 1 0 1.5H13v4.25a.75.75 0 0 1-1.5 0V10H7.25a.75.75 0 0 1 0-1.5h4.25V4.25a.75.75 0 0 1 .75-.75ZM6.562 19.25a.75.75 0 0 1 .75-.75h9.938a.75.75 0 0 1 0 1.5H7.312a.75.75 0 0 1-.75-.75Z"/></svg><span data-i18n="diffTab">Session diff</span></button>
+      </div>
+      <div class="showcase-descriptions">
+        <p id="copy-description" class="is-active" data-i18n="copyText">Copy a session to another agent.</p>
+        <p id="tree-description" aria-hidden="true" data-i18n="treeText">See shared history and branches.</p>
+        <p id="diff-description" aria-hidden="true" data-i18n="diffText">Compare changes line by line.</p>
+      </div>
+      <div class="screenshot-panel" id="copy-panel" role="tabpanel" aria-labelledby="copy-tab">
+        <p class="screenshot-placeholder" data-i18n="screenshotPending">Screenshot in preparation</p>
+          <img class="screenshot" hidden data-screen="copy" width="2562" height="1522" alt="koto's copy dialog lets you choose a destination agent for selected conversation turns.">
+      </div>
+      <div class="screenshot-panel" id="tree-panel" role="tabpanel" aria-labelledby="tree-tab" hidden>
+        <p class="screenshot-placeholder" data-i18n="screenshotPending">Screenshot in preparation</p>
+          <img class="screenshot" hidden data-screen="tree" width="2562" height="1522" alt="koto shows the common history and branches of related sessions in a tree.">
+      </div>
+      <div class="screenshot-panel" id="diff-panel" role="tabpanel" aria-labelledby="diff-tab" hidden>
+        <p class="screenshot-placeholder" data-i18n="screenshotPending">Screenshot in preparation</p>
+          <img class="screenshot" hidden data-screen="diff" width="2562" height="1522" alt="koto compares two sessions side by side, highlighting differences in prompts and replies.">
+      </div>
+    </section>
+
+    <section class="cli wrap" aria-labelledby="cli-title">
+      <div class="cli-intro">
+        <h2 id="cli-title"><span data-i18n="cliTitleLead">There’s also koto CLI.</span> <span class="cli-title-action"><span data-i18n="cliTitleActionIntro">Copy a session. </span><span data-i18n="cliTitleActionEnd">Just ask.</span></span></h2>
+        <p data-i18n="cliScope">Included with the app.</p>
+      </div>
+      <figure class="cli-demo" aria-label="Example of copying a conversation with koto CLI">
+        <blockquote class="cli-message cli-request"><span class="sr-only" data-i18n="cliRequest">Use koto to copy this session to pi.</span><span class="dialogue-typed" id="cli-request-typed" aria-hidden="true">Use koto to copy this session to pi.</span></blockquote>
+        <div class="cli-message cli-response"><p><span class="sr-only" data-i18n="cliResponse">Copied 5 turns to pi.</span><span class="dialogue-typed" id="cli-response-typed" aria-hidden="true">Copied 5 turns to pi.</span></p><p class="cli-instruction"><span class="sr-only" data-i18n="cliInstruction">Open the copied session in pi with this command:</span><span class="dialogue-typed" id="cli-instruction-typed" aria-hidden="true">Open the copied session in pi with this command:</span></p><pre><code><span class="sr-only" data-i18n="cliCommand">cd &lt;project&gt; &amp;&amp; pi --session &lt;id&gt;</span><span class="dialogue-typed" id="cli-command-typed" aria-hidden="true">cd &lt;project&gt; &amp;&amp; pi --session &lt;id&gt;</span></code></pre></div>
+      </figure>
+    </section>
+
+    <section class="agents wrap" aria-labelledby="agents-title">
+      <h2 id="agents-title" data-i18n="agentsTitle">Works with your agents</h2>
+      <div class="agent-list">
+        <span><img src="assets/claude-code.svg" alt="">Claude Code</span>
+        <span><img src="assets/codex.svg" alt="">Codex</span>
+        <span><img src="assets/pi.svg" alt="">pi</span>
+        <span><img src="assets/dsh.svg" alt="">DeepSeek Harness</span>
+        <span><img src="assets/antigravity.svg" alt="">Antigravity CLI</span>
+        <span class="agent-roadmap" data-i18n="moreAgents">More agents coming soon.</span>
+      </div>
+    </section>
+
+    <section class="download wrap" id="get-koto">
+      <h2 data-i18n="getTitle">Get koto</h2>
+      <div class="download-status">
+        <div class="download-controls"><label class="sr-only" for="release-asset" data-i18n="downloadPlatform">Platform and architecture</label><select id="release-asset"><option value="" disabled selected data-i18n="downloadChoose">Choose a version</option></select><a class="download-button" id="release-download" role="link" aria-disabled="true" data-i18n="downloadPending">Coming soon</a></div>
+      </div>
+    </section>
+  </main>
+  <footer class="wrap"><a class="wordmark" href="#" aria-label="koto home"><span class="wordmark-icon" aria-hidden="true">💬</span><span class="wordmark-name">koto<span class="wordmark-dot">.</span></span></a><span>MIT © Seanium</span></footer>
+</body>
+</html>

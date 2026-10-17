@@ -1,0 +1,28 @@
+{
+  "name": "koto-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Frontend of the koto desktop app (Wails v3 + Vite + React)",
+  "scripts": {
+    "dev": "vite",
+    "build:dev": "tsc -p tsconfig.json && vite build --minify false --mode development",
+    "build": "tsc -p tsconfig.json && vite build --mode production",
+    "typecheck": "tsc -p tsconfig.json",
+    "seed": "cd .. && . ./env.sh && go run ./cmd/seed"
+  },
+  "dependencies": {
+    "@wailsio/runtime": "3.0.0-beta.24",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.4"
+  }
+}

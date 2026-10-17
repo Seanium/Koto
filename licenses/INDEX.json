@@ -1,0 +1,351 @@
+{
+  "packages": [
+    {
+      "ecosystem": "go",
+      "name": "github.com/klauspost/compress",
+      "version": "v1.20.3",
+      "directory": "go/github.com_klauspost_compress@v1.20.3"
+    },
+    {
+      "ecosystem": "go",
+      "name": "github.com/wailsapp/wails/v3",
+      "version": "v3.0.0-beta.24",
+      "directory": "go/github.com_wailsapp_wails_v3@v3.0.0-beta.24"
+    },
+    {
+      "ecosystem": "go",
+      "name": "golang.org/x/sys",
+      "version": "v0.48.0",
+      "directory": "go/golang.org_x_sys@v0.48.0"
+    },
+    {
+      "ecosystem": "go",
+      "name": "golang.org/x/text",
+      "version": "v0.43.0",
+      "directory": "go/golang.org_x_text@v0.43.0"
+    },
+    {
+      "ecosystem": "go",
+      "name": "modernc.org/sqlite",
+      "version": "v1.60.1",
+      "directory": "go/modernc.org_sqlite@v1.60.1"
+    },
+    {
+      "ecosystem": "go",
+      "name": "github.com/adrg/xdg",
+      "version": "v0.5.3",
+      "directory": "go/github.com_adrg_xdg@v0.5.3"
+    },
+    {
+      "ecosystem": "go",
+      "name": "github.com/coder/websocket",
+      "version": "v1.8.14",
+      "directory": "go/github.com_coder_websocket@v1.8.14"
+    },
+    {
+      "ecosystem": "go",
+      "name": "github.com/dustin/go-humanize",
+      "version": "v1.0.1",
+      "directory": "go/github.com_dustin_go-humanize@v1.0.1"
+    },
+    {
+      "ecosystem": "go",
+      "name": "github.com/go-ole/go-ole",
+      "version": "v1.3.0",
+      "directory": "go/github.com_go-ole_go-ole@v1.3.0"
+    },
+    {
+      "ecosystem": "go",
+      "name": "github.com/godbus/dbus/v5",
+      "version": "v5.2.2",
+      "directory": "go/github.com_godbus_dbus_v5@v5.2.2"
+    },
+    {
+      "ecosystem": "go",
+      "name": "github.com/google/uuid",
+      "version": "v1.6.0",
+      "directory": "go/github.com_google_uuid@v1.6.0"
+    },
+    {
+      "ecosystem": "go",
+      "name": "github.com/mattn/go-colorable",
+      "version": "v0.1.14",
+      "directory": "go/github.com_mattn_go-colorable@v0.1.14"
+    },
+    {
+      "ecosystem": "go",
+      "name": "github.com/mattn/go-isatty",
+      "version": "v0.0.24",
+      "directory": "go/github.com_mattn_go-isatty@v0.0.24"
+    },
+    {
+      "ecosystem": "go",
+      "name": "github.com/ncruces/go-strftime",
+      "version": "v1.0.0",
+      "directory": "go/github.com_ncruces_go-strftime@v1.0.0"
+    },
+    {
+      "ecosystem": "go",
+      "name": "github.com/remyoudompheng/bigfft",
+      "version": "v0.0.0-20230129092748-24d4a6f8daec",
+      "directory": "go/github.com_remyoudompheng_bigfft@v0.0.0-20230129092748-24d4a6f8daec"
+    },
+    {
+      "ecosystem": "go",
+      "name": "modernc.org/libc",
+      "version": "v1.77.1",
+      "directory": "go/modernc.org_libc@v1.77.1"
+    },
+    {
+      "ecosystem": "go",
+      "name": "modernc.org/mathutil",
+      "version": "v1.7.1",
+      "directory": "go/modernc.org_mathutil@v1.7.1"
+    },
+    {
+      "ecosystem": "go",
+      "name": "modernc.org/memory",
+      "version": "v1.12.1",
+      "directory": "go/modernc.org_memory@v1.12.1"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@oxc-project/types",
+      "version": "0.154.0",
+      "directory": "npm/@oxc-project_types@0.154.0"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@rolldown/binding-darwin-arm64",
+      "version": "1.2.14",
+      "directory": "npm/@rolldown_binding-darwin-arm64@1.2.14"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@rolldown/pluginutils",
+      "version": "1.0.1",
+      "directory": "npm/@rolldown_pluginutils@1.0.1"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@types/node",
+      "version": "24.19.2",
+      "directory": "npm/@types_node@24.19.2"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@types/react",
+      "version": "19.3.0",
+      "directory": "npm/@types_react@19.3.0"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@types/react-dom",
+      "version": "19.3.0",
+      "directory": "npm/@types_react-dom@19.3.0"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@vitejs/plugin-react",
+      "version": "6.1.2",
+      "directory": "npm/@vitejs_plugin-react@6.1.2"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@wailsio/runtime",
+      "version": "3.0.0-beta.24",
+      "directory": "npm/@wailsio_runtime@3.0.0-beta.24"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "csstype",
+      "version": "3.2.3",
+      "directory": "npm/csstype@3.2.3"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "detect-libc",
+      "version": "2.1.2",
+      "directory": "npm/detect-libc@2.1.2"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "fdir",
+      "version": "6.5.0",
+      "directory": "npm/fdir@6.5.0"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "fsevents",
+      "version": "2.3.3",
+      "directory": "npm/fsevents@2.3.3"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "lightningcss",
+      "version": "1.33.0",
+      "directory": "npm/lightningcss@1.33.0"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "lightningcss-darwin-arm64",
+      "version": "1.33.0",
+      "directory": "npm/lightningcss-darwin-arm64@1.33.0"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "nanoid",
+      "version": "3.3.20",
+      "directory": "npm/nanoid@3.3.20"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "picocolors",
+      "version": "1.1.1",
+      "directory": "npm/picocolors@1.1.1"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "picomatch",
+      "version": "4.0.7",
+      "directory": "npm/picomatch@4.0.7"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "postcss",
+      "version": "8.5.30",
+      "directory": "npm/postcss@8.5.30"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "react",
+      "version": "19.3.1",
+      "directory": "npm/react@19.3.1"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "react-dom",
+      "version": "19.3.1",
+      "directory": "npm/react-dom@19.3.1"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "rolldown",
+      "version": "1.2.14",
+      "directory": "npm/rolldown@1.2.14"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "scheduler",
+      "version": "0.28.0",
+      "directory": "npm/scheduler@0.28.0"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "source-map-js",
+      "version": "1.2.2",
+      "directory": "npm/source-map-js@1.2.2"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "tinyglobby",
+      "version": "0.2.17",
+      "directory": "npm/tinyglobby@0.2.17"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "typescript",
+      "version": "5.9.3",
+      "directory": "npm/typescript@5.9.3"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "undici-types",
+      "version": "7.24.6",
+      "directory": "npm/undici-types@7.24.6"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "vite",
+      "version": "8.3.4",
+      "directory": "npm/vite@8.3.4"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "zustand",
+      "version": "5.0.15",
+      "directory": "npm/zustand@5.0.15"
+    }
+  ],
+  "files": {
+    "assets/lobe-icons-LICENSE": "add9d7531d1b21646317a8958e38fc727506fa39d24bdecb44154d943c82753a",
+    "assets/magpie-LICENSE": "79d2c8444715d4bc453ec4f8a0aaf2051a4c1ee5ac08f5bd2e5848aef87c7572",
+    "assets/octicons-LICENSE": "da259c8bd0de62713ccdcf88910aebca810644f98c2c912bad814fc79ea778df",
+    "go/github.com_adrg_xdg@v0.5.3/LICENSE": "fb119fabde05e05b70b07f445b3f41863b22326c0ebb5b7bee9f0309112d3640",
+    "go/github.com_coder_websocket@v1.8.14/LICENSE.txt": "cc0975a5f6305145bdd7b41ce9479632fdac3870e6ac4281f28017f18c767c4e",
+    "go/github.com_dustin_go-humanize@v1.0.1/LICENSE": "a973b4498c13eb74baa2a8e5c351426a6826f2fcdd909916dbe53ee2e755fd71",
+    "go/github.com_go-ole_go-ole@v1.3.0/LICENSE": "d883dbca28769ff23dd4368a8edb7ad9f9f23a8f86adde2875c6e41a828aac62",
+    "go/github.com_godbus_dbus_v5@v5.2.2/LICENSE": "e4646a82a976369d7ae8f6ed5c11d35dc0af18433a8ccc24c85b459ad8b95128",
+    "go/github.com_google_uuid@v1.6.0/LICENSE": "0a8d61ed3cbfd5312326e8126c31ce9c627a283adc99131b56896d29ada04b2d",
+    "go/github.com_klauspost_compress@v1.20.3/LICENSE": "0d9e582ee4bff57bf1189c9e514e6da7ce277f9cd3bc2d488b22fbb39a6d87cf",
+    "go/github.com_klauspost_compress@v1.20.3/gzhttp/LICENSE": "2252a5b1e2b1d3663b53ea77051b8ed065cb9270a3d1174d5d6ead8a2de051b6",
+    "go/github.com_klauspost_compress@v1.20.3/internal/lz4ref/LICENSE": "6a358d2540ca14048f02d366f23787c0a480157e58f058113f0e27168dd4e447",
+    "go/github.com_klauspost_compress@v1.20.3/internal/snapref/LICENSE": "f69f157b0be75da373605dbc8bbf142e8924ee82d8f44f11bcaf351335bf98cf",
+    "go/github.com_klauspost_compress@v1.20.3/s2/LICENSE": "08683b14bda8ae3538abf19e1879e853a39e3b8276a8d673363b529d15a61c1a",
+    "go/github.com_klauspost_compress@v1.20.3/s2/cmd/internal/filepathx/LICENSE": "8582c87d9a6baa28f7827c5205b7d16c3179bc794ebd4c7cc287c49a89b7eaa1",
+    "go/github.com_klauspost_compress@v1.20.3/s2/cmd/internal/readahead/LICENSE": "10fa24a602fde465db603cd5d546e37e33642a73cd24ddf5910be81724fec8b2",
+    "go/github.com_klauspost_compress@v1.20.3/snappy/LICENSE": "f69f157b0be75da373605dbc8bbf142e8924ee82d8f44f11bcaf351335bf98cf",
+    "go/github.com_klauspost_compress@v1.20.3/snappy/xerial/LICENSE": "d4ff111fa30ac75e28dca3868de957a3b73ff50b76bc4b8fe5c3a1f008d26703",
+    "go/github.com_klauspost_compress@v1.20.3/zstd/internal/xxhash/LICENSE.txt": "f566a9f97bacdaf00d9f21dd991e81dc11201c4e016c86b470799429a1c9a79c",
+    "go/github.com_mattn_go-colorable@v0.1.14/LICENSE": "88a2379b3ca34bf5c57127aff9dcb802bbb60ece0805cdbda65b3bd115f971d9",
+    "go/github.com_mattn_go-isatty@v0.0.24/LICENSE": "08eab1118c80885fa1fa6a6dd7303f65a379fcb3733e063d20d1bbc2c76e6fa1",
+    "go/github.com_ncruces_go-strftime@v1.0.0/LICENSE": "38ae43959daf953a393a585b2988672cb65a5a541aca0d0be5e72595a0a16883",
+    "go/github.com_remyoudompheng_bigfft@v0.0.0-20230129092748-24d4a6f8daec/LICENSE": "dd26a7abddd02e2d0aba97805b31f248ef7835d9e10da289b22e3b8ab78b324d",
+    "go/github.com_wailsapp_wails_v3@v3.0.0-beta.24/LICENSE": "cede95c28e6e9d67d1c1e49e8ba3c20250c7d4080c3faca1579b6732327ae40d",
+    "go/github.com_wailsapp_wails_v3@v3.0.0-beta.24/internal/go-common-file-dialog/LICENSE": "2c09e92358414ef4da9739026acadfbd0663118e590238b306d70ccf60db3159",
+    "go/github.com_wailsapp_wails_v3@v3.0.0-beta.24/internal/templates/ios/frontend/public/puppertino/LICENSE": "a82239687742375c71ef1cc05b9351f86db937b0dba8120c1f0a02e2b444508b",
+    "go/github.com_wailsapp_wails_v3@v3.0.0-beta.24/internal/webview2/webviewloader/LICENSE": "e2c9290019954c3c3664428b73b34186b2bb8faad9b2c50605d7cdd9df5c7177",
+    "go/golang.org_x_sys@v0.48.0/LICENSE": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+    "go/golang.org_x_text@v0.43.0/LICENSE": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+    "go/modernc.org_libc@v1.77.1/LICENSE": "95ff867eb55a56935fa7492406cfa953fb7c13ca73f4c0a86ae05756b4605600",
+    "go/modernc.org_libc@v1.77.1/LICENSE-3RD-PARTY.md": "f597097efe3d97021f89170746bd3a0fb9a8b6fb26b82043ed68a4e0283bee6c",
+    "go/modernc.org_mathutil@v1.7.1/LICENSE": "bfa9bf72a72ca009fd62a8f84fca3dca67e51d93af96352723646599898b6cf5",
+    "go/modernc.org_mathutil@v1.7.1/mersenne/LICENSE": "c05630f9ca899ea094620d37daea6ba66f99adbf9268ea5fea9db607e1102bd9",
+    "go/modernc.org_memory@v1.12.1/LICENSE": "59895e669f48f168b6b858358f6005779cdf40a265f7828813061b56af67b496",
+    "go/modernc.org_memory@v1.12.1/LICENSE-GO": "2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067",
+    "go/modernc.org_memory@v1.12.1/LICENSE-LOGO": "5ae5bee3072a841376451b48d8cfcec7188e10543926d5870828d36c8a750dc5",
+    "go/modernc.org_memory@v1.12.1/LICENSE-MMAP-GO": "c2eba69f20d05414538c3a5df7694dde392e065ff70882e1625e90f5d6659fff",
+    "go/modernc.org_sqlite@v1.60.1/LICENSE": "c6fe05491a60ae13bcd223088d2705e36dede24e5587226231d2459ada5c4822",
+    "go/modernc.org_sqlite@v1.60.1/LICENSE-3RD-PARTY.md": "b4366b9c27a9364633e015011a231913ed19bf1228f335bf617e50a6f7b168a6",
+    "go/modernc.org_sqlite@v1.60.1/LICENSE-SQLITE": "8438c9c89b849131ead81d5435cb97fcf052df5b0b286dda8a2d4c29e6cb3fd0",
+    "go/modernc.org_sqlite@v1.60.1/LICENSE-SQLITE_VEC": "6ce72bbe12d975bd5286e5ab0a064c069693300c47bccbc57bec18485f1621ea",
+    "npm/@oxc-project_types@0.154.0/LICENSE": "95ced5ecf1133fbf41d409b5555c86c344f83f3b019926057ddbc07cfdcc27b3",
+    "npm/@rolldown_binding-darwin-arm64@1.2.14/LICENSE": "23ecfff35a5a2e80d92142f75228912c3b1abc4b5a8337a821ff4397e2f9f734",
+    "npm/@rolldown_pluginutils@1.0.1/LICENSE": "e1919b3b98b8bf6c1b99fcc60a0ed46027c97ac947432e1278446c9606f50161",
+    "npm/@types_node@24.19.2/LICENSE": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383",
+    "npm/@types_react-dom@19.3.0/LICENSE": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383",
+    "npm/@types_react@19.3.0/LICENSE": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383",
+    "npm/@vitejs_plugin-react@6.1.2/LICENSE": "29b68325fe026047d13e187b44c33b2acacf7dc647dec4583702e59f235e13b5",
+    "npm/@wailsio_runtime@3.0.0-beta.24/LICENSE": "cede95c28e6e9d67d1c1e49e8ba3c20250c7d4080c3faca1579b6732327ae40d",
+    "npm/csstype@3.2.3/LICENSE": "11d55bd4541c75ee7879547ac49089c489163dae49551389713c3d026cab383e",
+    "npm/detect-libc@2.1.2/LICENSE": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1",
+    "npm/fdir@6.5.0/LICENSE": "9a39f2aadab11a3697edd668ff2d8ad885b649737b7ab4d3bf12b34e5ada0c86",
+    "npm/fsevents@2.3.3/LICENSE": "2a8a5d6197bb97a018b8a190dd3ed853d750ca87c8e80c17aad41d6c6ff448e1",
+    "npm/lightningcss-darwin-arm64@1.33.0/LICENSE": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e",
+    "npm/lightningcss@1.33.0/LICENSE": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e",
+    "npm/nanoid@3.3.20/LICENSE": "da4db1480d9beea3483a2eda5c53b22238d0827d57da162b48f122e04d2d9987",
+    "npm/picocolors@1.1.1/LICENSE": "6582629e2979466878f6014313dcc2f3756c9616148682227ce3063dde310750",
+    "npm/picomatch@4.0.7/LICENSE": "d0cd141b0c322fded5dfad1d4645bb2fedfc05b7321fe1009469638190d59ef9",
+    "npm/postcss@8.5.30/LICENSE": "5be1f3465bba68a626777f984878814aaf35e7ef8e9fd314d469bcf887050fb8",
+    "npm/react-dom@19.3.1/LICENSE": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
+    "npm/react@19.3.1/LICENSE": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
+    "npm/rolldown@1.2.14/LICENSE": "23ecfff35a5a2e80d92142f75228912c3b1abc4b5a8337a821ff4397e2f9f734",
+    "npm/scheduler@0.28.0/LICENSE": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
+    "npm/source-map-js@1.2.2/LICENSE": "6cb0631f71c7749763fd3dd1d5bee52dd1070ec17f2edc1710079ad070bd2fbd",
+    "npm/tinyglobby@0.2.17/LICENSE": "22c68811e174cbbfb3813d4135918df4f540959c14d872e601d9abe83d3cde8f",
+    "npm/typescript@5.9.3/LICENSE.txt": "a7d00bfd54525bc694b6e32f64c7ebcf5e6b7ae3657be5cc12767bce74654a47",
+    "npm/undici-types@7.24.6/LICENSE": "a6db8096b2707bc0102d256917d4d33f298ba36d8c3f25de067a2b5bb379db27",
+    "npm/vite@8.3.4/LICENSE.md": "a47172e44a86a7e2cd1c16282341f7726ec60caafe3a6166fe3e0602005b6fa6",
+    "npm/zustand@5.0.15/LICENSE": "c1e6e266563517467b1bf874817d23e426f3149252bd7d42758cd697514b8417"
+  }
+}

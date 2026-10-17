@@ -1,0 +1,66 @@
+version: '3'
+
+vars:
+  APP_NAME: "koto"
+  BIN_DIR: "bin"
+  PACKAGE_MANAGER: '{{.PACKAGE_MANAGER | default "npm"}}'
+  VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
+  # Target OS for build/package/run. Defaults to the host OS, and is overridden
+  # by `wails3 build GOOS=...` (or the GOOS env var) for cross-compilation. The
+  # tasks below dispatch to the matching platform Taskfile via this variable.
+  GOOS: '{{.GOOS | default OS}}'
+
+includes:
+  common: ./build/Taskfile.yml
+  windows: ./build/windows/Taskfile.yml
+  darwin: ./build/darwin/Taskfile.yml
+  linux: ./build/linux/Taskfile.yml
+
+tasks:
+  build:
+    summary: Builds the application
+    cmds:
+      - task: "{{.GOOS}}:build"
+
+  package:
+    summary: Packages a production build of the application
+    cmds:
+      - task: "{{.GOOS}}:package"
+
+  run:
+    summary: Runs the application
+    cmds:
+      - task: "{{.GOOS}}:run"
+
+  dev:
+    summary: Runs the application in development mode
+    cmds:
+      - wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}
+
+  seed:
+    summary: Fills the project sandbox (app/.sandbox, wiped first) with synthetic sessions and copies
+    cmds:
+      - . ./env.sh && go run ./cmd/seed
+
+  test:
+    summary: Runs the Go tests (sandboxed temp dirs only)
+    cmds:
+      - . ./env.sh && go test ./...
+
+  check:platforms:
+    summary: Cross-compiles the CLI for macOS, Linux and Windows into project-local cache
+    cmds:
+      - scripts/check-platforms.sh
+
+  tools:dsh:
+    summary: Installs dsh project-locally (.tools/dsh) so the tests can run dsh's own log verifier
+    dir: ..
+    cmds:
+      - mkdir -p .tools/dsh && cd .tools/dsh && ([ -f package.json ] || echo '{"private":true}' > package.json) && npm install @deepseek-ai/dsh@0.2.0-rc.2
+
+  dev:sandbox:
+    summary: Runs the app in dev mode against the project sandbox (app/.sandbox; fill it with `task seed`)
+    env:
+      KOTO_APP_SANDBOX: '{{.ROOT_DIR}}/.sandbox'
+    cmds:
+      - wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}

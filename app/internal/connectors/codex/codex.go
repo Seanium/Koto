@@ -1,0 +1,703 @@
+// Package codex is the Codex connector. Storage root: $CODEX_HOME (default ~/.codex), shared by
+// the Codex CLI, app, IDE plugin and `codex exec`.
+//
+// Source: rollout JSONL (authoritative; state_5.sqlite is a projection). Rollouts get zstd-compressed
+// after 7 days and may move, so a session is its rollout key `<thread>[_<rollout>]`, never a path.
+//
+// Sink: new native rollouts registered with the official app-server, preserving multimodal history.
+package codex
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
+	"sort"
+	"strings"
+	"sync"
+	"unicode"
+
+	"koto/internal/connectors/shared"
+	"koto/internal/core"
+	"koto/internal/engine"
+)
+
+const Version = "codex-connector@0.1.0"
+
+var shellBin = regexp.MustCompile(`(^|/)(ba|z)?sh$`)
+
+// ToCanonical maps Codex tools to the canonical vocabulary.
+func ToCanonical(name string, args any) map[string]any {
+	a := core.Obj(args)
+	switch name {
+	case "exec_command":
+		cmd, ok := a["cmd"].(string)
+		if !ok {
+			if arr, ok := a["cmd"].([]any); ok {
+				var ss []string
+				for _, x := range arr {
+					ss = append(ss, jsStr(x))
+				}
+				cmd = strings.Join(ss, " ")
+			}
+		}
+		t := map[string]any{"op": "shell", "command": cmd}
+		if w := core.S(a["workdir"]); w != "" {
+			t["cwd"] = w
+		}
+		return t
+	case "shell", "local_shell":
+		var cmd []string
+		if arr, ok := a["command"].([]any); ok {
+			for _, x := range arr {
+				cmd = append(cmd, jsStr(x))
+			}
+		}
+		command := strings.Join(cmd, " ")
+		if len(cmd) >= 3 && shellBin.MatchString(cmd[0]) && cmd[1] == "-lc" {
+			command = cmd[2]
+		}
+		t := map[string]any{"op": "shell", "command": command}
+		if w := core.S(a["workdir"]); w != "" {
+			t["cwd"] = w
+		}
+		return t
+	case "apply_patch":
+		if s, ok := args.(string); ok {
+			return map[string]any{"op": "patch", "patch": s}
+		}
+		return map[string]any{"op": "patch", "patch": core.S(a["input"])}
+	case "view_image":
+		return map[string]any{"op": "read", "path": core.S(a["path"])}
+	}
+	return map[string]any{"op": "raw"}
+}
+
+func jsStr(v any) string {
+	switch x := v.(type) {
+	case string:
+		return x
+	case nil:
+		return ""
+	case float64:
+		s, _ := core.ESNumber(x)
+		return s
+	case bool:
+		if x {
+			return "true"
+		}
+		return "false"
+	}
+	return fmt.Sprint(v)
+}
+
+// Native historical tool calls retain their original names and arguments; they never re-run.
+type Vocabulary struct{}
+
+func (Vocabulary) ToCanonical(name string, args any) map[string]any { return ToCanonical(name, args) }
+func (Vocabulary) FromCanonical(t map[string]any) (core.NativeToolCall, bool) {
+	return core.NativeToolCall{}, false
+}
+
+var vocab = Vocabulary{}
+
+var Capabilities = core.Capabilities{
+	Read: core.ReadCaps{Images: true, Reasoning: "sealed", Subagents: true, Compaction: true},
+	Write: &core.WriteCaps{Mode: "native-file", Images: true, SameAPI: "openai-responses", Tools: "native",
+		ToolCallID: &core.IDRule{Pattern: "^[a-zA-Z0-9_-]+$", MaxLength: 64}},
+	WriteProfile: "codex-rollout@1", FormatVersions: []string{"rollout-jsonl"},
+}
+
+// ThreadOf: <thread>[_<rollout>] → <thread>, what `codex resume` and the app-server take.
+func ThreadOf(session string) string { return strings.SplitN(session, "_", 2)[0] }
+
+var rolloutRe = regexp.MustCompile(`^rollout-\d{4}-\d\d-\d\dT\d\d-\d\d-\d\d-(.+?)\.jsonl(\.zst)?$`)
+
+// RolloutKey: rollout-2026-10-08T10-15-43-<thread>[_<rollout>].jsonl[.zst] → <thread>[_<rollout>].
+func RolloutKey(file string) string {
+	if m := rolloutRe.FindStringSubmatch(filepath.Base(file)); m != nil {
+		return m[1]
+	}
+	return ""
+}
+
+// ------------------------------------------------------------------ decode
+
+var contextTags = []string{"<environment_context>", "<user_instructions>", "<permissions instructions>", "# AGENTS.md instructions", "<INSTRUCTIONS>", "<turn_aborted>", "<user_shell_command>", "<skill", "<heartbeat>"}
+
+var dataURL = regexp.MustCompile(`(?s)^data:([^;]+);base64,(.*)$`)
+
+func contentItems(content any, ctx *engine.DecodeContext) []core.Part {
+	if s, ok := content.(string); ok {
+		if s == "" {
+			return []core.Part{}
+		}
+		return shared.DecodeAttachmentText(s, assetDirectory(ctx.Ref.Path), ctx.Blob)
+	}
+	out := []core.Part{}
+	for _, x := range core.Arr(content) {
+		c := core.Obj(x)
+		t := core.S(c["type"])
+		if t == "input_text" || t == "output_text" || t == "text" {
+			if s, ok := c["text"].(string); ok {
+				out = append(out, shared.DecodeAttachmentText(s, assetDirectory(ctx.Ref.Path), ctx.Blob)...)
+			}
+		} else if t == "input_image" || t == "input_audio" {
+			field, kind := "image_url", "image"
+			if t == "input_audio" {
+				field, kind = "audio_url", "file"
+			}
+			if u, ok := c[field].(string); ok {
+				if m := dataURL.FindStringSubmatch(u); m != nil {
+					out = append(out, core.Part{"type": kind, "blob": ctx.Blob(core.Base64(m[2])), "mediaType": m[1]})
+				} else {
+					out = append(out, core.Part{"type": kind, "uri": u, "mediaType": map[string]string{"image": "image/unknown", "file": "audio/unknown"}[kind]})
+				}
+			} else {
+				out = append(out, core.Part{"type": kind, "name": "unavailable " + t})
+			}
+		}
+	}
+	return out
+}
+
+func parseArgs(v any) any {
+	s, ok := v.(string)
+	if !ok {
+		return v // undefined/null → null
+	}
+	var x any
+	if json.Unmarshal([]byte(s), &x) != nil {
+		return s
+	}
+	return x
+}
+
+func strOrNil(v any) any {
+	if s, ok := v.(string); ok {
+		return s
+	}
+	return nil
+}
+
+// Decoder reads rollout JSONL. State: model, cwd, effort, provider, lastNative, metaKey.
+type Decoder struct{}
+
+func (Decoder) FormatVersion() string { return "rollout-jsonl" }
+func (Decoder) InitialState() core.JsonObject {
+	return core.JsonObject{"model": nil, "cwd": nil, "effort": nil, "provider": nil, "lastNative": nil, "metaKey": nil}
+}
+
+func setIf(st core.JsonObject, k string, v any) {
+	if s, ok := v.(string); ok {
+		st[k] = s
+	}
+}
+
+func (Decoder) Decode(r0 any, raw []byte, ctx *engine.DecodeContext) engine.DecodeOut {
+	r := core.Obj(r0)
+	typ, hasType := r["type"].(string)
+	p := core.Obj(r["payload"])
+	nativeID := fmt.Sprintf("L%d", ctx.Index)
+	if o, ok := r["ordinal"].(float64); ok {
+		s, _ := core.ESNumber(o)
+		nativeID = "o" + s
+	}
+	var t *float64
+	if s, ok := r["timestamp"].(string); ok {
+		t = core.ParseTime(s)
+	}
+	st := ctx.State
+	ev := func(kind, actor string, parts []core.Part, attrs core.JsonObject, replaces *core.DraftReplaces) engine.DecodeOut {
+		st["lastNative"] = nativeID
+		a := core.JsonObject{}
+		if c := core.S(st["cwd"]); c != "" {
+			a["cwd"] = c
+		}
+		for k, v := range attrs {
+			a[k] = v
+		}
+		return engine.DecodeOut{NativeID: nativeID, Draft: &core.DraftEvent{NativeID: nativeID, Time: t, Kind: kind, Actor: actor, Parts: parts, Attrs: a, Replaces: replaces}}
+	}
+	// Codex speaks the Responses wire API; the provider is whatever the user configured.
+	model := func() map[string]any {
+		return map[string]any{"provider": st["provider"], "api": "openai-responses", "id": st["model"]}
+	}
+	switch typ {
+	case "session_meta":
+		setIf(st, "cwd", p["cwd"])
+		setIf(st, "provider", p["model_provider"])
+		out := engine.DecodeOut{NativeID: fmt.Sprintf("#meta%d", ctx.Index), Meta: core.JsonObject{"cwd": st["cwd"], "threadId": strOrNil(p["id"]), "frontend": strOrNil(p["source"]), "originator": strOrNil(p["originator"]), "cliVersion": strOrNil(p["cli_version"])}}
+		fork := core.S(p["forked_from_id"])
+		base := core.Obj(p["history_base"])
+		id := core.S(p["id"])
+		after := func(v any) string {
+			if n, ok := v.(float64); ok {
+				s, _ := core.ESNumber(n - 1)
+				return "o" + s
+			}
+			return ""
+		}
+		switch {
+		case fork != "":
+			out.Lineage = &core.Lineage{Kind: "fork", Harness: "codex", Session: fork, AfterNative: after(p["forked_from_ordinal_exclusive"])}
+		// A rollback (thread/revert) leaves the rollout as it was and starts <thread>_<rollout>.jsonl:
+		// its history is the base rollout up to end_ordinal_exclusive, then what this file adds.
+		case core.S(base["thread_id"]) != "" && id != "" && strings.HasPrefix(ctx.Ref.Session, id+"_"):
+			b := core.S(base["thread_id"])
+			s := id
+			if b != id {
+				s = id + "_" + b
+			}
+			out.Lineage = &core.Lineage{Kind: "continue", Harness: "codex", Session: s, AfterNative: after(base["end_ordinal_exclusive"])}
+		case core.S(base["thread_id"]) != "" && core.S(base["thread_id"]) != id:
+			out.Lineage = &core.Lineage{Kind: "continue", Harness: "codex", Session: core.S(base["thread_id"]), AfterNative: after(base["end_ordinal_exclusive"])}
+		case core.S(p["parent_thread_id"]) != "":
+			out.Lineage = &core.Lineage{Kind: "spawn", Harness: "codex", Session: core.S(p["parent_thread_id"])}
+		}
+		return out
+	case "turn_context":
+		setIf(st, "model", p["model"])
+		setIf(st, "cwd", p["cwd"])
+		setIf(st, "effort", p["effort"])
+		key := metaKey(st)
+		if st["metaKey"] == key {
+			return engine.DecodeOut{NativeID: fmt.Sprintf("#tc%d", ctx.Index)}
+		}
+		st["metaKey"] = key
+		return ev("meta", "harness", []core.Part{}, core.JsonObject{"model": model(), "effort": st["effort"]}, nil)
+	case "compacted":
+		var texts []string
+		if m := core.S(p["message"]); m != "" {
+			texts = append(texts, m)
+		}
+		for _, h := range core.Arr(p["replacement_history"]) {
+			hm := core.Obj(h)
+			if hm["type"] != "message" {
+				continue
+			}
+			for _, x := range contentItems(hm["content"], ctx) {
+				if x["type"] == "text" && core.S(x["text"]) != "" {
+					texts = append(texts, core.S(x["text"]))
+				}
+			}
+		}
+		prev := core.S(st["lastNative"])
+		var rep *core.DraftReplaces
+		if prev != "" {
+			rep = &core.DraftReplaces{To: core.NativeParent(prev)}
+		}
+		return ev("compaction", "harness", []core.Part{{"type": "text", "text": strings.Join(texts, "\n\n")}}, nil, rep)
+	case "response_item":
+		return decodeResponseItem(p, ev, model, ctx)
+	}
+	// event_msg (UI lifecycle, duplicates items), world_state, token usage, inter-agent metadata…
+	if !hasType {
+		typ = "x"
+	}
+	return engine.DecodeOut{NativeID: fmt.Sprintf("#%s%d", typ, ctx.Index)}
+}
+
+// metaKey mirrors `${model}\0${cwd}\0${effort}` with JavaScript's null → "null".
+func metaKey(st core.JsonObject) string {
+	f := func(v any) string {
+		if v == nil {
+			return "null"
+		}
+		return jsStr(v)
+	}
+	return f(st["model"]) + "\x00" + f(st["cwd"]) + "\x00" + f(st["effort"])
+}
+
+type evFn func(kind, actor string, parts []core.Part, attrs core.JsonObject, replaces *core.DraftReplaces) engine.DecodeOut
+
+func decodeResponseItem(p map[string]any, ev evFn, model func() map[string]any, ctx *engine.DecodeContext) engine.DecodeOut {
+	t, _ := p["type"].(string)
+	switch t {
+	case "message":
+		role, hasRole := p["role"].(string)
+		parts := contentItems(p["content"], ctx)
+		if role == "assistant" {
+			a := core.JsonObject{"model": model()}
+			if ph := core.S(p["phase"]); ph != "" {
+				a["phase"] = ph
+			}
+			return ev("message", "assistant", parts, a, nil)
+		}
+		if role == "user" {
+			kinds, isArr := core.Obj(p["internal_chat_message_metadata_passthrough"])["content_item_kinds"].([]any)
+			byKind := false
+			if isArr && len(kinds) > 0 {
+				byKind = true
+				for _, k := range kinds {
+					if s, ok := k.(string); ok && strings.HasPrefix(s, "user.") {
+						byKind = false
+					}
+				}
+			}
+			byTag := false
+			if !isArr {
+				for _, x := range parts {
+					if x["type"] == "text" {
+						txt := strings.TrimLeftFunc(core.S(x["text"]), func(r rune) bool { return unicode.IsSpace(r) || r == 0xfeff })
+						for _, tag := range contextTags {
+							if strings.HasPrefix(txt, tag) {
+								byTag = true
+							}
+						}
+						break
+					}
+				}
+			}
+			kind := "message"
+			if byKind || byTag {
+				kind = "context"
+			}
+			return ev(kind, "user", parts, nil, nil)
+		}
+		var rv any = nil
+		if hasRole {
+			rv = role
+		}
+		return ev("context", "system", parts, core.JsonObject{"role": rv}, nil)
+	case "reasoning":
+		var texts []string
+		for _, s := range core.Arr(p["summary"]) {
+			if x := core.S(core.Obj(s)["text"]); x != "" {
+				texts = append(texts, x)
+			}
+		}
+		for _, s := range core.Arr(p["content"]) {
+			if x := core.S(core.Obj(s)["text"]); x != "" {
+				texts = append(texts, x)
+			}
+		}
+		part := core.Part{"type": "reasoning"}
+		if text := strings.Join(texts, "\n\n"); text != "" {
+			part["text"] = text
+		}
+		if enc := core.S(p["encrypted_content"]); enc != "" {
+			part["sealed"] = map[string]any{"by": "openai-responses", "blob": ctx.Blob([]byte(enc))}
+		}
+		return ev("reasoning", "assistant", []core.Part{part}, core.JsonObject{"model": model()}, nil)
+	case "function_call", "custom_tool_call":
+		name := core.S(p["name"])
+		var args any
+		if t == "function_call" {
+			args = parseArgs(p["arguments"])
+		} else {
+			args = p["input"]
+			if args == nil {
+				args = ""
+			}
+		}
+		return ev("tool_call", "assistant", []core.Part{{"type": "tool_call", "callId": core.S(p["call_id"]), "rawName": name, "args": args, "tool": ToCanonical(name, args)}}, core.JsonObject{"model": model(), "codexType": t}, nil)
+	case "local_shell_call":
+		action := core.Obj(p["action"])
+		cmd := action["command"]
+		if cmd == nil {
+			cmd = []any{}
+		}
+		args := map[string]any{"command": cmd, "workdir": action["working_directory"]}
+		callID, ok := p["call_id"].(string)
+		if !ok {
+			callID = core.S(p["id"])
+		}
+		return ev("tool_call", "assistant", []core.Part{{"type": "tool_call", "callId": callID, "rawName": "local_shell", "args": args, "tool": ToCanonical("local_shell", args)}}, core.JsonObject{"model": model(), "codexType": t}, nil)
+	case "function_call_output", "custom_tool_call_output", "local_shell_call_output":
+		out := p["output"]
+		var parts []core.Part
+		if s, ok := out.(string); ok {
+			parts = []core.Part{{"type": "text", "text": s}}
+		} else {
+			parts = contentItems(out, ctx)
+		}
+		outcome := "success"
+		if core.Obj(out)["success"] == false {
+			outcome = "error"
+		}
+		return ev("tool_result", "tool", []core.Part{{"type": "tool_result", "callId": core.S(p["call_id"]), "outcome": outcome, "parts": core.PartsJSON(parts)}}, nil, nil)
+	case "web_search_call":
+		a := core.Obj(p["action"])
+		q, ok := a["query"].(string)
+		if !ok {
+			if arr, ok := a["queries"].([]any); ok {
+				var ss []string
+				for _, x := range arr {
+					ss = append(ss, jsStr(x))
+				}
+				q = strings.Join(ss, " | ")
+			}
+		}
+		return ev("message", "assistant", []core.Part{{"type": "text", "text": "[web search: " + q + "]"}}, core.JsonObject{"model": model(), "codexType": t}, nil)
+	case "tool_search_call", "tool_search_output":
+		return ev("context", "harness", []core.Part{}, core.JsonObject{"codexType": t}, nil)
+	case "agent_message":
+		return ev("x-codex-agent-message", "harness", contentItems(p["content"], ctx), core.JsonObject{"codexType": t}, nil)
+	}
+	tt := t
+	if _, ok := p["type"].(string); !ok {
+		tt = jsStr(p["type"])
+		if p["type"] == nil {
+			tt = "undefined"
+		}
+	}
+	return ev("message", "harness", []core.Part{{"type": "opaque", "blob": ctx.Blob([]byte(core.Stringify(p))), "semantic": "codex:" + tt, "reason": "unmapped response item"}}, nil, nil)
+}
+
+// ------------------------------------------------------------------ connector
+
+// Options for the connector.
+type Options struct {
+	Home string // $CODEX_HOME
+	// Shadow is the isolated HOME used by the app-server; CODEX_HOME is the target root.
+	Shadow string
+	Bin    string
+	ID     string
+}
+
+type codexConn struct {
+	id, home, shadow, bin string
+	files                 *shared.PathIndex
+	mu                    sync.Mutex
+	server                *AppServer
+}
+
+// New makes a Codex connector.
+func New(o Options) *engine.Connector {
+	if o.ID == "" {
+		o.ID = "codex"
+	}
+	if o.Bin == "" {
+		o.Bin = "codex"
+	}
+	c := &codexConn{id: o.ID, home: o.Home, shadow: o.Shadow, bin: o.Bin, files: shared.NewPathIndex()}
+	return &engine.Connector{ID: c.id, Root: c.home, Harness: "codex", Version: Version, Capabilities: Capabilities, Vocabulary: vocab, Source: c, Sink: c, Trash: c,
+		Dispose: func() {
+			c.mu.Lock()
+			s := c.server
+			c.mu.Unlock()
+			if s != nil {
+				s.Stop()
+			}
+		}}
+}
+
+var rolloutFile = regexp.MustCompile(`^rollout-.*\.jsonl(\.zst)?$`)
+
+func walk(dir string, fn func(string)) {
+	ents, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	for _, e := range ents {
+		p := filepath.Join(dir, e.Name())
+		if e.IsDir() {
+			walk(p, fn)
+		} else if rolloutFile.MatchString(e.Name()) {
+			fn(p)
+		}
+	}
+}
+
+func (c *codexConn) Discover(ctx context.Context) ([]core.NativeRef, error) {
+	seen := map[string]string{}
+	var order []string
+	for _, root := range []string{filepath.Join(c.home, "sessions"), filepath.Join(c.home, "archived_sessions")} {
+		walk(root, func(f string) {
+			key := RolloutKey(f)
+			if key == "" {
+				return
+			}
+			// During compression both containers can exist briefly: prefer the plain file.
+			if prev, ok := seen[key]; ok && strings.HasSuffix(prev, ".jsonl") && strings.HasSuffix(f, ".zst") {
+				return
+			}
+			if _, ok := seen[key]; !ok {
+				order = append(order, key)
+			}
+			seen[key] = f
+		})
+	}
+	names := c.threadNames()
+	// After a rollback the thread goes on in its newest rollout; the older ones keep the branches it left.
+	type nk struct{ key, at string }
+	newest := map[string]nk{}
+	for _, s := range order {
+		t, at := ThreadOf(s), filepath.Base(seen[s])
+		if prev, ok := newest[t]; !ok || at > prev.at {
+			newest[t] = nk{s, at}
+		}
+	}
+	var out []core.NativeRef
+	for _, s := range order {
+		f := seen[s]
+		c.files.Set(s, f)
+		st, err := os.Stat(f)
+		if err != nil {
+			continue
+		}
+		meta := core.JsonObject{}
+		if title, ok := names[ThreadOf(s)]; ok {
+			meta["title"] = title
+		}
+		if cur := newest[ThreadOf(s)].key; cur == s {
+			meta["supersededBy"] = nil
+		} else {
+			meta["supersededBy"] = cur
+		}
+		out = append(out, core.NativeRef{Harness: "codex", Connector: c.id, Session: s, Path: f, Size: st.Size(), MtimeMs: engine.MtimeMs(st), Meta: meta})
+	}
+	return out, nil
+}
+
+// threadNames are the names the user gave in Codex ($CODEX_HOME/session_index.jsonl, newest entry per thread).
+func (c *codexConn) threadNames() map[string]string {
+	b, err := os.ReadFile(filepath.Join(c.home, "session_index.jsonl"))
+	if err != nil {
+		return nil
+	}
+	type na struct{ name, at string }
+	best := map[string]na{}
+	for _, l := range strings.Split(string(b), "\n") {
+		if strings.TrimSpace(l) == "" {
+			continue
+		}
+		var r map[string]any
+		if json.Unmarshal([]byte(l), &r) != nil {
+			continue // a torn last line while Codex writes
+		}
+		id, ok1 := r["id"].(string)
+		name, ok2 := r["thread_name"].(string)
+		if !ok1 || !ok2 || strings.TrimSpace(name) == "" {
+			continue
+		}
+		at, _ := r["updated_at"].(string)
+		if prev, ok := best[id]; !ok || at >= prev.at {
+			best[id] = na{strings.TrimSpace(name), at}
+		}
+	}
+	out := map[string]string{}
+	for k, v := range best {
+		out[k] = v.name
+	}
+	return out
+}
+
+func (c *codexConn) Tail(ctx context.Context, ref core.NativeRef, from *core.SourceOffset, yield func(core.SourceBatch) error) error {
+	return engine.TailJSONL(ctx, ref, from, Decoder{}, yield, 0, false)
+}
+
+func (c *codexConn) WatchRoots() []string {
+	return []string{filepath.Join(c.home, "sessions"), filepath.Join(c.home, "session_index.jsonl")}
+}
+
+func (c *codexConn) ReadRecord(session string, index int, offset *int64) ([]byte, error) {
+	p, ok := c.files.Get(session)
+	if !ok {
+		_, _ = c.Discover(context.Background())
+		p, ok = c.files.Get(session)
+	}
+	if !ok || offset == nil {
+		return nil, nil
+	}
+	return engine.ReadRecordAt(p, *offset)
+}
+
+func (c *codexConn) findRollout(key string) string {
+	found := ""
+	for _, root := range []string{filepath.Join(c.home, "sessions"), filepath.Join(c.home, "archived_sessions")} {
+		walk(root, func(f string) {
+			if found == "" && RolloutKey(f) == key {
+				found = f
+			}
+		})
+		if found != "" {
+			return found
+		}
+	}
+	return ""
+}
+
+func (c *codexConn) ensureServer() *AppServer {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.server == nil {
+		c.server = &AppServer{Bin: c.bin, IdleMs: 1000, Env: map[string]string{"HOME": c.shadow, "CODEX_HOME": c.home}}
+	}
+	return c.server
+}
+
+// Archive with Codex's own API (thread/archive): it moves the rollout to archived_sessions and keeps
+// its index right, so `codex resume` finds it again after thread/unarchive.
+func (c *codexConn) Archive(ctx context.Context, s engine.SessionRef) (core.JsonObject, error) {
+	before := c.findRollout(s.Session)
+	if before == "" {
+		return nil, fmt.Errorf("codex thread %s has no rollout under %s", s.Session, c.home)
+	}
+	archived := filepath.Join(c.home, "archived_sessions")
+	if strings.HasPrefix(before, archived+string(filepath.Separator)) {
+		return core.JsonObject{"alreadyArchived": true, "from": before, "path": before}, nil
+	}
+	if _, err := c.ensureServer().Call("thread/archive", map[string]any{"threadId": ThreadOf(s.Session)}); err != nil {
+		return nil, err
+	}
+	after := c.findRollout(s.Session)
+	if !strings.HasPrefix(after, archived+string(filepath.Separator)) {
+		return nil, fmt.Errorf("codex did not archive thread %s", s.Session)
+	}
+	return core.JsonObject{"alreadyArchived": false, "from": before, "path": after}, nil
+}
+
+func (c *codexConn) Unarchive(ctx context.Context, s engine.SessionRef, receipt core.JsonObject) error {
+	if receipt["alreadyArchived"] == true {
+		return nil
+	}
+	if _, err := c.ensureServer().Call("thread/unarchive", map[string]any{"threadId": ThreadOf(s.Session)}); err != nil {
+		return err
+	}
+	now := c.findRollout(s.Session)
+	if now == "" || strings.HasPrefix(now, filepath.Join(c.home, "archived_sessions")+string(filepath.Separator)) {
+		return fmt.Errorf("codex did not unarchive thread %s", s.Session)
+	}
+	return nil
+}
+
+func (c *codexConn) OpenBy(s engine.SessionRef) string {
+	return OpenBy(c.home, s.Session, c.findRollout(s.Session))
+}
+
+var toolNote = regexp.MustCompile(`\[external_agent_tool_(call|result)[^\]]*\][\s\S]*?\[/external_agent_tool_(call|result)\]`)
+var userQuery = regexp.MustCompile(`(?s)^<user_query>(.*)</user_query>$`)
+
+// OpenBy: a thread's writer holds $CODEX_HOME/thread-writer-locks/<thread>.lock (flock, removed on
+// release) and keeps the rollout open for append while the thread is loaded.
+func OpenBy(home, thread, rollout string) string {
+	lock := filepath.Join(home, "thread-writer-locks", thread+".lock")
+	if _, err := os.Stat(lock); err == nil {
+		h, ok := shared.FileHolders(lock)
+		if !ok || len(h) > 0 {
+			if len(h) > 0 {
+				return fmt.Sprintf("Codex holds its writer lock (pid %s)", joinInts(h))
+			}
+			return "Codex holds its writer lock"
+		}
+	}
+	if rollout != "" {
+		if h, _ := shared.FileHolders(rollout); len(h) > 0 {
+			return fmt.Sprintf("Codex pid %s has the rollout open", joinInts(h))
+		}
+	}
+	return ""
+}
+
+func joinInts(xs []int) string {
+	sort.Ints(xs)
+	var s []string
+	for _, x := range xs {
+		s = append(s, fmt.Sprint(x))
+	}
+	return strings.Join(s, ", ")
+}

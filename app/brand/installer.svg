@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="660" height="410" viewBox="0 0 660 410">
+  <!-- Apple emoji are rendered by generate-installer.cjs using the local system font. -->
+  <rect width="660" height="410" fill="#F7F7F5"/>
+  <g font-family="-apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" text-anchor="middle">
+    <text x="330" y="59" fill="#282724" font-size="29" font-weight="600" letter-spacing="-.8">koto</text>
+    <text x="330" y="88" fill="#77736E" font-size="14">Drag to Applications to install</text>
+  </g>
+  <rect x="88" y="116" width="196" height="208" rx="22" fill="#FFFFFF" stroke="#E5E5E0"/>
+  <rect x="376" y="116" width="196" height="208" rx="22" fill="#FFFFFF" stroke="#E5E5E0"/>
+</svg>

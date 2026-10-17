@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Koto
+Comment=Copy coding-agent conversations between harnesses
+Exec=/usr/lib/koto/koto-desktop
+Terminal=false
+Type=Application
+Icon=koto
+Categories=Development;
+StartupWMClass=koto
