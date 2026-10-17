@@ -44,13 +44,13 @@ cat > "$ROOT/DEBIAN/control" <<EOF
 Package: koto
 Version: $DEB_VERSION
 Architecture: $ARCH
-Maintainer: Koto contributors
+Maintainer: koto contributors
 Section: utils
 Priority: optional
 Installed-Size: $SIZE
 Depends: libc6 (>= $LIBC_VERSION), libgtk-3-0, libwebkit2gtk-4.1-0, libayatana-appindicator3-1
 Description: Copy coding-agent conversations between harnesses
- Koto is a local desktop app and command-line tool for reading, comparing,
+ koto is a local desktop app and command-line tool for reading, comparing,
  and copying coding-agent sessions.
 EOF
 cp build/linux/nfpm/scripts/postinstall.sh "$ROOT/DEBIAN/postinst"
@@ -66,7 +66,7 @@ cp "$ROOT/usr/share/applications/koto.desktop" "$PORTABLE/"
 cp brand/appicon.png "$PORTABLE/koto.png"
 cp -R "$ROOT/usr/share/doc/koto" "$PORTABLE/legal"
 cat > "$PORTABLE/README.txt" <<EOF
-Koto $VERSION / Linux $ARCH
+koto $VERSION / Linux $ARCH
 
 Run ./koto-desktop to open the app, or ./koto --help for the CLI.
 Requires glibc $LIBC_VERSION or newer, GTK3, WebKitGTK 4.1, and Ayatana

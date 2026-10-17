@@ -1,6 +1,6 @@
 [Desktop Entry]
 Version=1.0
-Name=Koto
+Name=koto
 Comment=Copy coding-agent conversations between harnesses
 Exec=/usr/lib/koto/koto-desktop
 Terminal=false

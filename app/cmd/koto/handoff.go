@@ -188,7 +188,7 @@ func runHandoff(pos, flags []string, stdout, stderr io.Writer, getenv func(strin
 	}
 	app, err := koto.New(o.config)
 	if err != nil {
-		return fail(handoffErr("CONFIGURATION", "Cannot open Koto's local data directory.", "Check --data or KOTO_HOME and directory permissions."), 1)
+		return fail(handoffErr("CONFIGURATION", "Cannot open koto's local data directory.", "Check --data or KOTO_HOME and directory permissions."), 1)
 	}
 	defer app.Close()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -264,7 +264,7 @@ func discoverSource(ctx context.Context, app *koto.App, selector, resolvedBy str
 		return nativeSession{}, nil, handoffErr("SOURCE_NOT_FOUND", "The exact session is not present in the enabled Agent roots.", "Check the selector and Agent home. The current session may not have been saved yet; no other session was substituted.")
 	}
 	if len(matches) > 1 {
-		return nativeSession{}, nil, handoffErr("SOURCE_AMBIGUOUS", "The session identity matches multiple native session files.", "Use an exact rollout selector and a single source root. Koto will not guess which branch is current.")
+		return nativeSession{}, nil, handoffErr("SOURCE_AMBIGUOUS", "The session identity matches multiple native session files.", "Use an exact rollout selector and a single source root. koto will not guess which branch is current.")
 	}
 	return matches[0], refs, nil
 }
