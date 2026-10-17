@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"koto/internal/connectors/pi"
 	"koto/internal/core"
 	"koto/internal/engine"
 	"koto/internal/koto"
@@ -209,7 +210,7 @@ func piSession(session, cwd, name string, minAgo float64, turns []turn) {
 	}
 	recs = append(recs, O{{K: "type", V: "session_info"}, {K: "id", V: "si"}, {K: "parentId", V: prev}, t(200), {K: "name", V: name}})
 	stamp := strings.NewReplacer(":", "-", ".", "-").Replace(iso(minAgo, 0))
-	lines(j("pi", "sessions", "--"+strings.ReplaceAll(cwd[1:], "/", "-")+"--", stamp+"_"+session+".jsonl"), recs, false)
+	lines(j("pi", "sessions", pi.CwdDir(cwd), stamp+"_"+session+".jsonl"), recs, false)
 }
 
 // ---------------------------------------------------------------- Codex
@@ -402,7 +403,7 @@ func main() {
 	// pi: a picture in the prompt.
 	piImg := "01a13866-f891-73d8-b45a-90076c4d7d0f"
 	pt := func(s int) KV { return KV{K: "timestamp", V: iso(40, s)} }
-	lines(j("pi", "sessions", "--"+strings.ReplaceAll((work + "/etl")[1:], "/", "-")+"--", strings.NewReplacer(":", "-", ".", "-").Replace(iso(40, 0))+"_"+piImg+".jsonl"), []any{
+	lines(j("pi", "sessions", pi.CwdDir(work+"/etl"), strings.NewReplacer(":", "-", ".", "-").Replace(iso(40, 0))+"_"+piImg+".jsonl"), []any{
 		O{{K: "type", V: "session"}, {K: "version", V: 3}, {K: "id", V: piImg}, pt(0), {K: "cwd", V: work + "/etl"}},
 		O{{K: "type", V: "message"}, {K: "id", V: "pu0"}, {K: "parentId", V: nil}, pt(1), {K: "message", V: O{{K: "role", V: "user"}, {K: "content", V: []any{O{{K: "type", V: "text"}, {K: "text", V: "这张报表图里的峰值是哪天？"}}, O{{K: "type", V: "image"}, {K: "data", V: pngB64(360, 220, 1)}, {K: "mimeType", V: "image/png"}}}}, {K: "timestamp", V: ms(40, 1)}}}},
 		O{{K: "type", V: "message"}, {K: "id", V: "pa0"}, {K: "parentId", V: "pu0"}, pt(5), {K: "message", V: O{{K: "role", V: "assistant"}, {K: "content", V: []any{O{{K: "type", V: "text"}, {K: "text", V: "峰值在周三，比平时高约 40%。"}}}}, {K: "api", V: "openai-responses"}, {K: "provider", V: "acme"}, {K: "model", V: "acme-large"}, {K: "usage", V: piUsage}, {K: "stopReason", V: "stop"}, {K: "timestamp", V: ms(40, 5)}}}},
