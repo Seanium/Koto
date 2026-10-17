@@ -29,7 +29,7 @@ App und CLI gibt es als getrennte Downloads unter [Releases](https://github.com/
 | macOS / Linux | `koto-cli-<os>-<arch>` herunterladen, in `koto` umbenennen und `chmod +x koto` ausführen. |
 | Windows | `koto-cli-windows-<arch>.exe` herunterladen und in `koto.exe` umbenennen. |
 
-Die CLI in einen Ordner im PATH legen oder dem Agent den vollständigen Pfad geben. Windows-Befehle zum Fortsetzen in PowerShell ausführen. Die Windows-App ist eine direkt ausführbare `.exe`; die Linux-App gibt es als Binärdatei und DEB, jeweils ohne CLI.
+Die CLI in einen Ordner im PATH legen oder dem Agent den vollständigen Pfad geben. Windows-Befehle zum Fortsetzen in PowerShell ausführen. Die Windows-App ist eine direkt ausführbare `.exe`; die Linux-App gibt es als Binärdatei und DEB, jeweils ohne CLI. Die Linux-Binärdatei vor dem Start mit `chmod +x koto-linux-<arch>` ausführbar machen.
 
 Dann sagen: **„Kopiere dieses Gespräch mit koto nach pi.“**
 

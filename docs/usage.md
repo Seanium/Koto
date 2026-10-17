@@ -29,7 +29,7 @@ App and CLI are separate downloads from [Releases](https://github.com/Seanium/ko
 | macOS / Linux | Download `koto-cli-<os>-<arch>`, rename it to `koto`, and run `chmod +x koto`. |
 | Windows | Download `koto-cli-windows-<arch>.exe` and rename it to `koto.exe`. |
 
-Put the CLI in a folder on PATH, or give your Agent its full path. Run Windows continuation commands in PowerShell. Windows App downloads are standalone `.exe` files; Linux App downloads are a binary or DEB. Neither includes the CLI.
+Put the CLI in a folder on PATH, or give your Agent its full path. Run Windows continuation commands in PowerShell. Windows App downloads are standalone `.exe` files; Linux App downloads are a binary or DEB. Neither includes the CLI. Before running a Linux App binary, use `chmod +x koto-linux-<arch>`.
 
 Ask: **“Use koto to copy this session to pi.”**
 

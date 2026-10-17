@@ -6,6 +6,8 @@
 
 Gespräche zwischen Agents kopieren. Sitzungen mit Baumansicht und Diff vergleichen.
 
+[Download](https://github.com/Seanium/koto/releases/latest) · [Website](https://seanium.github.io/koto/)
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="../../site/assets/screenshots/de-dark-copy.png">
   <img src="../../site/assets/screenshots/de-light-copy.png" alt="koto: Ausgewählte Gesprächsrunden zu einem anderen Agent kopieren" width="1120">

@@ -6,6 +6,8 @@
 
 把對話複製到另一個 Agent。用樹狀檢視和 diff 比較對話。
 
+[下載](https://github.com/Seanium/koto/releases/latest) · [網站](https://seanium.github.io/koto/)
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="../../site/assets/screenshots/zh-TW-dark-copy.png">
   <img src="../../site/assets/screenshots/zh-TW-light-copy.png" alt="koto：將選取的對話複製到另一個 Agent" width="1120">

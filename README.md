@@ -6,6 +6,8 @@
 
 Copy sessions between agents. Compare them with a session tree and diff.
 
+[Download](https://github.com/Seanium/koto/releases/latest) · [Website](https://seanium.github.io/koto/)
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="site/assets/screenshots/en-dark-copy.png">
   <img src="site/assets/screenshots/en-light-copy.png" alt="koto — copy selected conversation turns to another Agent" width="1120">

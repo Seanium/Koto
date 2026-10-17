@@ -29,7 +29,7 @@ App 和 CLI 从 [Releases](https://github.com/Seanium/koto/releases) 分别下�
 | macOS / Linux | 下载 `koto-cli-<系统>-<架构>`，改名为 `koto`，执行 `chmod +x koto`。 |
 | Windows | 下载 `koto-cli-windows-<架构>.exe`，改名为 `koto.exe`。 |
 
-将 CLI 放到 PATH 中的目录，或把完整路径告诉 Agent。Windows 续聊命令在 PowerShell 中执行。Windows App 是直接运行的 `.exe`；Linux App 提供二进制和 DEB，均不捆绑 CLI。
+将 CLI 放到 PATH 中的目录，或把完整路径告诉 Agent。Windows 续聊命令在 PowerShell 中执行。Windows App 是直接运行的 `.exe`；Linux App 提供二进制和 DEB，均不捆绑 CLI。运行 Linux App 二进制前，先执行 `chmod +x koto-linux-<架构>`。
 
 直接说：**「用 koto 复制当前会话到 pi」**
 

@@ -29,7 +29,7 @@ App と CLI は [Releases](https://github.com/Seanium/koto/releases) から個�
 | macOS / Linux | `koto-cli-<os>-<arch>` をダウンロードし、`koto` に改名して `chmod +x koto` を実行します。 |
 | Windows | `koto-cli-windows-<arch>.exe` をダウンロードし、`koto.exe` に改名します。 |
 
-CLI を PATH 内のフォルダーに置くか、Agent にフルパスを伝えてください。Windows の継続コマンドは PowerShell で実行します。Windows App は直接起動する `.exe`、Linux App はバイナリと DEB です。CLI は同梱しません。
+CLI を PATH 内のフォルダーに置くか、Agent にフルパスを伝えてください。Windows の継続コマンドは PowerShell で実行します。Windows App は直接起動する `.exe`、Linux App はバイナリと DEB です。CLI は同梱しません。Linux App のバイナリは、起動前に `chmod +x koto-linux-<arch>` を実行してください。
 
 **「koto で今の対話を pi にコピーして。」**と頼みます。
 

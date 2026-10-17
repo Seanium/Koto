@@ -9,6 +9,7 @@
 | `pi.svg` | pi | `pi` (monochrome; drawn as a mask in the text colour) |
 | `dsh.svg` | DeepSeek Harness | `deepseek-color` |
 | `antigravity.svg` | Antigravity | `antigravity-color` |
+| `opencode.svg` | OpenCode | `opencode` (monochrome) |
 
 - **Source:** [lobehub/lobe-icons](https://github.com/lobehub/lobe-icons), MIT License, © LobeHub.
   Copied unchanged from magpie's vendored set (`internal/gui/assets/icons/` in
