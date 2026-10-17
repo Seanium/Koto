@@ -2,7 +2,7 @@
 export const publication = Object.freeze({
   published: false,
   version: '0.1.0-beta.1',
-  repository: 'https://github.com/Seanium/Koto'
+  repository: 'https://github.com/Seanium/koto'
 });
 
 export const releaseAssets = Object.freeze([

@@ -17,5 +17,5 @@ type AppInfo struct {
 }
 
 func (s *AppService) AppInfo() AppInfo {
-	return AppInfo{Version: strings.TrimSpace(appVersionFile), ProjectURL: "https://github.com/Seanium/Koto"}
+	return AppInfo{Version: strings.TrimSpace(appVersionFile), ProjectURL: "https://github.com/Seanium/koto"}
 }

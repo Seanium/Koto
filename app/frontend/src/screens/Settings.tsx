@@ -68,7 +68,7 @@ function General({ hub }: { hub: Hub }) {
         <Line title={tr("项目地址")}>
           <Button variant="ghost" disabled={!info} title={info?.projectURL} onClick={() => {
             if (info) void shell.openExternal(info.projectURL).then(() => setInfoError(undefined)).catch(e => setInfoError(String(e)))
-          }}>github.com/Seanium/Koto</Button>
+          }}>github.com/Seanium/koto</Button>
         </Line>
       </div>
       {infoError && <div className="note" title={infoError}>{tr(info ? "无法打开链接" : "无法读取应用信息")}</div>}

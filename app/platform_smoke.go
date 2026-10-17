@@ -138,7 +138,7 @@ document.querySelector('.sheet-foot button').click()`)
 	js(`window.platformNav('设置').click()`)
 	js(`(async()=>{const tab=()=>[...document.querySelectorAll('[role=tab]')].find(e=>e.textContent.trim()==='通用');await window.platformWait(tab);tab().click()})()`)
 	versionJSON, _ := json.Marshal(strings.TrimSpace(appVersionFile))
-	js(`window.platformWait(()=>document.body.textContent.includes(` + string(versionJSON) + `)&&document.body.textContent.includes('github.com/Seanium/Koto'))`)
+	js(`window.platformWait(()=>document.body.textContent.includes(` + string(versionJSON) + `)&&document.body.textContent.includes('github.com/Seanium/koto'))`)
 	result["appInfo"] = strings.TrimSpace(appVersionFile)
 	result["passed"] = true
 }
