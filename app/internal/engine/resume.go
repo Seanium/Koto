@@ -98,7 +98,10 @@ func shellCommandWithInputPrompt(argv []string, cwd string, envs map[string]stri
 		}
 		if len(argv) > 0 {
 			if prompt != "" {
-				parts = append(parts, "& { $OutputEncoding = [System.Text.UTF8Encoding]::new($false); Read-Host", PowerShellQ(prompt), "|")
+				// .NET Framework initializes native stdin using Console.InputEncoding
+				// before PowerShell applies OutputEncoding; a UTF-8 BOM can otherwise
+				// reach the child first. Restore the console setting even on failure.
+				parts = append(parts, "& { $OutputEncoding = [System.Text.UTF8Encoding]::new($false); $kotoInputEncoding = [Console]::InputEncoding; try { [Console]::InputEncoding = $OutputEncoding; Read-Host", PowerShellQ(prompt), "|")
 			}
 			parts = append(parts, "&")
 			for i, arg := range argv {
@@ -114,7 +117,7 @@ func shellCommandWithInputPrompt(argv []string, cwd string, envs map[string]stri
 			}
 			if prompt != "" {
 				// Preserve ordinary appended options for the native command.
-				parts = append(parts, "@args }")
+				parts = append(parts, "@args } finally { [Console]::InputEncoding = $kotoInputEncoding } }")
 			}
 		}
 	} else {

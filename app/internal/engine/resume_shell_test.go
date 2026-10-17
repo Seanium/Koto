@@ -55,9 +55,11 @@ func TestWindowsResumeInputPromptPreservesUTF8(t *testing.T) {
 	prompt, input := "Message O'Brien $HOME; [literal]", "请回复 中文🐙 O'Brien & $HOME; 不要改写"
 	argv := []string{bin, "-test.run=^TestPowerShellResumeHelper$", "--", "session O'Brien"}
 	line := shellCommandWithInputPrompt(argv, dir, map[string]string{"KOTO_RESUME_TEST_HELPER": "1", "KOTO_RESUME_TEST_STDIN": "1"}, "windows", prompt)
-	// Replace only keyboard input: the real PowerShell 5.1 pipeline still writes
-	// to a native process. Assert literal prompt values and no encoding leakage.
-	script := "$ErrorActionPreference='Stop'; $before=$OutputEncoding; function Read-Host { param($Prompt); if ($Prompt -cne " + PowerShellQ(prompt) + ") { throw 'changed prompt' }; " + PowerShellQ(input) + " }; " + line + " 'appended literal'; if (-not [Object]::ReferenceEquals($before,$OutputEncoding)) { throw 'encoding leaked' }"
+	// Start with the BOM-bearing console encoding used by UTF-8 Windows CI
+	// consoles. .NET Framework can emit its preamble before OutputEncoding is
+	// applied. Replace only keyboard input; assert the native bytes are exact
+	// and both caller encoding settings survive the wrapper.
+	script := "$ErrorActionPreference='Stop'; [Console]::InputEncoding=[System.Text.Encoding]::UTF8; $before=$OutputEncoding; $inputBefore=[Console]::InputEncoding; function Read-Host { param($Prompt); if ($Prompt -cne " + PowerShellQ(prompt) + ") { throw 'changed prompt' }; " + PowerShellQ(input) + " }; " + line + " 'appended literal'; if (-not [Object]::ReferenceEquals($before,$OutputEncoding)) { throw 'output encoding leaked' }; if ([Console]::InputEncoding.CodePage -ne $inputBefore.CodePage -or [Convert]::ToBase64String([Console]::InputEncoding.GetPreamble()) -cne [Convert]::ToBase64String($inputBefore.GetPreamble())) { throw 'console input encoding leaked' }"
 	words := utf16.Encode([]rune(script))
 	bytes := make([]byte, len(words)*2)
 	for i, word := range words {
