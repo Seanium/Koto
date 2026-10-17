@@ -16,23 +16,42 @@ package main
 static void *kotoEmojiPNG(int pixels, int *length) {
 	*length = 0;
 	@autoreleasepool {
-		NSFont *font = [NSFont fontWithName:@"Apple Color Emoji" size:pixels * 0.82];
+		// Small Apple Color Emoji strikes can extend beyond their layout bounds.
+		// Downsample the same padded, high-resolution rendering used for the Dock.
+		int renderPixels = MAX(pixels, 512);
+		NSFont *font = [NSFont fontWithName:@"Apple Color Emoji" size:renderPixels * 0.82];
 		if (font == nil) return NULL;
 		NSBitmapImageRep *bitmap = [[NSBitmapImageRep alloc]
-			initWithBitmapDataPlanes:NULL pixelsWide:pixels pixelsHigh:pixels
+			initWithBitmapDataPlanes:NULL pixelsWide:renderPixels pixelsHigh:renderPixels
 			bitsPerSample:8 samplesPerPixel:4 hasAlpha:YES isPlanar:NO
 			colorSpaceName:NSCalibratedRGBColorSpace bytesPerRow:0 bitsPerPixel:0];
 		if (bitmap == nil) return NULL;
 		NSGraphicsContext *context = [NSGraphicsContext graphicsContextWithBitmapImageRep:bitmap];
 		[NSGraphicsContext saveGraphicsState];
 		[NSGraphicsContext setCurrentContext:context];
-		CGContextClearRect(context.CGContext, CGRectMake(0, 0, pixels, pixels));
+		CGContextClearRect(context.CGContext, CGRectMake(0, 0, renderPixels, renderPixels));
 		NSString *emoji = @"\U0001F4AC";
 		NSDictionary *attributes = @{NSFontAttributeName: font};
 		NSSize size = [emoji sizeWithAttributes:attributes];
-		[emoji drawAtPoint:NSMakePoint((pixels - size.width) / 2.0,
-			(pixels - size.height) / 2.0) withAttributes:attributes];
+		[emoji drawAtPoint:NSMakePoint((renderPixels - size.width) / 2.0,
+			(renderPixels - size.height) / 2.0) withAttributes:attributes];
 		[NSGraphicsContext restoreGraphicsState];
+		if (renderPixels != pixels) {
+			NSBitmapImageRep *scaled = [[NSBitmapImageRep alloc]
+				initWithBitmapDataPlanes:NULL pixelsWide:pixels pixelsHigh:pixels
+				bitsPerSample:8 samplesPerPixel:4 hasAlpha:YES isPlanar:NO
+				colorSpaceName:NSCalibratedRGBColorSpace bytesPerRow:0 bitsPerPixel:0];
+			if (scaled == nil) return NULL;
+			NSGraphicsContext *smallContext = [NSGraphicsContext graphicsContextWithBitmapImageRep:scaled];
+			[NSGraphicsContext saveGraphicsState];
+			[NSGraphicsContext setCurrentContext:smallContext];
+			smallContext.imageInterpolation = NSImageInterpolationHigh;
+			CGContextClearRect(smallContext.CGContext, CGRectMake(0, 0, pixels, pixels));
+			CGFloat margin = MAX(2.0, pixels * 0.04);
+			[bitmap drawInRect:NSInsetRect(NSMakeRect(0, 0, pixels, pixels), margin, margin)];
+			[NSGraphicsContext restoreGraphicsState];
+			bitmap = scaled;
+		}
 		NSData *png = [bitmap representationUsingType:NSBitmapImageFileTypePNG properties:@{}];
 		if (png.length == 0 || png.length > INT_MAX) return NULL;
 		void *result = malloc(png.length);

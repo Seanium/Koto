@@ -10,7 +10,7 @@ import (
 )
 
 func TestNativeEmojiIcon(t *testing.T) {
-	for _, size := range []int{64, 512} {
+	for _, size := range []int{32, 64, 128, 512} {
 		t.Run(fmt.Sprint(size), func(t *testing.T) {
 			image, err := png.Decode(bytes.NewReader(nativeEmojiPNG(size)))
 			if err != nil {
