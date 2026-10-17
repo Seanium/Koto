@@ -567,7 +567,10 @@ func (c *dshConn) Files(s engine.SessionRef) []string {
 }
 
 func (c *dshConn) NewSessionID(key string) string { return "session-" + core.UUID5("dsh\x00"+key) }
-func (c *dshConn) ResumeCommand() string          { return "dsh --resume {id}" }
+
+// The official headless profile accepts an explicit stdin task. Without the
+// trailing dash an interactive terminal fails immediately with "a task is required".
+func (c *dshConn) ResumeCommand() string { return "dsh headless --session-id {id} -" }
 
 func (c *dshConn) OpenBy(s engine.SessionRef) string {
 	file, ok := c.files.Get(s.Session)

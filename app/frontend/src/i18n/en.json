@@ -348,5 +348,7 @@
   "无法读取应用信息": "Could not read app information",
   "开源许可": "Open-source licenses",
   "查看许可": "View licenses",
-  "无法读取许可信息": "Unable to read license notices"
+  "无法读取许可信息": "Unable to read license notices",
+  "输入下一条消息后，在新行按 Ctrl+D 提交。": "Type your next message, then submit on a new line with Ctrl+D.",
+  "输入下一条消息，按 Enter 提交。": "Type your next message and press Enter to submit."
 }

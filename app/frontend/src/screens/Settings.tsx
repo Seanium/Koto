@@ -1,4 +1,5 @@
 import { languages, setLanguage, tr } from '../i18n/core.ts'
+import { setAppearance } from '../appearance'
 // Settings (⌘,): a view inside the main window, beside the sidebar (Esc goes back) — 通用 · Agent.
 
 import { useEffect, useState } from 'react'
@@ -43,7 +44,7 @@ function General({ hub }: { hub: Hub }) {
   const save = async (p: Prefs) => {
     const before = prefs
     setPrefs(p); setError(undefined)
-    try { await shell.setPrefs(p); setLanguage(p.language); void refreshOpeners() } catch (e) { setPrefs(before); setError((e as Error).message) }
+    try { await shell.setPrefs(p); setLanguage(p.language); setAppearance(p.appearance); void refreshOpeners() } catch (e) { setPrefs(before); setError((e as Error).message) }
   }
   const openers = useOpeners()
   return (

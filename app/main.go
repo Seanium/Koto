@@ -25,12 +25,12 @@ type UI struct {
 	locale     atomic.Value
 	localeMu   sync.Mutex
 	menuLabels []menuLabel
+	opening    windowOpenQueue
 }
 
 // openSettings shows the main window on its settings view (tab "" keeps the last one).
 func (u *UI) openSettings(tab string) {
-	u.openMain("")
-	u.app.Event.Emit("settings:tab", tab)
+	u.requestOpen(windowOpenRequest{settings: &tab})
 }
 
 // keepOnClose makes closing a window hide it (the app lives on in the menu bar / tray).
@@ -42,10 +42,30 @@ func keepOnClose(w *application.WebviewWindow) {
 }
 
 func (u *UI) openMain(nav string) {
+	u.requestOpen(windowOpenRequest{nav: nav})
+}
+
+func (u *UI) requestOpen(request windowOpenRequest) {
+	// Wait for the actual React listeners, which also guarantees WebView2 is
+	// initialized. A single queue keeps a cold-start tray request and its target.
+	if u.opening.request(request) {
+		u.showRequest(request)
+	}
+}
+
+func (u *UI) frontendReady() {
+	if pending := u.opening.activate(); pending != nil {
+		u.showRequest(*pending)
+	}
+}
+
+func (u *UI) showRequest(request windowOpenRequest) {
 	u.main.Show()
 	u.main.Focus()
-	if nav != "" {
-		u.app.Event.Emit("app:navigate", nav)
+	if request.settings != nil {
+		u.app.Event.Emit("settings:tab", *request.settings)
+	} else if request.nav != "" {
+		u.app.Event.Emit("app:navigate", request.nav)
 	}
 }
 
@@ -135,26 +155,47 @@ func main() {
 	// Native fullscreen/restore and programmatic resize can clear Wails' constraints. Reapply
 	// the product minimum after those transitions, and repair an undersized frame immediately.
 	minimum := mainWindowOptions()
+	var lastWorkArea atomic.Value
 	enforceMinimum := func() {
-		if !ui.main.IsFullscreen() {
-			w, h := ui.main.Size()
-			if w < minimum.MinWidth || h < minimum.MinHeight {
-				ui.main.SetSize(max(w, minimum.MinWidth), max(h, minimum.MinHeight))
-			}
-			ui.main.SetMinSize(minimum.MinWidth, minimum.MinHeight)
+		if ui.main.IsMinimised() || ui.main.IsFullscreen() {
+			return
+		}
+		enforceWindowFrame(ui.main, minimum.MinWidth, minimum.MinHeight)
+		if area, ok := windowWorkArea(ui.main); ok {
+			lastWorkArea.Store(area)
 		}
 	}
-	for _, ev := range []events.WindowEventType{events.Common.WindowShow, events.Common.WindowRestore, events.Common.WindowUnFullscreen} {
+	for _, ev := range []events.WindowEventType{events.Common.WindowShow, events.Common.WindowRestore, events.Common.WindowUnFullscreen, events.Common.WindowUnMaximise, events.Common.WindowUnMinimise, events.Common.WindowDPIChanged} {
 		ui.main.OnWindowEvent(ev, func(*application.WindowEvent) { enforceMinimum() })
 	}
+	// Clamp on a monitor/work-area change, not every move: ordinary dragging
+	// must still let the window cross a display boundary.
+	ui.main.OnWindowEvent(events.Common.WindowDidMove, func(*application.WindowEvent) {
+		if ui.main.IsMinimised() || ui.main.IsFullscreen() {
+			return
+		}
+		if area, ok := windowWorkArea(ui.main); ok {
+			before := lastWorkArea.Swap(area)
+			if before != nil && before.(application.Rect) != area {
+				enforceMinimum()
+			}
+		}
+	})
 	ui.main.OnWindowEvent(events.Common.WindowDidResize, func(*application.WindowEvent) {
 		w, h := ui.main.Size()
-		if w < minimum.MinWidth || h < minimum.MinHeight {
+		minWidth, minHeight := windowMinimum(ui.main, minimum.MinWidth, minimum.MinHeight)
+		if w < minWidth || h < minHeight {
 			enforceMinimum()
 		}
 	})
+	ui.main.OnWindowEvent(events.Common.WindowRuntimeReady, func(*application.WindowEvent) {
+		enforceMinimum()
+	})
 	keepOnClose(ui.main)
 	saveFrame := func() {
+		if ui.main.IsMinimised() || ui.main.IsMaximised() || ui.main.IsFullscreen() {
+			return
+		}
 		x, y := ui.main.Position()
 		w, h := ui.main.Size()
 		p := prefs.Get()
@@ -185,6 +226,10 @@ func main() {
 
 	// Quit can exit the process before Run returns: let go of the data here.
 	app.OnShutdown(func() { saveFrame(); core.Stop() })
+	if platformSmokeResult != "" {
+		// Exercise a real cold-start menu request before the WebView exists.
+		ui.openSettings("general")
+	}
 	err := app.Run()
 	core.Stop()
 	if err != nil {

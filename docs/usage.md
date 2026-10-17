@@ -39,6 +39,10 @@ Current-session detection uses `CODEX_THREAD_ID`, `PI_SESSION_ID`, `DSH_SESSION_
 
 The reply includes the copied counts, conversion notes, and command to continue. The unfinished current turn, including the copy request, is excluded. The source stays unchanged; the target Agent is not launched automatically.
 
+DeepSeek Harness uses its headless interface for exact-session continuation. Run the command and type your next message. On macOS/Linux, submit on a new line with **Ctrl+D**; on Windows, the command prompts for a message and **Enter** submits it. Each command answers one message.
+
+For OpenCode 1.19.3 on Windows ARM, use the official x64 build; the native ARM build cannot launch its terminal interface.
+
 ## CLI and MCP
 
 Replace the example IDs below with actual session IDs. `--dry-run` previews a copy; `--help` lists all options.

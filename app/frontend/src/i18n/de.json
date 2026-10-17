@@ -348,5 +348,7 @@
   "无法读取应用信息": "App-Informationen konnten nicht geladen werden",
   "开源许可": "Open-Source-Lizenzen",
   "查看许可": "Lizenzen anzeigen",
-  "无法读取许可信息": "Lizenzhinweise konnten nicht geladen werden"
+  "无法读取许可信息": "Lizenzhinweise konnten nicht geladen werden",
+  "输入下一条消息后，在新行按 Ctrl+D 提交。": "Nächste Nachricht eingeben und in einer neuen Zeile mit Strg+D senden.",
+  "输入下一条消息，按 Enter 提交。": "Nächste Nachricht eingeben und mit Enter senden."
 }

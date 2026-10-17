@@ -180,7 +180,7 @@ func TestCopyCurrentPreviewNativeReadbackAndSourceUnchanged(t *testing.T) {
 	if code != 0 || r.State != "copied" || !r.OK || r.Resume == nil || r.Resume.Cwd == nil || *r.Resume.Cwd != s.cwd || !strings.HasPrefix(r.Resume.Shell, prefix) {
 		t.Fatalf("copy: %d %s", code, raw)
 	}
-	if !strings.Contains(r.Instructions, "resume.shell exactly as returned") || !strings.Contains(r.Instructions, "Do not launch") {
+	if !strings.Contains(r.Instructions, "resume.shell exactly as returned") || !strings.Contains(r.Instructions, "Do not launch") || !strings.Contains(r.Instructions, "resume.instructions") {
 		t.Fatal("copy result must tell the calling Agent how to report and continue")
 	}
 	if strings.Contains(raw, "iVBOR") || strings.Contains(raw, "PRESERVED answer") || strings.Contains(raw, "records") {
@@ -498,5 +498,14 @@ func TestHandoffCLIProcess(t *testing.T) {
 		} else if err == nil || result.OK || result.Error == nil || result.Error.Code != test.code {
 			t.Fatalf("process expected %s with nonzero exit: %v %s", test.code, err, raw)
 		}
+	}
+}
+
+func TestHandoffTextKeepsResumeInputInstructions(t *testing.T) {
+	var out bytes.Buffer
+	r := &handoffResult{State: "copied", Source: &sessionIdentity{}, Destination: &sessionIdentity{}, Counts: &copyCounts{}, Resume: &koto.Resume{Shell: "dsh headless --session-id session-test -", Instructions: "Type a message, then Ctrl+D."}}
+	printHandoff(&out, r)
+	if !strings.Contains(out.String(), r.Resume.Shell+"\n"+r.Resume.Instructions) {
+		t.Fatal("text output must explain stdin submission next to the resume command", out.String())
 	}
 }

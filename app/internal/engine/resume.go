@@ -73,7 +73,18 @@ func ShellCommand(argv []string, cwd string, envs map[string]string) string {
 	return shellCommand(argv, cwd, envs, runtime.GOOS)
 }
 
+// ShellCommandWithInputPrompt supplies a line of interactive input to a native
+// stdin command on Windows. The encoding change is scoped to the script block;
+// PowerShell 5.1 otherwise replaces non-ASCII input with question marks.
+func ShellCommandWithInputPrompt(argv []string, cwd string, envs map[string]string, prompt string) string {
+	return shellCommandWithInputPrompt(argv, cwd, envs, runtime.GOOS, prompt)
+}
+
 func shellCommand(argv []string, cwd string, envs map[string]string, goos string) string {
+	return shellCommandWithInputPrompt(argv, cwd, envs, goos, "")
+}
+
+func shellCommandWithInputPrompt(argv []string, cwd string, envs map[string]string, goos, prompt string) string {
 	keys := make([]string, 0, len(envs))
 	for key := range envs {
 		keys = append(keys, key)
@@ -86,6 +97,9 @@ func shellCommand(argv []string, cwd string, envs map[string]string, goos string
 			parts = append(parts, "$env:"+key+"="+PowerShellQ(envs[key])+";")
 		}
 		if len(argv) > 0 {
+			if prompt != "" {
+				parts = append(parts, "& { $OutputEncoding = [System.Text.UTF8Encoding]::new($false); Read-Host", PowerShellQ(prompt), "|")
+			}
 			parts = append(parts, "&")
 			for i, arg := range argv {
 				// npm installs both .ps1 and .cmd launchers. Resolve a native
@@ -97,6 +111,10 @@ func shellCommand(argv []string, cwd string, envs map[string]string, goos string
 					}
 				}
 				parts = append(parts, PowerShellQ(arg))
+			}
+			if prompt != "" {
+				// Preserve ordinary appended options for the native command.
+				parts = append(parts, "@args }")
 			}
 		}
 	} else {

@@ -1,8 +1,8 @@
 /* Design tokens. Every colour, size, radius and duration used anywhere comes from here.
-   Spacing 4/8/12/16/24/32 · radius 6/8/12/14 · type 11/12/13/15/19. Dark follows the system. */
+   Spacing 4/8/12/16/24/32 · radius 6/8/12/14 · type 11/12/13/15/19. Appearance can follow the system or be selected explicitly. */
 
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 
   --bg-window: #ffffff;
   --bg-sidebar: #f4f4f2;
@@ -55,8 +55,8 @@
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
+:root[data-appearance="dark"] {
+    color-scheme: dark;
     --bg-window: #1e1e20;
     --bg-sidebar: #252527;
     --bg-list: #212123;
@@ -95,7 +95,6 @@
     --dot-idle: #6a6a70;
 
     --shadow-sheet: 0 24px 64px rgba(0, 0, 0, 0.5), 0 0 0 0.5px rgba(255, 255, 255, 0.1);
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

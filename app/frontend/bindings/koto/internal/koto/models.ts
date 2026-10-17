@@ -103,6 +103,7 @@ export interface Resume {
     "cwd": string | null;
     "env": { [_ in string]?: string } | null;
     "shell": string;
+    "instructions"?: string;
 }
 
 /**

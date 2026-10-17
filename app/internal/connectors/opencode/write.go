@@ -77,7 +77,10 @@ func (c *connector) Plan(in engine.PlanInput) (*engine.DeliveryPlan, error) {
 		}
 		info := core.JsonObject{"role": role, "time": core.JsonObject{"created": ts}, "agent": "build"}
 		if role == "user" {
-			info["model"] = core.JsonObject{"providerID": provider, "modelID": modelID}
+			// The TUI initializes its next-turn model picker from the last user
+			// message, even when session.model is set. Foreign or missing model
+			// names must not become an invalid continuation setting.
+			info["model"] = core.JsonObject{"providerID": d.Model["providerID"], "modelID": d.Model["id"]}
 			parent = id
 		} else {
 			info["parentID"] = parent

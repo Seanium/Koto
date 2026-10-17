@@ -39,6 +39,10 @@ OpenCode 未提供宿主会话 ID 时，koto 通过正在运行的工具调用�
 
 回复会说明复制数量、转换情况，并给出继续聊的命令。当前未完成的轮次（包括这条复制请求）不会带入新会话。原会话保持不变，目标 Agent 不会自动启动。
 
+DeepSeek Harness 使用 headless 界面精确续聊。运行命令并输入下一条消息：macOS/Linux 换行后按 **Ctrl+D** 提交；Windows 按提示输入，按 **Enter** 提交。每次运行回答一条消息。
+
+Windows ARM 上使用 OpenCode 1.19.3 时，请选官方 x64 版；原生 ARM 版的终端界面目前无法启动。
+
 ## CLI 与 MCP
 
 将下方示例 ID 替换为实际会话 ID。`--dry-run` 预览复制，`--help` 查看完整参数。

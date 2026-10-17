@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -26,8 +27,54 @@ func TestPowerShellResumeHelper(t *testing.T) {
 			break
 		}
 	}
-	_ = json.NewEncoder(os.Stdout).Encode(map[string]any{"cwd": dir, "env": os.Getenv("KOTO_RESUME_TEST_ROOT"), "args": os.Args[start:]})
+	input := ""
+	if os.Getenv("KOTO_RESUME_TEST_STDIN") == "1" {
+		b, _ := io.ReadAll(os.Stdin)
+		input = string(b)
+	}
+	_ = json.NewEncoder(os.Stdout).Encode(map[string]any{"cwd": dir, "env": os.Getenv("KOTO_RESUME_TEST_ROOT"), "args": os.Args[start:], "input": input})
 	os.Exit(0)
+}
+
+func TestWindowsResumeInputPromptPreservesUTF8(t *testing.T) {
+	shell := os.Getenv("KOTO_TEST_POWERSHELL")
+	if shell == "" && runtime.GOOS == "windows" {
+		shell = "powershell.exe"
+	}
+	if shell == "" {
+		t.Skip("requires native Windows PowerShell or KOTO_TEST_POWERSHELL")
+	}
+	bin, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(t.TempDir(), "项目 O'Brien [copy]")
+	if err := os.Mkdir(dir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	prompt, input := "Message O'Brien $HOME; [literal]", "请回复 中文🐙 O'Brien & $HOME; 不要改写"
+	argv := []string{bin, "-test.run=^TestPowerShellResumeHelper$", "--", "session O'Brien"}
+	line := shellCommandWithInputPrompt(argv, dir, map[string]string{"KOTO_RESUME_TEST_HELPER": "1", "KOTO_RESUME_TEST_STDIN": "1"}, "windows", prompt)
+	// Replace only keyboard input: the real PowerShell 5.1 pipeline still writes
+	// to a native process. Assert literal prompt values and no encoding leakage.
+	script := "$ErrorActionPreference='Stop'; $before=$OutputEncoding; function Read-Host { param($Prompt); if ($Prompt -cne " + PowerShellQ(prompt) + ") { throw 'changed prompt' }; " + PowerShellQ(input) + " }; " + line + " 'appended literal'; if (-not [Object]::ReferenceEquals($before,$OutputEncoding)) { throw 'encoding leaked' }"
+	words := utf16.Encode([]rune(script))
+	bytes := make([]byte, len(words)*2)
+	for i, word := range words {
+		binary.LittleEndian.PutUint16(bytes[i*2:], word)
+	}
+	out, err := exec.Command(shell, "-NoLogo", "-NoProfile", "-NonInteractive", "-EncodedCommand", base64.StdEncoding.EncodeToString(bytes)).Output()
+	if err != nil {
+		t.Fatalf("PowerShell stdin resume: %v\n%s", err, out)
+	}
+	var got struct {
+		Input string   `json:"input"`
+		Args  []string `json:"args"`
+		Cwd   string   `json:"cwd"`
+	}
+	if err := json.Unmarshal(out, &got); err != nil || strings.TrimSuffix(strings.TrimSuffix(got.Input, "\n"), "\r") != input || !reflect.DeepEqual(got.Args, []string{"session O'Brien", "appended literal"}) || !strings.EqualFold(filepath.Clean(got.Cwd), filepath.Clean(dir)) {
+		t.Fatalf("stdin or command changed: %v, %s", err, out)
+	}
 }
 
 // Run the returned command in the real shell, including apostrophes, Unicode,

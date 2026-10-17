@@ -77,7 +77,7 @@ export function Detail({ hub, item, detailError, conversation: c, loadEarlier, o
             <Button variant="ghost" icon aria-label={tr("取消选择")} title={tr("取消选择")} onClick={selection.exit}>{Icon.close}</Button>
             <Button id="copy-main" variant="primary" disabled={!custom} onClick={copy}>{tr("复制到…")}</Button>
           </> : <>
-            {binding.resume && <ResumeActions command={binding.resume.shell} />}
+            {binding.resume && <ResumeActions command={binding.resume.shell} instructions={binding.resume.instructions && binding.harness === 'dsh' ? tr(/win/i.test(navigator.platform) ? "输入下一条消息，按 Enter 提交。" : "输入下一条消息后，在新行按 Ctrl+D 提交。") : binding.resume.instructions} />}
             <Button id="copy-main" variant="primary" disabled={!selection.canStart} onClick={selection.start}>{tr("选择复制范围")}</Button>
           </>}
         </span>

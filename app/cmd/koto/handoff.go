@@ -48,6 +48,7 @@ const agentGuide = `For an AI Agent asked "用 koto 复制当前会话到 pi" (n
      warnings and any deferred.events. Return the JSON-decoded resume.shell in
      a shell code block; do not add quoting or backslashes. It already includes
      the working directory and environment needed to continue.
+     Include resume.instructions when present so the user knows how to submit input.
 
 Identity: KOTO_SESSION is an explicitly supplied agent:session-id selector;
 Hosts may provide CLAUDE_CODE_SESSION_ID, CODEX_THREAD_ID, PI_SESSION_ID, DSH_SESSION_ID or
@@ -411,7 +412,7 @@ func performHandoff(ctx context.Context, app *koto.App, command, selector, resol
 		cwd = p.Projection.Hints.Cwd
 	}
 	result.State = "copied"
-	result.Instructions = "Report the source, destination, counts, warnings and deferred.events to the user. Give resume.shell exactly as returned after JSON decoding, in a shell code block. JSON escape sequences are not part of the command: do not add backslashes, quoting, or another shell wrapper. Do not launch the destination Agent unless requested."
+	result.Instructions = "Report the source, destination, counts, warnings and deferred.events to the user. Give resume.shell exactly as returned after JSON decoding, in a shell code block. JSON escape sequences are not part of the command: do not add backslashes, quoting, or another shell wrapper. Include resume.instructions when present. Do not launch the destination Agent unless requested."
 	result.Destination = &sessionIdentity{Agent: p.Plan.Harness, Session: session, Selector: p.Plan.Harness + ":" + session, Cwd: cwd}
 	result.Resume = app.WithResume(hub.Binding{Harness: p.Plan.Harness, Connector: p.Sink.ID, Session: session, Meta: core.JsonObject{"cwd": cwd}}).Resume
 	return result, nil
@@ -589,5 +590,8 @@ func printHandoff(out io.Writer, r *handoffResult) {
 	}
 	if r.Resume != nil {
 		fmt.Fprintln(out, "continue with:", r.Resume.Shell)
+		if r.Resume.Instructions != "" {
+			fmt.Fprintln(out, r.Resume.Instructions)
+		}
 	}
 }

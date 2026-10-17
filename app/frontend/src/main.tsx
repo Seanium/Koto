@@ -3,6 +3,7 @@
 import { StrictMode, useEffect, useState, useSyncExternalStore } from 'react'
 import { createRoot } from 'react-dom/client'
 import './theme.css'
+import { observeSystemAppearance, setAppearance } from './appearance'
 import './ui/ui.css'
 import { useHub } from './store'
 import { shell } from './api/client'
@@ -17,7 +18,8 @@ function App() {
   const hub = useHub()
   const locale = useSyncExternalStore(subscribeLanguage, getLocale)
   const [ready, setReady] = useState(false)
-  useEffect(() => { let live = true; void shell.prefs().then(p => { if (live) { setLanguage(p.language); setReady(true) } }, () => { if (live) setReady(true) }); const changed = () => setLanguage(getLanguage()); window.addEventListener('languagechange', changed); return () => { live = false; window.removeEventListener('languagechange', changed) } }, [])
+  useEffect(observeSystemAppearance, [])
+  useEffect(() => { let live = true; void shell.prefs().then(p => { if (live) { setLanguage(p.language); setAppearance(p.appearance); setReady(true) } }, () => { if (live) setReady(true) }); const changed = () => setLanguage(getLanguage()); window.addEventListener('languagechange', changed); return () => { live = false; window.removeEventListener('languagechange', changed) } }, [])
   useEffect(() => { if (ready) void shell.setUILocale(locale) }, [ready, locale])
   return ready ? <MainWindow hub={hub} /> : null
 }

@@ -246,8 +246,11 @@ func (s *AppService) PickDirectory(title string) (string, error) {
 	return d.PromptForSingleSelection()
 }
 
-// Mark is a development hook: the frontend reports UI milestones (used by the screenshot walk).
+// Mark receives frontend readiness and verification milestones.
 func (s *AppService) Mark(name string) {
+	if name == "ui-ready" && s.ui != nil {
+		s.ui.frontendReady()
+	}
 	if strings.HasPrefix(name, "error: ") {
 		log.Printf("frontend %s", name)
 		return

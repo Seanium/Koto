@@ -43,14 +43,18 @@ func platformSmoke(resultFile string, ui *UI, core *Core, marks <-chan string) {
 	if core.Status().State != "ready" {
 		panic("core did not become ready: " + core.Status().Error)
 	}
-	ui.main.Show()
+	// The main window opens normally. Wait for its real WebView before using
+	// window APIs: ApplicationStarted does not mean WebView2 is initialized.
 	ready := time.NewTimer(45 * time.Second)
 	defer ready.Stop()
+	coreReady, uiReady := false, false
 waitReady:
 	for {
 		select {
 		case mark := <-marks:
-			if mark == "ready" {
+			coreReady = coreReady || mark == "ready"
+			uiReady = uiReady || mark == "ui-ready"
+			if coreReady && uiReady {
 				break waitReady
 			}
 		case <-ready.C:
@@ -58,6 +62,14 @@ waitReady:
 		}
 	}
 	result["webviewReady"] = true
+	if runtime.GOOS == "windows" {
+		area, ok := windowWorkArea(ui.main)
+		bounds := ui.main.Bounds()
+		if !ok || bounds.Width <= 0 || bounds.Height <= 0 || bounds.X < area.X || bounds.Y < area.Y || bounds.X+bounds.Width > area.X+area.Width || bounds.Y+bounds.Height > area.Y+area.Height {
+			panic(fmt.Sprintf("window lies outside usable desktop: bounds=%+v area=%+v", bounds, area))
+		}
+		result["windowWorkArea"] = map[string]any{"bounds": bounds, "workArea": area, "fits": true}
+	}
 	step := 0
 	js := func(code string) string {
 		step++
@@ -83,6 +95,8 @@ waitReady:
 		}
 	}
 	js(`window.platformWait=async(test)=>{const end=Date.now()+12000;while(Date.now()<end){if(test())return;await new Promise(r=>setTimeout(r,100))}throw Error('UI condition timed out')}`)
+	js(`window.platformWait(()=>[...document.querySelectorAll('[role=tab]')].some(e=>e.textContent.trim()==='通用'&&e.getAttribute('aria-selected')==='true'))`)
+	result["coldStartSettings"] = true
 	js(`(async()=>{window.platformNav=(text)=>[...document.querySelectorAll('nav [role=option]')].find(e=>e.textContent.trim()===text);await window.platformWait(()=>window.platformNav('会话复制'));if(window.platformNav('会话复制').getAttribute('aria-expanded')!=='true')window.platformNav('会话复制').click();await window.platformWait(()=>window.platformNav('全部会话'));window.platformNav('全部会话').click();await window.platformWait(()=>window.platformNav('全部会话')?.getAttribute('aria-selected')==='true');})()`)
 	js(`(async()=>{window.platformSource=()=>[...document.querySelectorAll('#sessions [role=option]')].find(e=>e.id.slice(2)==='claude-code:6b1f2a40-1c2d-4e3f-8a4b-5c6d7e8f9a01');await window.platformWait(window.platformSource);window.platformSource().click();})()`)
 	js(`window.platformWait(()=>window.platformSource()?.getAttribute('aria-selected')==='true'&&document.querySelector('.session-heading h1')?.textContent==='把 CAS 打包改成按天分片'&&document.getElementById('copy-main')&&!document.getElementById('copy-main').disabled)`)
@@ -152,5 +166,14 @@ document.querySelector('.sheet-foot button').click()`)
 	versionJSON, _ := json.Marshal(strings.TrimSpace(appVersionFile))
 	js(`window.platformWait(()=>document.body.textContent.includes(` + string(versionJSON) + `)&&document.body.textContent.includes('github.com/Seanium/koto'))`)
 	result["appInfo"] = strings.TrimSpace(appVersionFile)
+	// Assert rendered colours, not only the selected preference: Windows/Linux
+	// previously saved appearance while leaving the WebView in the system theme.
+	js(`window.platformAppearance=(label)=>[...document.querySelectorAll('[aria-label="外观"] button')].find(e=>e.textContent.trim()===label);window.platformColours=()=>{const s=getComputedStyle(document.body);return [s.backgroundColor,s.color].join('|')}`)
+	js(`(async()=>{window.platformAppearance('深色').click();await window.platformWait(()=>window.platformColours()==='rgb(30, 30, 32)|rgb(236, 236, 239)')})()`)
+	result["darkAppearance"] = true
+	js(`(async()=>{window.platformAppearance('浅色').click();await window.platformWait(()=>window.platformColours()==='rgb(255, 255, 255)|rgb(23, 23, 26)')})()`)
+	result["lightAppearance"] = true
+	js(`(async()=>{window.platformAppearance('跟随系统').click();await window.platformWait(()=>window.platformAppearance('跟随系统').getAttribute('aria-pressed')==='true'&&window.platformColours()===(matchMedia('(prefers-color-scheme: dark)').matches?'rgb(30, 30, 32)|rgb(236, 236, 239)':'rgb(255, 255, 255)|rgb(23, 23, 26)'));window.platformAppearance('浅色').click();await window.platformWait(()=>window.platformColours()==='rgb(255, 255, 255)|rgb(23, 23, 26)')})()`)
+	result["systemAppearance"] = true
 	result["passed"] = true
 }

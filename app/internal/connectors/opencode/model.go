@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -43,7 +44,9 @@ func (c *connector) targetModel(cwd string) (core.JsonObject, error) {
 	if cwd == c.modelCwd && time.Now().Before(c.modelUntil) {
 		return c.model, nil
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// OpenCode can initialize its isolated runtime on the first invocation.
+	// A cold native Windows launch can take over 20 seconds.
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	cmd, err := nativeCommand(ctx, "debug", "config", "--pure")
 	if err != nil {
@@ -51,9 +54,9 @@ func (c *connector) targetModel(cwd string) (core.JsonObject, error) {
 	}
 	cmd.Dir = cwd
 	cmd.Env = c.nativeEnv()
-	b, err := cmd.Output()
+	b, err := readModelConfiguration(ctx, cmd)
 	if err != nil {
-		return nil, fmt.Errorf("read OpenCode model configuration: %w", err)
+		return nil, err
 	}
 	var config struct {
 		Model string `json:"model"`
@@ -69,4 +72,16 @@ func (c *connector) targetModel(cwd string) (core.JsonObject, error) {
 	c.modelCwd = cwd
 	c.modelUntil = time.Now().Add(30 * time.Second)
 	return c.model, nil
+}
+
+func readModelConfiguration(ctx context.Context, cmd *exec.Cmd) ([]byte, error) {
+	b, err := cmd.Output()
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, fmt.Errorf("read OpenCode model configuration timed out or was canceled: %w", ctx.Err())
+		}
+		// Resolved config and stderr may contain provider credentials.
+		return nil, fmt.Errorf("read OpenCode model configuration: %w", err)
+	}
+	return b, nil
 }

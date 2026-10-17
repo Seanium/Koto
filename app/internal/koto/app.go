@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -56,11 +57,12 @@ type ConnectorInfo struct {
 // Resume is how to continue a native session in its harness: argv in cwd with env (a non-default
 // storage root), or the whole thing as one shell line.
 type Resume struct {
-	Argv    []string          `json:"argv"`
-	Command string            `json:"command"`
-	Cwd     *string           `json:"cwd"`
-	Env     map[string]string `json:"env"`
-	Shell   string            `json:"shell"`
+	Argv         []string          `json:"argv"`
+	Command      string            `json:"command"`
+	Cwd          *string           `json:"cwd"`
+	Env          map[string]string `json:"env"`
+	Shell        string            `json:"shell"`
+	Instructions string            `json:"instructions,omitempty"`
 }
 
 // BindingView is a native session with how to open it.
@@ -319,7 +321,9 @@ func (a *App) WithResume(b hub.Binding) BindingView {
 	if v, ok := rootEnv[b.Harness]; ok && c != nil && c.Root != "" {
 		r1, _ := filepath.Abs(c.Root)
 		r2, _ := filepath.Abs(defaults[b.Harness])
-		if r1 != r2 {
+		// Defaults include the caller's environment. Preserve an inherited
+		// storage override too, so the command also works in a fresh terminal.
+		if r1 != r2 || os.Getenv(v) != "" {
 			envs[v] = c.Root
 		}
 	}
@@ -332,7 +336,18 @@ func (a *App) WithResume(b hub.Binding) BindingView {
 	if cwd != nil {
 		dir = *cwd
 	}
-	return BindingView{Binding: b, Resume: &Resume{Argv: argv, Command: command, Cwd: cwd, Env: envs, Shell: engine.ShellCommand(argv, dir, envs)}}
+	resume := &Resume{Argv: argv, Command: command, Cwd: cwd, Env: envs, Shell: engine.ShellCommand(argv, dir, envs)}
+	// A custom resume command may open another interface; only describe stdin
+	// when the actual command uses DSH's official headless stdin mode.
+	if b.Harness == "dsh" && len(argv) == 5 && argv[1] == "headless" && argv[2] == "--session-id" && argv[4] == "-" {
+		resume.Instructions = "Type your next message, then submit on a new line with Ctrl+D."
+		if runtime.GOOS == "windows" {
+			resume.Command = engine.ShellCommandWithInputPrompt(argv, "", nil, "Message")
+			resume.Shell = engine.ShellCommandWithInputPrompt(argv, dir, envs, "Message")
+			resume.Instructions = "Type your next message and press Enter to submit."
+		}
+	}
+	return BindingView{Binding: b, Resume: resume}
 }
 
 // Bindings of a thread in a working copy, each with how to open it.

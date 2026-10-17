@@ -178,11 +178,16 @@ export function MainWindow({ hub }: { hub: Hub }) {
   const openSettings = (tab?: string) => setMode(m => ({ kind: 'settings', tab: tab && isSettingsTab(tab) ? tab : m.kind === 'settings' ? m.tab : 'agents' }))
 
   // Shell → window: tray 「复制到…」, right-click menu, ⌘, and 设置 from the menu bar.
-  useEffect(() => onNavigate(n => {
-    if (n.thread) { setMode({ kind: 'sessions' }); setFilters(NO_FILTERS); setQuery(''); setSelected(n.thread) }
+  useEffect(() => {
+    const offNavigate = onNavigate(n => {
+      if (n.thread) { setMode({ kind: 'sessions' }); setFilters(NO_FILTERS); setQuery(''); setSelected(n.thread) }
+    })
+    const offSettings = onSettingsTab(openSettings)
+    // Native menu/tray requests can be replayed only after both listeners exist.
+    shell.mark('ui-ready')
+    return () => { offNavigate(); offSettings() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [])
-  useEffect(() => onSettingsTab(openSettings), [])
+  }, [])
   useEffect(() => onContextAction(a => {
     if (a.action === 'copy-id') void shell.copy(a.thread)
     if (a.action === 'trash') { setSelected(a.thread); setAskTrash(n => n + 1) }

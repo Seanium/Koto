@@ -57,6 +57,7 @@ export interface Resume {
   env: Record<string, string>
   /** cwd + env + command as one shell line. */
   shell: string
+  instructions?: string
 }
 
 export interface ThreadSummary {
