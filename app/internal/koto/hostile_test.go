@@ -51,7 +51,7 @@ func TestOwnSideFile(t *testing.T) {
 }
 
 func TestHostileCwdStaysOneFolderUnder(t *testing.T) {
-	root := "/r/sessions"
+	root := filepath.Join(t.TempDir(), "sessions")
 	cwds := []string{"../../pwned", "/tmp/x/../..", `a:b\c`, "..", ".", "", "/", "/../../etc", `C:\..\..`, "~/x", `..\..\up`, strings.Repeat("/a", 300)}
 	for _, cwd := range cwds {
 		for name, enc := range map[string]string{"claude-code": claudecode.ProjectDir(cwd), "pi": pi.CwdDir(cwd), "dsh": dsh.ProjectKey(cwd)} {

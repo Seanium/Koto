@@ -165,9 +165,35 @@ func fixture(t *testing.T, name string, repl map[string]string) string {
 	must(t, err)
 	s := string(b)
 	for k, v := range repl {
-		s = strings.ReplaceAll(s, k, v)
+		encoded, err := json.Marshal(v)
+		must(t, err)
+		// Placeholders live inside JSON strings, including paths on Windows.
+		s = strings.ReplaceAll(s, k, string(encoded[1:len(encoded)-1]))
+	}
+	for i, line := range strings.Split(s, "\n") {
+		if strings.TrimSpace(line) != "" && !json.Valid([]byte(line)) {
+			t.Fatalf("fixture %s line %d is not valid JSON after substitution", name, i+1)
+		}
 	}
 	return s
+}
+
+func TestFixtureWindowsPathRoundTrip(t *testing.T) {
+	root := `C:\Users\测试 O'Brien\project\claude`
+	content := fixture(t, "cc_session.jsonl", map[string]string{"{{SESSION}}": CCSession, "{{ROOT}}": root})
+	found := false
+	for _, line := range strings.Split(content, "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		var row map[string]any
+		must(t, json.Unmarshal([]byte(line), &row))
+		if path := core.S(core.Obj(row["toolUseResult"])["persistedOutputPath"]); path != "" {
+			ok(t, strings.HasPrefix(path, root+"/"), "fixture preserves literal Windows backslashes and Unicode")
+			found = true
+		}
+	}
+	ok(t, found, "fixture has a persisted side-file path")
 }
 
 var nonAlnum = regexp.MustCompile(`[^a-zA-Z0-9]`)

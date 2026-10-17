@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"koto/internal/connectors/shared"
 	"koto/internal/core"
 	"koto/internal/engine"
 
@@ -82,7 +83,7 @@ func writeAgy(t *testing.T, root, id string, steps []agyStep) string {
 	}
 	_, err = db.Exec("INSERT INTO gen_metadata VALUES (0, ?)", pbEnc([]pbf{{1, []pbf{{4, []pbf{{7, "bot-1"}}}, {19, "gemini-x"}}}}))
 	must(t, err)
-	_, err = db.Exec("INSERT INTO trajectory_metadata_blob VALUES ('main', ?)", pbEnc([]pbf{{7, "file:///work/proj"}}))
+	_, err = db.Exec("INSERT INTO trajectory_metadata_blob VALUES ('main', ?)", pbEnc([]pbf{{7, shared.FileURL(filepath.Join(root, "work", "proj")).String()}}))
 	must(t, err)
 	return file
 }
@@ -130,7 +131,7 @@ func TestAntigravityDecode(t *testing.T) {
 	}
 	tool := core.Obj(call["tool"])
 	ok(t, tool["op"] == "shell" && tool["command"] == "ls")
-	eq(t, b.Meta["cwd"], any("/work/proj"))
+	eq(t, b.Meta["cwd"], any(filepath.Join(s.Agy, "work", "proj")))
 	r := carry(t, a, engine.CarryOptions{Selector: "antigravity:conv-1", To: "pi"})
 	eq(t, len(r.Plan.Losses), 0)
 	// rescan without changes: nothing read; the source DB never written by us

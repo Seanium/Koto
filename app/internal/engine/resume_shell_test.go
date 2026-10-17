@@ -60,7 +60,9 @@ func TestWindowsResumeCommandExecutesLiterally(t *testing.T) {
 		}
 		return base64.StdEncoding.EncodeToString(bytes)
 	}
-	out, err := exec.Command(shell, "-NoLogo", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded(line)).CombinedOutput()
+	// Windows PowerShell can emit first-run module progress as CLIXML on stderr.
+	// The helper's JSON contract is stdout; progress must not corrupt its readback.
+	out, err := exec.Command(shell, "-NoLogo", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded(line)).Output()
 	if err != nil {
 		t.Fatalf("PowerShell resume: %v\n%s", err, out)
 	}
@@ -115,7 +117,7 @@ func TestWindowsResumeUsesNPMCommandLauncher(t *testing.T) {
 	t.Setenv("PATHEXT", ".COM;.EXE;.BAT;.CMD")
 	args := []string{"--session", filepath.Join(dir, "会话 O'Brien.jsonl")}
 	line := ShellCommand(append([]string{"test-agent"}, args...), dir, map[string]string{"KOTO_RESUME_TEST_HELPER": "1"})
-	out, err := exec.Command("powershell.exe", "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", line).CombinedOutput()
+	out, err := exec.Command("powershell.exe", "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", line).Output()
 	if err != nil {
 		t.Fatalf("npm-style resume: %v\n%s", err, out)
 	}

@@ -162,10 +162,6 @@ func TestSessionLossCodexRegistrationFails(t *testing.T) {
 	if !hasCodex() {
 		t.Skip("codex CLI not installed")
 	}
-	node, err := exec.LookPath("node")
-	if err != nil {
-		t.Skip("node not installed")
-	}
 	s := newSandbox(t)
 	ccFile := writeCcSession(t, s.Claude, "", false)
 	cwd := filepath.Join(s.Root, "work")
@@ -178,18 +174,33 @@ func TestSessionLossCodexRegistrationFails(t *testing.T) {
 
 	// A server that initializes but rejects registering the new native file.
 	fake := filepath.Join(s.Root, "fake-codex")
-	must(t, os.WriteFile(fake, []byte("#!"+node+`
-require('readline').createInterface({ input: process.stdin }).on('line', l => {
-  const m = JSON.parse(l); if (m.id === undefined) return
-  const out = o => process.stdout.write(JSON.stringify(o) + '\n')
-  if (m.method === 'initialize') out({ id: m.id, result: {} })
-  else out({ id: m.id, error: {code:-1,message:'registration failed: boom'} })
-})
-`), 0o755))
+	if runtime.GOOS == "windows" {
+		fake += ".exe"
+	}
+	source := filepath.Join(s.Root, "fake-codex.go")
+	must(t, os.WriteFile(source, []byte(`package main
+import ("bufio"; "encoding/json"; "os")
+func main() {
+  scanner := bufio.NewScanner(os.Stdin)
+  encoder := json.NewEncoder(os.Stdout)
+  for scanner.Scan() {
+    var request map[string]any
+    if json.Unmarshal(scanner.Bytes(), &request) != nil || request["id"] == nil { continue }
+    response := map[string]any{"id": request["id"]}
+    if request["method"] == "initialize" { response["result"] = map[string]any{} } else {
+      response["error"] = map[string]any{"code": -1, "message": "registration failed: boom"}
+    }
+    encoder.Encode(response)
+  }
+}
+`), 0o600))
+	if output, err := exec.Command("go", "build", "-o", fake, source).CombinedOutput(); err != nil {
+		t.Fatalf("build rejecting app-server: %v: %s", err, output)
+	}
 	appendLines(t, ccFile, ccTurn(CCSession, "a5", 1, ""))
 	bad := s.app(enable("claude-code", "codex"), func(c *Config) { c.CodexBin = fake })
 	scan(t, bad)
-	_, err = bad.Engine.Carry(ctx, engine.CarryOptions{Selector: "claude-code:" + CCSession, To: "codex", Cwd: cwd})
+	_, err := bad.Engine.Carry(ctx, engine.CarryOptions{Selector: "claude-code:" + CCSession, To: "codex", Cwd: cwd})
 	ok(t, err != nil && regexp.MustCompile(`boom|did not accept`).MatchString(err.Error()), err)
 	eq(t, text(t, core.S(r1.Receipt["path"])), original, "failed new copy must not alter a prior session")
 	bad.Close()

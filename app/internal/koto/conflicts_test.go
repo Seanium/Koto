@@ -5,9 +5,11 @@ package koto
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -32,9 +34,12 @@ func kotoCLI(t *testing.T) string {
 			return
 		}
 		cliPath = filepath.Join(dir, "koto")
+		if runtime.GOOS == "windows" {
+			cliPath += ".exe"
+		}
 		out, err := exec.Command("go", "build", "-o", cliPath, "koto/cmd/koto").CombinedOutput()
 		if err != nil {
-			cliErr = &exec.ExitError{Stderr: out}
+			cliErr = fmt.Errorf("build test CLI: %w: %s", err, out)
 		}
 	})
 	if cliErr != nil {
@@ -80,7 +85,7 @@ func TestConflictsThreeProcesses(t *testing.T) {
 	s := newSandbox(t)
 	ccFile := writeCcSession(t, s.Claude, "", true)
 	if out, err := s.cli(t, "scan"); err != nil {
-		t.Fatal(out)
+		t.Fatal(err, out)
 	}
 	parallel := func() []string {
 		var wg sync.WaitGroup
@@ -110,7 +115,7 @@ func TestConflictsThreeProcesses(t *testing.T) {
 	// More turns at the source, then three concurrent new copies.
 	appendLines(t, ccFile, append(ccTurn(CCSession, "a5", 1, ""), ccTurn(CCSession, "xa1", 2, "")...))
 	if out, err := s.cli(t, "scan"); err != nil {
-		t.Fatal(out)
+		t.Fatal(err, out)
 	}
 	parallel()
 	files = jsonlFiles(t, filepath.Join(s.Pi, "sessions"), "")
