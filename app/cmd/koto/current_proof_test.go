@@ -63,6 +63,9 @@ func TestProofInvocationPaths(t *testing.T) {
 		`koto current --proof ` + token + ` --json`,
 		`'/Applications/koto.app/Contents/Helpers/koto' current --proof='` + token + `' --json`,
 		`& 'C:\Users\测试 用户\koto-cli.exe' current --json --proof "` + token + `"`,
+		`'/home/test/Downloads/koto-cli-linux-arm64' current --proof ` + token + ` --json`,
+		`'/Users/test/Downloads/koto-cli-darwin-amd64' current --proof ` + token + ` --json`,
+		`& 'C:\Users\测试 用户\Downloads\koto-cli-windows-arm64.exe' current --proof ` + token + ` --json`,
 	} {
 		if !rx.MatchString(command) {
 			t.Fatalf("valid invocation rejected: %s", command)
@@ -70,6 +73,8 @@ func TestProofInvocationPaths(t *testing.T) {
 	}
 	for _, command := range []string{
 		`not-koto current --proof ` + token,
+		`not-koto-cli-linux-arm64 current --proof ` + token,
+		`koto-cli-linux-arm64-unrelated current --proof ` + token,
 		`koto copy --proof ` + token,
 		`koto current --proof ` + token + `ffff`,
 	} {

@@ -18,7 +18,7 @@ import (
 var proofToken = regexp.MustCompile(`^[a-f0-9]{32}$`)
 
 func proofInvocation(token string) *regexp.Regexp {
-	return regexp.MustCompile(`(?:^|[/\\\s"'])koto(?:-cli)?(?:\.exe)?["']?\s+current\b[^\r\n]*\s--proof(?:=|\s+)["']?` + regexp.QuoteMeta(token) + `["']?(?:\s|$)`)
+	return regexp.MustCompile(`(?:^|[/\\\s"'])koto(?:-cli(?:-(?:darwin|linux|windows)-(?:arm64|amd64))?)?(?:\.exe)?["']?\s+current\b[^\r\n]*\s--proof(?:=|\s+)["']?` + regexp.QuoteMeta(token) + `["']?(?:\s|$)`)
 }
 
 // OpenCode does not supply a session ID to its shell tools. A fresh challenge
