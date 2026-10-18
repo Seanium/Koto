@@ -243,9 +243,16 @@ func runHandoff(pos, flags []string, stdout, stderr io.Writer, getenv func(strin
 		}
 		o.targetProfile = p.ID
 	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
 	if (pos[0] == "current" || o.current) && resolvedBy != "KOTO_SESSION" {
 		agent, _, _, _ := core.ParseSessionSelector(selector)
-		if env := map[string]string{"claude-code": "CLAUDE_CONFIG_DIR", "codex": "CODEX_HOME", "pi": "PI_CODING_AGENT_DIR", "dsh": "DSH_HOME", "zcode": "ZCODE_STORAGE_DIR"}[agent]; env != "" && getenv(env) != "" {
+		if resolvedBy == "CLAUDE_CODE_SESSION_ID" && claudeHostVariant(getenv("CLAUDE_CODE_ENTRYPOINT")) != "" {
+			o.sourceConnector, err = claudeHostConnector(ctx, app, selector, getenv)
+			if err != nil {
+				return fail(err, 1)
+			}
+		} else if env := map[string]string{"claude-code": "CLAUDE_CONFIG_DIR", "codex": "CODEX_HOME", "pi": "PI_CODING_AGENT_DIR", "dsh": "DSH_HOME", "zcode": "ZCODE_STORAGE_DIR"}[agent]; env != "" && getenv(env) != "" {
 			ids := app.ProfileIDsForRoot(agent, getenv(env), engine.DefaultVariant(agent))
 			if len(ids) == 1 {
 				o.sourceConnector = ids[0]
@@ -260,8 +267,6 @@ func runHandoff(pos, flags []string, stdout, stderr io.Writer, getenv func(strin
 			return fail(err, 1)
 		}
 	}
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer stop()
 	if *proof != "" {
 		selector, err = resolveCurrentProof(ctx, app, *proof)
 		if err != nil {
