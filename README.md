@@ -6,7 +6,7 @@
 
 Copy sessions between agents. Compare them with a session tree and diff.
 
-[Download](https://github.com/Seanium/koto/releases/latest) · [Website](https://seanium.github.io/koto/)
+[Download](https://github.com/Seanium/koto/releases/latest) · [Website](https://kotoai.site/)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="site/assets/screenshots/en-dark-copy.png">

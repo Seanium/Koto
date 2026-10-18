@@ -6,7 +6,7 @@
 
 対話を別の Agent にコピー。ツリーと diff でセッションを比較。
 
-[ダウンロード](https://github.com/Seanium/koto/releases/latest) · [Webサイト](https://seanium.github.io/koto/)
+[ダウンロード](https://github.com/Seanium/koto/releases/latest) · [Webサイト](https://kotoai.site/)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="../../site/assets/screenshots/ja-dark-copy.png">

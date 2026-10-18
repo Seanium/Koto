@@ -6,7 +6,7 @@
 
 Gespräche zwischen Agents kopieren. Sitzungen mit Baumansicht und Diff vergleichen.
 
-[Download](https://github.com/Seanium/koto/releases/latest) · [Website](https://seanium.github.io/koto/)
+[Download](https://github.com/Seanium/koto/releases/latest) · [Website](https://kotoai.site/)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="../../site/assets/screenshots/de-dark-copy.png">

@@ -6,7 +6,7 @@
 
 把会话复制到另一个 Agent。用会话树和 diff 对比会话。
 
-[下载](https://github.com/Seanium/koto/releases/latest) · [网站](https://seanium.github.io/koto/)
+[下载](https://github.com/Seanium/koto/releases/latest) · [网站](https://kotoai.site/)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="../../site/assets/screenshots/zh-dark-copy.png">
