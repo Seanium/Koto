@@ -9,6 +9,16 @@
             <string>koto</string>
         <key>CFBundleIdentifier</key>
             <string>app.koto.desktop.dev</string>
+        <key>CFBundleDevelopmentRegion</key>
+            <string>en</string>
+        <key>CFBundleLocalizations</key>
+            <array>
+                <string>en</string>
+                <string>zh-Hans</string>
+                <string>zh-Hant</string>
+                <string>ja</string>
+                <string>de</string>
+            </array>
         <key>CFBundleVersion</key>
             <string>0.1.0</string>
         <key>CFBundleGetInfoString</key>

@@ -99,7 +99,7 @@ func TestAPIConnectorRootsPersist(t *testing.T) {
 		}
 		return out
 	}
-	jsonEq(t, rows(api), []row{{"claude-code", s.Claude, true, false}, {"pi", s.Pi, true, false}})
+	jsonEq(t, rows(api), []row{{a.Registry.Get("claude-code").ID, s.Claude, true, false}, {a.Registry.Get("pi").ID, s.Pi, true, false}})
 
 	// extra storage root: validated, registered at once, read
 	for _, bad := range [][2]string{{"claude-code", filepath.Join(s.Root, "missing")}, {"nope", extraRoot}, {"claude-code", s.Claude}} {
@@ -109,7 +109,7 @@ func TestAPIConnectorRootsPersist(t *testing.T) {
 	}
 	added, err := api.AddRoot("claude-code", extraRoot)
 	must(t, err)
-	ok(t, regexp.MustCompile(`^claude-code@[0-9a-f]{8}$`).MatchString(added.ID), added.ID)
+	ok(t, regexp.MustCompile(`^claude-code@[0-9a-f]{16}$`).MatchString(added.ID), added.ID)
 	ok(t, added.Removable)
 	api.Reindex(ctx)
 	sel := "claude-code:" + CCSession
@@ -131,7 +131,7 @@ func TestAPIConnectorRootsPersist(t *testing.T) {
 	for _, c := range api.Connectors() {
 		ids = append(ids, c.ID+":"+map[bool]string{true: "on", false: "off"}[c.Enabled])
 	}
-	jsonEq(t, ids, []string{"claude-code:on", "pi:off", added.ID + ":on"})
+	jsonEq(t, ids, []string{a.Registry.Get("claude-code").ID + ":on", a.Registry.Get("pi").ID + ":off", added.ID + ":on"})
 	_, err = api.SetConnectorEnabled("pi", true)
 	must(t, err)
 	api.Reindex(ctx)
@@ -146,7 +146,7 @@ func TestAPIConnectorRootsPersist(t *testing.T) {
 	for _, c := range newAPI(a).Connectors() {
 		ids = append(ids, c.ID)
 	}
-	jsonEq(t, ids, []string{"claude-code", "pi"})
+	jsonEq(t, ids, []string{a.Registry.Get("claude-code").ID, a.Registry.Get("pi").ID})
 }
 
 // A copy's dry run in one conversation never reads other conversations into its working copy.

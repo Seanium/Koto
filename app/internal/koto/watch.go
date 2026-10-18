@@ -19,8 +19,11 @@ func (a *API) Watch(ctx context.Context, every time.Duration) {
 		select {
 		case <-ctx.Done():
 			return
+		case <-a.scanWake():
+			a.Reindex(ctx)
 		case <-t.C:
 			a.App.Engine.Jobs.Sweep()
+			a.App.Sessions.SweepViews(time.Now())
 			a.Reindex(ctx)
 		}
 	}

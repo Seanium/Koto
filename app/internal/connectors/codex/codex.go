@@ -24,7 +24,7 @@ import (
 	"koto/internal/engine"
 )
 
-const Version = "codex-connector@0.1.0"
+const Version = "codex-connector@0.2.0"
 
 var shellBin = regexp.MustCompile(`(^|/)(ba|z)?sh$`)
 
@@ -130,6 +130,9 @@ var contextTags = []string{"<environment_context>", "<user_instructions>", "<per
 var dataURL = regexp.MustCompile(`(?s)^data:([^;]+);base64,(.*)$`)
 
 func contentItems(content any, ctx *engine.DecodeContext) []core.Part {
+	if ctx.IndexOnly {
+		return indexContentItems(content, assetDirectory(ctx.Ref.Path))
+	}
 	if s, ok := content.(string); ok {
 		if s == "" {
 			return []core.Part{}
@@ -230,6 +233,18 @@ func (Decoder) Decode(r0 any, raw []byte, ctx *engine.DecodeContext) engine.Deco
 		setIf(st, "cwd", p["cwd"])
 		setIf(st, "provider", p["model_provider"])
 		out := engine.DecodeOut{NativeID: fmt.Sprintf("#meta%d", ctx.Index), Meta: core.JsonObject{"cwd": st["cwd"], "threadId": strOrNil(p["id"]), "frontend": strOrNil(p["source"]), "originator": strOrNil(p["originator"]), "cliVersion": strOrNil(p["cli_version"])}}
+		identity := core.SessionIdentity{}
+		if account := core.S(p["creator_account_id"]); account != "" {
+			identity.Claims = append(identity.Claims, core.IdentityClaim{Kind: "account", ID: account, Scope: "creator", Evidence: "Codex session_meta.creator_account_id"})
+		}
+		if user := core.S(p["creator_user_id"]); user != "" {
+			out.Meta["creatorUserId"] = user
+		}
+		if provider := core.S(p["model_provider"]); provider != "" {
+			identity.Providers = append(identity.Providers, core.ProviderIdentity{ID: provider, Scope: "session", Evidence: "Codex session_meta.model_provider"})
+		}
+		out.Meta["identity"] = core.IdentityMeta(identity)
+		st["identity"] = out.Meta["identity"]
 		fork := core.S(p["forked_from_id"])
 		base := core.Obj(p["history_base"])
 		id := core.S(p["id"])
@@ -261,14 +276,37 @@ func (Decoder) Decode(r0 any, raw []byte, ctx *engine.DecodeContext) engine.Deco
 	case "turn_context":
 		setIf(st, "model", p["model"])
 		setIf(st, "cwd", p["cwd"])
+		setIf(st, "provider", p["model_provider"])
 		setIf(st, "effort", p["effort"])
+		identity := core.ReadIdentity(core.JsonObject{"identity": st["identity"]})
+		provider, modelID := core.S(st["provider"]), core.S(st["model"])
+		found := false
+		for _, v := range identity.Providers {
+			if v.ID == provider && v.Model == modelID && v.Scope == "message" {
+				found = true
+				break
+			}
+		}
+		if !found && (provider != "" || modelID != "") {
+			identity.Providers = append(identity.Providers, core.ProviderIdentity{ID: provider, Model: modelID, Scope: "message", Evidence: "Codex turn_context.model / model_provider"})
+		}
+		st["identity"] = core.IdentityMeta(identity)
 		key := metaKey(st)
 		if st["metaKey"] == key {
 			return engine.DecodeOut{NativeID: fmt.Sprintf("#tc%d", ctx.Index)}
 		}
 		st["metaKey"] = key
-		return ev("meta", "harness", []core.Part{}, core.JsonObject{"model": model(), "effort": st["effort"]}, nil)
+		out := ev("meta", "harness", []core.Part{}, core.JsonObject{"model": model(), "effort": st["effort"]}, nil)
+		out.Meta = core.JsonObject{"identity": st["identity"]}
+		return out
 	case "compacted":
+		if ctx.IndexOnly {
+			var rep *core.DraftReplaces
+			if prev := core.S(st["lastNative"]); prev != "" {
+				rep = &core.DraftReplaces{To: core.NativeParent(prev)}
+			}
+			return ev("compaction", "harness", nil, nil, rep)
+		}
 		var texts []string
 		if m := core.S(p["message"]); m != "" {
 			texts = append(texts, m)
@@ -300,7 +338,7 @@ func (Decoder) Decode(r0 any, raw []byte, ctx *engine.DecodeContext) engine.Deco
 	return engine.DecodeOut{NativeID: fmt.Sprintf("#%s%d", typ, ctx.Index)}
 }
 
-// metaKey mirrors `${model}\0${cwd}\0${effort}` with JavaScript's null → "null".
+// metaKey includes provider: switching endpoints with the same model is still a context change.
 func metaKey(st core.JsonObject) string {
 	f := func(v any) string {
 		if v == nil {
@@ -308,13 +346,18 @@ func metaKey(st core.JsonObject) string {
 		}
 		return jsStr(v)
 	}
-	return f(st["model"]) + "\x00" + f(st["cwd"]) + "\x00" + f(st["effort"])
+	return f(st["model"]) + "\x00" + f(st["cwd"]) + "\x00" + f(st["effort"]) + "\x00" + f(st["provider"])
 }
 
 type evFn func(kind, actor string, parts []core.Part, attrs core.JsonObject, replaces *core.DraftReplaces) engine.DecodeOut
 
 func decodeResponseItem(p map[string]any, ev evFn, model func() map[string]any, ctx *engine.DecodeContext) engine.DecodeOut {
 	t, _ := p["type"].(string)
+	if ctx.IndexOnly {
+		if out, ok := indexResponseItem(p, t, ev, model); ok {
+			return out
+		}
+	}
 	switch t {
 	case "message":
 		role, hasRole := p["role"].(string)
@@ -463,6 +506,7 @@ type codexConn struct {
 	files                 *shared.PathIndex
 	mu                    sync.Mutex
 	server                *AppServer
+	projects              projectCache
 }
 
 // New makes a Codex connector.
@@ -503,6 +547,9 @@ func walk(dir string, fn func(string)) {
 }
 
 func (c *codexConn) Discover(ctx context.Context) ([]core.NativeRef, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	seen := map[string]string{}
 	var order []string
 	for _, root := range []string{filepath.Join(c.home, "sessions"), filepath.Join(c.home, "archived_sessions")} {
@@ -522,6 +569,7 @@ func (c *codexConn) Discover(ctx context.Context) ([]core.NativeRef, error) {
 		})
 	}
 	names := c.threadNames()
+	locations := c.currentLocations(ctx)
 	// After a rollback the thread goes on in its newest rollout; the older ones keep the branches it left.
 	type nk struct{ key, at string }
 	newest := map[string]nk{}
@@ -533,6 +581,9 @@ func (c *codexConn) Discover(ctx context.Context) ([]core.NativeRef, error) {
 	}
 	var out []core.NativeRef
 	for _, s := range order {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		f := seen[s]
 		c.files.Set(s, f)
 		st, err := os.Stat(f)
@@ -540,6 +591,12 @@ func (c *codexConn) Discover(ctx context.Context) ([]core.NativeRef, error) {
 			continue
 		}
 		meta := core.JsonObject{}
+		// Null clears a previous assignment when the user detaches a project.
+		meta["currentCwd"], meta["currentProject"] = nil, nil
+		if location, ok := locations[ThreadOf(s)]; ok {
+			meta["currentCwd"] = location.cwd
+			meta["currentProject"] = location.project
+		}
 		if title, ok := names[ThreadOf(s)]; ok {
 			meta["title"] = title
 		}
@@ -591,19 +648,27 @@ func (c *codexConn) Tail(ctx context.Context, ref core.NativeRef, from *core.Sou
 }
 
 func (c *codexConn) WatchRoots() []string {
-	return []string{filepath.Join(c.home, "sessions"), filepath.Join(c.home, "session_index.jsonl")}
+	return []string{filepath.Join(c.home, "sessions"), filepath.Join(c.home, "session_index.jsonl"), filepath.Join(c.home, ".codex-global-state.json"), filepath.Join(c.home, "state_5.sqlite"), filepath.Join(c.home, "state_5.sqlite-wal")}
 }
 
 func (c *codexConn) ReadRecord(session string, index int, offset *int64) ([]byte, error) {
+	return c.ReadRecordContext(context.Background(), session, index, offset)
+}
+func (c *codexConn) ReadRecordContext(ctx context.Context, session string, index int, offset *int64) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	p, ok := c.files.Get(session)
 	if !ok {
-		_, _ = c.Discover(context.Background())
+		if _, err := c.Discover(ctx); err != nil {
+			return nil, err
+		}
 		p, ok = c.files.Get(session)
 	}
 	if !ok || offset == nil {
 		return nil, nil
 	}
-	return engine.ReadRecordAt(p, *offset)
+	return engine.ReadRecordAtContext(ctx, p, *offset)
 }
 
 func (c *codexConn) findRollout(key string) string {

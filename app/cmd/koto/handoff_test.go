@@ -92,7 +92,7 @@ func TestCurrentExactSessionAndMetadata(t *testing.T) {
 	s.writeCodex(t, testThread, "SOURCE", false)
 	s.writeCodex(t, otherThread, "NEWER SAME CWD", false)
 	r, code, raw := s.run(t, []string{"current"}, nil, map[string]string{"CODEX_THREAD_ID": testThread})
-	if code != 0 || !r.OK || r.Source.Selector != "codex:"+testThread || r.Source.Cwd != s.cwd || r.ResolvedBy != "CODEX_THREAD_ID" {
+	if code != 0 || !r.OK || r.Source.Selector != "@"+engine.ProfileID("codex", s.codex, "cli")+":"+testThread || r.Source.Cwd != s.cwd || r.ResolvedBy != "CODEX_THREAD_ID" {
 		t.Fatalf("wrong exact session: %d %s", code, raw)
 	}
 	if strings.Contains(raw, "question") || strings.Contains(raw, "PRIVATE SYSTEM") {
@@ -111,6 +111,7 @@ func TestNativeHostSessionIdentity(t *testing.T) {
 		{"PI_SESSION_ID", "pi", testThread},
 		{"DSH_SESSION_ID", "dsh", "session-" + testThread},
 		{"ANTIGRAVITY_CONVERSATION_ID", "antigravity", testThread},
+		{"CURSOR_CONVERSATION_ID", "cursor", testThread},
 	} {
 		t.Run(host.agent, func(t *testing.T) {
 			env := map[string]string{host.key: host.id}
@@ -180,7 +181,7 @@ func TestCopyCurrentPreviewNativeReadbackAndSourceUnchanged(t *testing.T) {
 	if code != 0 || r.State != "copied" || !r.OK || r.Resume == nil || r.Resume.Cwd == nil || *r.Resume.Cwd != s.cwd || !strings.HasPrefix(r.Resume.Shell, prefix) {
 		t.Fatalf("copy: %d %s", code, raw)
 	}
-	if !strings.Contains(r.Instructions, "resume.shell exactly as returned") || !strings.Contains(r.Instructions, "Do not launch") || !strings.Contains(r.Instructions, "resume.instructions") {
+	if !strings.Contains(r.Instructions, "JSON-decoded resume.shell character-for-character") || !strings.Contains(r.Instructions, "Do not launch") || !strings.Contains(r.Instructions, "resume.instructions") {
 		t.Fatal("copy result must tell the calling Agent how to report and continue")
 	}
 	if strings.Contains(raw, "iVBOR") || strings.Contains(raw, "PRESERVED answer") || strings.Contains(raw, "records") {
@@ -399,6 +400,24 @@ func TestProjectionCountsDoNotTreatToolsOrSummariesAsTurns(t *testing.T) {
 	got := projectionCounts(p, []*core.Event{q, a, tool})
 	if got != (copyCounts{Turns: 1, Messages: 2, Attachments: 4}) {
 		t.Fatalf("counts include synthetic/tool turns: %+v", got)
+	}
+}
+
+func TestNotificationCountsAndCurrentCopyBoundary(t *testing.T) {
+	q := &core.Event{ID: "question", Kind: "message", Actor: "user"}
+	a := &core.Event{ID: "answer", Kind: "message", Actor: "assistant", Attrs: core.JsonObject{"stopReason": "end_turn"}}
+	n := &core.Event{ID: "delivered-result", Kind: "notification", Actor: "user", Parts: []core.Part{{"type": "text", "text": "parent result"}}}
+	p := &planner.Projection{Items: []planner.Item{{Event: q}, {Event: a}, {Event: n}, {Event: n}}}
+	if got := projectionCounts(p, []*core.Event{q, a, n}); got != (copyCounts{Turns: 1, Messages: 3}) {
+		t.Fatalf("notification must count once as content, not a new turn: %+v", got)
+	}
+	path := []*core.Event{q, a, n,
+		{ID: "migration-request", Kind: "message", Actor: "user"},
+		{ID: "late-result", Kind: "notification", Actor: "user"},
+		{ID: "copy-tool", Kind: "message", Actor: "assistant", Parts: []core.Part{{"type": "tool_call", "callId": "copy"}}},
+	}
+	if head, deferred := completedSnapshot(path); head != n.ID || deferred != 3 {
+		t.Fatalf("task result moved across current-copy boundary: %s, %d", head, deferred)
 	}
 }
 

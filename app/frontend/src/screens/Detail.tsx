@@ -4,7 +4,7 @@ import { shortcut } from '../ui/shortcut'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { api, shell, useOpeners } from '../api/client'
 import { openerName, projectName, revealLabel } from '../api/model'
-import type { Conversation, Hub, SessionItem } from '../store'
+import type { Conversation, SessionItem } from '../store'
 import { Banner, Button, Icon, Menu, OverflowLabel, Popover, Segmented, Toast } from '../ui'
 import { ImageSource, Timeline, TimelineSkeleton, TurnPreview, type TimelineHandle } from './Timeline'
 import { SelectionCheck, SelectionContext, useContentSelection } from './ContentSelection'
@@ -12,9 +12,10 @@ import type { CopySource } from './Continue'
 import { ResumeActions } from './ResumeActions'
 import { SplitPane } from '../ui/SplitPane'
 import { SelectionSurface } from './SelectionSurface'
+import { captureScrollAnchor } from '../scrollAnchor'
 
-export function Detail({ hub, item, detailError, conversation: c, loadEarlier, onCopy, onTrash, askTrash }: {
-  hub: Hub; item: SessionItem; detailError?: string; conversation?: Conversation; loadEarlier: (untilTurn?: number) => Promise<void>
+export function Detail({ item, detailError, conversation: c, loadEarlier, onRetry, onCopy, onTrash, askTrash }: {
+  item: SessionItem; detailError?: string; conversation?: Conversation; loadEarlier: (untilTurn?: number) => Promise<void>; onRetry: () => void
   onCopy: (source: CopySource) => void
   onTrash: () => Promise<string | undefined>; askTrash: number
 }) {
@@ -28,11 +29,30 @@ export function Detail({ hub, item, detailError, conversation: c, loadEarlier, o
   const rangeLabel = selection.invalid ? tr("会话已变更，请重新选择") : custom?.label ?? tr("未选择内容")
   const [preview, setPreview] = useState<number>()
   const [loadingEarlier, setLoadingEarlier] = useState(false)
+  const earlierBusy = useRef(false)
+  const earlierFrame = useRef(0)
+  const listInteracted = useRef(false)
+  const alive = useRef(false)
+  useEffect(() => { alive.current = true; return () => { alive.current = false; cancelAnimationFrame(earlierFrame.current) } }, [])
   const turn = c?.turns.find(t => t.index === preview) ?? c?.turns.at(-1)
   const binding = item.bindings[0]
-  const imageSource = useCallback((sha: string) => api.image(item.id, sha), [item.id])
+  const imageSource = useCallback((sha: string, signal?: AbortSignal) => api.image(item.id, sha, signal), [item.id])
   const copy = () => { if (custom) onCopy(custom) }
   const loaded = !!c
+  const loadMore = useCallback(async () => {
+    if (earlierBusy.current || !c?.hasEarlier) return
+    listInteracted.current = false
+    earlierBusy.current = true; setLoadingEarlier(true)
+    const list = turnList.current
+    const restoreAnchor = captureScrollAnchor(list, '.turn-list-row')
+    try { await loadEarlier() } finally {
+      if (alive.current) earlierFrame.current = requestAnimationFrame(() => {
+        restoreAnchor()
+        earlierBusy.current = false; setLoadingEarlier(false)
+      })
+      else restoreAnchor()
+    }
+  }, [c?.hasEarlier, loadEarlier])
   useLayoutEffect(() => {
     if (view !== 'list' || !loaded) return
     const list = turnList.current
@@ -83,11 +103,17 @@ export function Detail({ hub, item, detailError, conversation: c, loadEarlier, o
         </span>
       </div>
     </header>
-    {detailError && <Banner action={<Button small onClick={() => void hub.reload()}>{tr("重试")}</Button>}>{detailError}</Banner>}
-    {!c ? <div style={{ padding: 24 }}><TimelineSkeleton /></div> : <SelectionContext.Provider value={selection.selection}><ImageSource.Provider value={imageSource}><SelectionSurface onFocusTurn={setPreview}>
+    {detailError && <Banner action={<Button small onClick={onRetry}>{tr("重试")}</Button>}>{detailError}</Banner>}
+    {!c ? !detailError && <div className="conversation-loading" aria-busy="true">
+      <div className="t-meta" role="status">{tr("正在读取会话内容…")}</div>
+      <span className="loading-bar indeterminate" role="progressbar" aria-label={tr("正在读取会话内容…")}><span /></span>
+      <TimelineSkeleton />
+    </div> : <SelectionContext.Provider value={selection.selection}><ImageSource.Provider value={imageSource}><SelectionSurface onFocusTurn={setPreview}>
       {view === 'list' ? <SplitPane name="turns" label={tr("轮次与内容宽度")} ratio={.55} min={220} minRest={280} minRatio={.25} maxRatio={.75} className="conversation-list" first={
-        <div ref={turnList} className="col grow scroll turn-list" role="listbox" aria-label={tr("轮次")} aria-multiselectable={selection.active || undefined}>
-          {c.hasEarlier && <Button variant="ghost" disabled={loadingEarlier} onClick={() => { setLoadingEarlier(true); void loadEarlier().finally(() => setLoadingEarlier(false)) }}>{loadingEarlier ? tr("加载中…") : tr("加载更早的轮次")}</Button>}
+        <div ref={turnList} className="col grow scroll turn-list" role="listbox" aria-label={tr("轮次")} aria-multiselectable={selection.active || undefined}
+          onWheel={() => { listInteracted.current = true }} onTouchStart={() => { listInteracted.current = true }} onPointerDown={() => { listInteracted.current = true }} onKeyDown={() => { listInteracted.current = true }}
+          onScroll={e => { if (listInteracted.current && e.currentTarget.scrollTop < 80) void loadMore() }}>
+          {c.hasEarlier && <Button variant="ghost" disabled={loadingEarlier} onClick={() => void loadMore()}>{loadingEarlier ? tr("加载中…") : tr("加载更早的轮次")}</Button>}
           {c.turns.map(t => <div key={t.index} role="option" tabIndex={0} data-turn={t.index} data-selection-unit={selection.active && !t.partial && t.index <= selection.selection!.state.through ? 'turn' : undefined} data-selection-events={selection.selection?.events(t.eventIds).join(' ')} aria-selected={selection.active ? t.index <= selection.selection!.state.through && t.eventIds.some(id => selection.selection?.has(id)) : turn?.index === t.index} className="turn-list-row no-drag" onClick={() => setPreview(t.index)} onKeyDown={e => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setPreview(t.index); if (selection.active && !t.partial && t.index <= selection.selection!.state.through) selection.selection?.toggle(t.eventIds) } }}>
             {selection.active ? <SelectionCheck scope="turn" events={t.eventIds} label={tr("第 {0} 轮", [t.index])} disabled={t.partial || t.index > selection.selection!.state.through} /> : <><span className="turn-list-point" /><span className="t-meta">{tr("第 ")}{t.index} {tr(" 轮")}</span></>}
             <span className="ellipsis">{t.user || (t.promptId ? tr("图片或附件") : tr("仅回复片段"))}</span>

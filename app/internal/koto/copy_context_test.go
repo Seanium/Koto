@@ -11,11 +11,9 @@ import (
 // Context may sit between the question and reply, or between two turns (model changes).
 func TestCopySelectedTurnWithContext(t *testing.T) {
 	for _, from := range []string{"claude-code", "codex"} {
-		for _, to := range []string{"claude-code", "pi", "codex", "dsh", "antigravity"} {
+		for _, to := range copyAgents {
 			t.Run(from+"/"+to, func(t *testing.T) {
-				if to == "codex" && !hasCodex() {
-					t.Skip("codex CLI not installed")
-				}
+				requireCopyAgent(t, from, to)
 				s := newSandbox(t)
 				var file, session, wanted, omitted string
 				if from == "claude-code" {

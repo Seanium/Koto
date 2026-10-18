@@ -6,12 +6,13 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
-	"net/url"
+	"os"
 	"path/filepath"
 	"regexp"
-	"strings"
 	"time"
 
+	"koto/internal/connectors/shared"
+	"koto/internal/core"
 	"koto/internal/koto"
 )
 
@@ -29,7 +30,7 @@ func currentProofHint() string {
 	if _, err := rand.Read(nonce[:]); err != nil {
 		return "Supply an exact agent:session-id; never choose by recency."
 	}
-	return fmt.Sprintf("If you are OpenCode, run koto current --proof %s --json from your shell tool, then copy the exact source.selector it returns. Keep any --opencode-root option. Otherwise supply an exact agent:session-id or KOTO_SESSION. Never choose by recency or working directory.", hex.EncodeToString(nonce[:]))
+	return fmt.Sprintf("If you are OpenCode or ZCode, run koto current --proof %s --json from your shell tool, then copy the exact source.selector it returns. Keep any --opencode-root or --zcode-root option. Otherwise supply an exact agent:session-id or KOTO_SESSION. Never choose by recency or working directory.", hex.EncodeToString(nonce[:]))
 }
 
 func resolveCurrentProof(ctx context.Context, app *koto.App, token string) (string, error) {
@@ -42,7 +43,7 @@ func resolveCurrentProof(ctx context.Context, app *koto.App, token string) (stri
 	seenDB := map[string]bool{}
 	matches := map[string]string{}
 	for _, c := range app.Registry.Sources() {
-		if c.Harness != "opencode" {
+		if c.Harness != "opencode" && c.Harness != "zcode" {
 			continue
 		}
 		dbSource, ok := c.Source.(interface{ DatabasePath() string })
@@ -50,20 +51,33 @@ func resolveCurrentProof(ctx context.Context, app *koto.App, token string) (stri
 			continue
 		}
 		path := dbSource.DatabasePath()
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			continue
+		}
 		seenDB[path] = true
-		ids, err := findRunningProof(ctx, path, invocation)
+		var ids []string
+		var err error
+		if source, ok := c.Source.(interface {
+			RunningToolSessions(context.Context, *regexp.Regexp) ([]string, error)
+		}); ok {
+			ids, err = source.RunningToolSessions(ctx, invocation)
+		} else if c.Harness == "opencode" {
+			ids, err = findRunningProof(ctx, path, invocation)
+		} else {
+			continue
+		}
 		if err != nil {
-			return "", handoffErr("CURRENT_SESSION_UNAVAILABLE", "Cannot verify the running OpenCode tool: "+err.Error(), "Check the OpenCode data directory and retry with a fresh proof.")
+			return "", handoffErr("CURRENT_SESSION_UNAVAILABLE", "Cannot verify the running "+c.Harness+" tool: "+err.Error(), "Check the Agent data directory and retry with a fresh proof.")
 		}
 		for _, id := range ids {
-			matches[path+"\x00"+id] = id
+			matches[path+"\x00"+id] = core.SessionSelector(c.ID, c.Harness, id)
 		}
 	}
 	if len(matches) != 1 {
-		return "", handoffErr("CURRENT_SESSION_UNVERIFIED", "The proof did not identify exactly one running OpenCode session.", "Run the proof command inside the requesting OpenCode session's shell tool; do not run it in another terminal or choose a session by recency.")
+		return "", handoffErr("CURRENT_SESSION_UNVERIFIED", "The proof did not identify exactly one running Agent session.", "Run the proof command inside the requesting Agent session's shell tool; do not run it in another terminal or choose a session by recency.")
 	}
 	for _, id := range matches {
-		return "opencode:" + id, nil
+		return id, nil
 	}
 	panic("unreachable")
 }
@@ -73,11 +87,8 @@ func findRunningProof(ctx context.Context, file string, invocation *regexp.Regex
 	if err != nil {
 		return nil, err
 	}
-	path = filepath.ToSlash(path)
-	if !strings.HasPrefix(path, "/") {
-		path = "/" + path
-	}
-	u := url.URL{Scheme: "file", Path: path, RawQuery: "mode=ro&_pragma=busy_timeout(1000)"}
+	u := shared.FileURL(path)
+	u.RawQuery = "mode=ro&_pragma=busy_timeout(1000)"
 	db, err := sql.Open("sqlite", u.String())
 	if err != nil {
 		return nil, err

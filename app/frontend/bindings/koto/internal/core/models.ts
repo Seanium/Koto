@@ -36,6 +36,19 @@ export interface IDRule {
 }
 
 /**
+ * IdentityClaim is an identity stated by native metadata. Scope distinguishes
+ * the creator of a session from its storage namespace or an individual message.
+ * Credentials and the currently logged-in user are never historical evidence.
+ */
+export interface IdentityClaim {
+    "kind": string;
+    "id": string;
+    "label"?: string;
+    "scope": string;
+    "evidence": string;
+}
+
+/**
  * JsonObject is a JSON object.
  */
 export type JsonObject = { [_ in string]?: any } | null;

@@ -12,5 +12,6 @@ export type {
     Opener,
     OpenersInfo,
     Prefs,
+    UpdateState,
     WindowFrame
 } from "./models.js";

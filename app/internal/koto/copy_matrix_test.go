@@ -1,6 +1,7 @@
 package koto
 
 import (
+	"path/filepath"
 	"testing"
 
 	"koto/internal/core"
@@ -27,11 +28,13 @@ func TestCopyAPIMatrix(t *testing.T) {
 					file = writeAgy(t, s.Agy, session, []agyStep{userStep(1, "你好 · matrix question", 0), modelStep(2, "matrix answer")})
 				case "dsh":
 					file, session = writeDsh(t, s.Dsh, dshV4), "demo"
+				case "cursor":
+					file, session = writeCursorNativeFixture(t, filepath.Join(s.Root, "cursor"))
 				}
 				a := s.app(enable(copyAgents...))
 				api := &API{App: a}
-				if from == "opencode" {
-					file, session = openCodeLinearSource(t, s, api)
+				if from == "opencode" || from == "zcode" || from == "workbuddy" || from == "workbuddy-ai" {
+					file, session = linearMatrixSource(t, s, api, from)
 				}
 				before := nativeSessionSnapshot(t, file, from, session)
 				api.Reindex(ctx)

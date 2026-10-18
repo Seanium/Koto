@@ -45,7 +45,7 @@ func TestMCP(t *testing.T) {
 	var rows []map[string]any
 	must(t, json.Unmarshal([]byte(text(rpc("tools/call", map[string]any{"name": "list_sessions", "arguments": map[string]any{"harness": "codex"}}))), &rows))
 	eq(t, len(rows), 1)
-	eq(t, rows[0]["selector"], any("codex:"+CodexThread))
+	eq(t, rows[0]["selector"], any("@"+a.Registry.Get("codex").ID+":"+CodexThread))
 	cc := text(rpc("tools/call", map[string]any{"name": "get_session", "arguments": map[string]any{"selector": "claude-code:" + CCSession}}))
 	ok(t, regexp.MustCompile(`## User\nList the files and read the README`).MatchString(cc))
 	ok(t, regexp.MustCompile(`\$ ls -la`).MatchString(cc), "tool calls rendered as text")

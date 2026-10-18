@@ -34,6 +34,20 @@ func normalizeAssets(parts []core.Part, role string, raw bool, o Options, loss f
 		if name == "" {
 			name = "附件"
 		}
+		hasBytes := false
+		if o.ReadBlob != nil {
+			if sha := core.S(core.Obj(p["blob"])["sha256"]); sha != "" {
+				_, hasBytes = o.ReadBlob(sha)
+			}
+		}
+		// Native readers may retain the source URI beside verified attachment
+		// bytes. Re-encode those bytes for the destination: keeping the URI here
+		// makes several writers reuse a path owned by the original conversation.
+		if hasBytes && core.S(p["uri"]) != "" {
+			p = copyPart(p)
+			delete(p, "uri")
+			changed = true
+		}
 		if uri := core.S(p["uri"]); uri != "" {
 			if (o.SinkHarness == "opencode" && role == "user" || o.SinkHarness == "claude-code" || o.SinkHarness == "antigravity" || o.SinkHarness == "codex" && (typ == "image" || strings.HasPrefix(media, "audio/"))) && role != "assistant" {
 				out = append(out, p)
@@ -45,8 +59,7 @@ func normalizeAssets(parts []core.Part, role string, raw bool, o Options, loss f
 			continue
 		}
 		if o.ReadBlob != nil {
-			_, ok := o.ReadBlob(core.S(core.Obj(p["blob"])["sha256"]))
-			if !ok {
+			if !hasBytes {
 				out = append(out, core.Part{"type": "text", "text": "[" + name + "：附件内容不可用]"})
 				loss(typ, "dropped", "附件内容不可用")
 				changed = true

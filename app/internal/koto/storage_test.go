@@ -69,7 +69,7 @@ func TestScanProgress(t *testing.T) {
 	eq(t, r.Changed, 120)
 	ok(t, len(seen) >= 2, "reports as it goes: ", len(seen))
 	end := seen[len(seen)-1]
-	jsonEq(t, []any{end.Connector, end.Harness, end.Done, end.Total}, []any{"claude-code", "claude-code", 120, 120})
+	jsonEq(t, []any{end.Connector, end.Harness, end.Done, end.Total}, []any{a.Registry.Get("claude-code").ID, "claude-code", 120, 120})
 	for i := 1; i < len(seen); i++ {
 		ok(t, seen[i].Done >= seen[i-1].Done)
 	}

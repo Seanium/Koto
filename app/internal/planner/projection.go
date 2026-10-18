@@ -288,6 +288,23 @@ func copyPart(p core.Part) core.Part {
 }
 
 func applyReplayRules(items []Item, o Options, level string, loss func(ev core.EventID, field, kind, note string), deferred *[]core.EventID) []Item {
+	// One native record can contain several results, some structurally
+	// representable and some textualized. Give each result its own replay item
+	// so a writer cannot silently ignore text alongside a native result.
+	expanded := make([]Item, 0, len(items))
+	for _, it := range items {
+		if it.Role != "tool" || it.Verbatim || len(it.Parts) < 2 {
+			expanded = append(expanded, it)
+			continue
+		}
+		for i, part := range it.Parts {
+			x := it
+			x.Key = fmt.Sprintf("%s:result:%d", it.Key, i)
+			x.Parts = []core.Part{part}
+			expanded = append(expanded, x)
+		}
+	}
+	items = expanded
 	w := o.Capabilities.Write
 	textTools := w == nil || w.Tools == "text" || level == "L2" || level == "L3"
 	var out []Item
@@ -413,13 +430,17 @@ func applyReplayRules(items []Item, o Options, level string, loss func(ev core.E
 		if len(parts) == 0 {
 			continue
 		}
-		// A tool item whose results were all textualized becomes a user message; while structural calls
-		// of the same turn still wait for results it is held back (nothing may stand between a call and its result).
+		// A textualized tool result is part of the assistant's work, not a new
+		// human prompt. Keep it after pending structural results, then apply the
+		// target's material rules for its effective role.
 		role := it.Role
 		if it.Role == "tool" && !hasType(parts, "tool_result") {
-			role = "user"
+			role = "assistant"
+			parts, _ = normalizeAssets(parts, role, false, o, func(field, kind, note string) {
+				loss(it.Event.ID, field, kind, note)
+			})
 		}
-		if role == "user" && it.Role == "tool" && len(openCalls) > 0 {
+		if role == "assistant" && it.Role == "tool" && len(openCalls) > 0 {
 			c := it
 			c.Role, c.Parts = role, parts
 			held = append(held, c)

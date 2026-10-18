@@ -1,5 +1,5 @@
-type Source = (sha: string) => Promise<string>
-interface Entry { refs: number; promise: Promise<string>; url?: string; start: () => void }
+type Source = (sha: string, signal?: AbortSignal) => Promise<string>
+interface Entry { refs: number; promise: Promise<string>; url?: string; start: () => void; abort: () => void }
 const sources = new WeakMap<Source, Map<string, Entry>>()
 const queue: Entry[] = []
 let active = 0
@@ -14,17 +14,20 @@ export function acquireMedia(source: Source, sha: string) {
   if (!entry) {
     let resolve!: (url: string) => void, reject!: (error: unknown) => void
     const promise = new Promise<string>((yes, no) => { resolve = yes; reject = no })
-    const item: Entry = { refs: 0, promise, start: () => {
+    const request = new AbortController()
+    const item: Entry = { refs: 0, promise, abort: () => request.abort(), start: () => {
       if (!item.refs) { resolve(''); return }
       active++
       void (async () => {
         try {
-          const blob = await (await fetch(await source(sha))).blob()
+          const data = await source(sha, request.signal)
+          if (!item.refs) { resolve(''); return }
+          const blob = await (await fetch(data, { signal: request.signal })).blob()
           const url = URL.createObjectURL(blob)
           if (item.refs) item.url = url
           else URL.revokeObjectURL(url)
           resolve(item.refs ? url : '')
-        } catch (e) { reject(e) } finally { active--; pump() }
+        } catch (e) { if (request.signal.aborted) resolve(''); else reject(e) } finally { active--; pump() }
       })()
     } }
     entry = item; entries.set(sha, item); queue.push(item)
@@ -36,6 +39,7 @@ export function acquireMedia(source: Source, sha: string) {
     if (released) return
     released = true
     if (--held.refs) return
+    held.abort()
     if (held.url) { URL.revokeObjectURL(held.url); held.url = undefined }
     if (cache.get(sha) === held) cache.delete(sha)
     if (!cache.size) sources.delete(source)

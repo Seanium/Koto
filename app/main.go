@@ -5,10 +5,14 @@ package main
 
 import (
 	"embed"
+	"fmt"
 	"log"
 	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
+
+	"koto/internal/update"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
@@ -28,7 +32,7 @@ type UI struct {
 	opening    windowOpenQueue
 }
 
-// openSettings shows the main window on its settings view (tab "" keeps the last one).
+// openSettings shows the main window on its settings view (tab "" opens General).
 func (u *UI) openSettings(tab string) {
 	u.requestOpen(windowOpenRequest{settings: &tab})
 }
@@ -98,6 +102,25 @@ func sessionMenu(ui *UI) {
 }
 
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "--koto-update-version" {
+		fmt.Println("koto", strings.TrimSpace(appVersionFile))
+		return
+	}
+	if len(os.Args) == 3 && os.Args[1] == "--koto-update-recover" {
+		if err := update.RunRecovery(os.Args[2]); err != nil {
+			log.Print(err)
+			os.Exit(1)
+		}
+		return
+	}
+	if len(os.Args) == 3 && os.Args[1] == "--koto-update-restart" {
+		if err := update.RunRestart(os.Args[2]); err != nil {
+			log.Print(err)
+			os.Exit(1)
+		}
+		return
+	}
+	update.CleanPrevious(update.App)
 	if previewSandbox != "" {
 		// A preview always runs on the project sandbox, whatever the environment says.
 		for k, v := range map[string]string{"KOTO_APP_SANDBOX": previewSandbox, "PATH": previewPath} {
@@ -146,6 +169,7 @@ func main() {
 		return
 	}
 	ui.app = app
+	svc.updates = newAppUpdater(func(state UpdateState) { app.Event.Emit("koto:update", state) }, app.Quit)
 	ui.prefs = prefs
 	core.OnEvent = func(raw string) { app.Event.Emit("koto:event", raw) }
 	core.OnStatus = func(s CoreStatus) { app.Event.Emit("koto:status", s) }
@@ -225,12 +249,13 @@ func main() {
 	})
 
 	// Quit can exit the process before Run returns: let go of the data here.
-	app.OnShutdown(func() { saveFrame(); core.Stop() })
+	app.OnShutdown(func() { svc.updates.cancel(); saveFrame(); core.Stop() })
 	if platformSmokeResult != "" {
 		// Exercise a real cold-start menu request before the WebView exists.
 		ui.openSettings("general")
 	}
 	err := app.Run()
+	svc.updates.cancel()
 	core.Stop()
 	if err != nil {
 		log.Fatal(err)

@@ -196,6 +196,7 @@ func (c *agy) Discover(ctx context.Context) ([]core.NativeRef, error) {
 func (c *agy) WatchRoots() []string { return []string{c.conv} }
 
 func (c *agy) Tail(ctx context.Context, ref core.NativeRef, from *core.SourceOffset, yield func(core.SourceBatch) error) error {
+	indexOnly := engine.IsIndexOnly(ctx)
 	witness, stable, err := engine.SourceWitness(ref)
 	if err != nil {
 		return err
@@ -266,11 +267,17 @@ func (c *agy) Tail(ctx context.Context, ref core.NativeRef, from *core.SourceOff
 	var drafts []core.DraftEvent
 	var blobs [][]byte
 	asset := func(data []byte) core.JsonObject {
+		if indexOnly {
+			return nil
+		}
 		blobs = append(blobs, data)
 		return core.JsonObject{"sha256": core.SHA256Hex(data), "bytes": len(data)}
 	}
 	prefix := core.ZeroPrefix
 	for index, r := range steps {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		raw := r.payload
 		sha := core.SHA256Hex(append([]byte(strconv.Itoa(r.typ)+":"), raw...))
 		prefix = core.ChainPrefix(prefix, sha)
@@ -298,6 +305,9 @@ func (c *agy) Tail(ctx context.Context, ref core.NativeRef, from *core.SourceOff
 			if s == "" {
 				return []core.Part{}
 			}
+			if indexOnly {
+				return shared.DecodeAttachmentTextIndex(s, strings.TrimSuffix(ref.Path, ".db")+".assets")
+			}
 			return shared.DecodeAttachmentText(s, strings.TrimSuffix(ref.Path, ".db")+".assets", asset)
 		}
 		switch r.typ {
@@ -306,6 +316,10 @@ func (c *agy) Tail(ctx context.Context, ref core.NativeRef, from *core.SourceOff
 			text, _ := input.Str(2)
 			parts := textPart(text)
 			for _, im := range input.Msgs(5) {
+				if indexOnly {
+					parts = append(parts, core.Part{"type": "image"})
+					continue
+				}
 				data, _ := im.Str(1)
 				mime, _ := im.Str(2)
 				name, _ := im.Str(3)
@@ -319,6 +333,14 @@ func (c *agy) Tail(ctx context.Context, ref core.NativeRef, from *core.SourceOff
 				parts = append(parts, q)
 			}
 			for _, m := range input.Msgs(9) {
+				if indexOnly {
+					kind := "file"
+					if mime, _ := m.Str(1); strings.HasPrefix(mime, "image/") {
+						kind = "image"
+					}
+					parts = append(parts, core.Part{"type": kind})
+					continue
+				}
 				mime, _ := m.Str(1)
 				name, _ := m.Str(9)
 				uri, _ := m.Str(5)
@@ -338,18 +360,20 @@ func (c *agy) Tail(ctx context.Context, ref core.NativeRef, from *core.SourceOff
 		case 15:
 			mm := p.Msg(20)
 			parts := []core.Part{}
-			if th, _ := mm.Str(3); th != "" {
-				parts = append(parts, core.Part{"type": "reasoning", "text": th})
-			}
-			if tx, _ := mm.Str(1); tx != "" {
-				parts = append(parts, textPart(tx)...)
-			}
-			for _, cl := range mm.Msgs(7) {
-				name, _ := cl.Str(2)
-				as, ok := cl.Str(3)
-				args := parseJSON(as, ok)
-				id, _ := cl.Str(1)
-				parts = append(parts, core.Part{"type": "tool_call", "callId": id, "rawName": name, "args": args, "tool": ToCanonical(name, args)})
+			if !indexOnly {
+				if th, _ := mm.Str(3); th != "" {
+					parts = append(parts, core.Part{"type": "reasoning", "text": th})
+				}
+				if tx, _ := mm.Str(1); tx != "" {
+					parts = append(parts, textPart(tx)...)
+				}
+				for _, cl := range mm.Msgs(7) {
+					name, _ := cl.Str(2)
+					as, ok := cl.Str(3)
+					args := parseJSON(as, ok)
+					id, _ := cl.Str(1)
+					parts = append(parts, core.Part{"type": "tool_call", "callId": id, "rawName": name, "args": args, "tool": ToCanonical(name, args)})
+				}
 			}
 			var model any = nil
 			if gen, _ := mm.Str(6); gen != "" {
@@ -359,6 +383,10 @@ func (c *agy) Tail(ctx context.Context, ref core.NativeRef, from *core.SourceOff
 			}
 			drafts = append(drafts, core.DraftEvent{NativeID: nativeID, Time: t, Kind: "message", Actor: "assistant", Parts: parts, Attrs: attrs(core.JsonObject{"model": map[string]any{"provider": nil, "api": "antigravity", "id": model}})})
 		case 132:
+			if indexOnly {
+				drafts = append(drafts, core.DraftEvent{NativeID: nativeID, Time: t, Kind: "tool_result", Actor: "tool", Attrs: attrs(nil)})
+				continue
+			}
 			call := p.Msg(5, 4)
 			out, ok := p.Msg(140, 2).Str(1)
 			if !ok {
@@ -378,6 +406,10 @@ func (c *agy) Tail(ctx context.Context, ref core.NativeRef, from *core.SourceOff
 			drafts = append(drafts, core.DraftEvent{NativeID: nativeID, Time: t, Kind: "tool_result", Actor: "tool",
 				Parts: []core.Part{{"type": "tool_result", "callId": id, "outcome": outcome, "parts": core.PartsJSON(textPart(out))}}, Attrs: attrs(core.JsonObject{"toolName": tool})})
 		case 101:
+			if indexOnly {
+				drafts = append(drafts, core.DraftEvent{NativeID: nativeID, Time: t, Kind: "context", Actor: "system", Attrs: attrs(nil)})
+				continue
+			}
 			text, _ := p.Msg(114).Str(1)
 			drafts = append(drafts, core.DraftEvent{NativeID: nativeID, Time: t, Attrs: attrs(nil), Kind: "context", Actor: "system", Parts: textPart(text)})
 		}

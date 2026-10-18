@@ -63,4 +63,15 @@ const pickFirst = paintSelection({ ...contextAll, all: false, ids: new Set<strin
 assert.deepEqual(selectionSource(withContext, pickFirst)?.eventIds, ['q1', 'a1'], 'clear then select a turn submits only conversation content')
 assert.deepEqual(turnsOf(events.slice(2, 4), true).map(t => ({ ids: t.eventIds, partial: t.partial })), [{ ids: ['a1'], partial: true }], 'mid-turn pagination ignores context without losing the reply')
 assert.deepEqual(turnsOf(events.filter(e => e.kind === 'context')), [], 'context alone is not a conversation turn')
+
+// Async task notifications are parent-visible results, including when a page starts at one.
+const notice = event('notice', 'notification', 'user', [{ type: 'text', text: '<task-notification>parent result</task-notification>' }])
+const notified = { completeTurns: 2, turns: turnsOf([event('q1', 'message', 'user'), event('a1', 'message', 'assistant'), notice, event('q2', 'message', 'user'), event('late-notice', 'notification', 'user'), event('a2', 'message', 'assistant')]) } as Conversation
+assert.deepEqual(notified.turns.map(t => t.eventIds), [['q1', 'a1', 'notice'], ['q2', 'late-notice', 'a2']], 'notifications attach by actual parent-log position, without starting turns')
+assert.equal(notified.turns[0].steps.at(-1)?.kind, 'text')
+assert.equal((notified.turns[0].steps.at(-1) as { text: string }).text, '<task-notification>parent result</task-notification>', 'parent task result is visible in both list preview and conversation view')
+const notifiedAll = beginSelection(notified)!
+const notifiedFirst = paintSelection({ ...notifiedAll, all: false, ids: new Set<string>() }, notified.turns[0].eventIds, true)
+assert.deepEqual(selectionSource(notified, notifiedFirst)?.eventIds, ['q1', 'a1', 'notice'])
+assert.deepEqual(turnsOf([notice], true).map(t => ({ ids: t.eventIds, partial: t.partial, prompt: t.promptId })), [{ ids: ['notice'], partial: true, prompt: undefined }])
 console.log('Selection: paged default-all, excluded tails, disjoint messages and frozen source passed')

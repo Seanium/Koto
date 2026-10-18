@@ -9,7 +9,9 @@ export type {
     BindingView,
     CarryRequest,
     ConnectorInfo,
+    Profile,
     Resume,
+    ScanStatus,
     ThreadDetail,
     ThreadListing
 } from "./models.js";

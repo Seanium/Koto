@@ -119,7 +119,7 @@ func TestCurrentProofRejectsAmbiguousSessions(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, err := resolveCurrentProof(context.Background(), app, token)
-	if err != nil || got != "opencode:ses_a" {
+	if err != nil || got != "@"+app.Registry.Get("opencode").ID+":ses_a" {
 		t.Fatalf("unique proof: %q %v", got, err)
 	}
 }

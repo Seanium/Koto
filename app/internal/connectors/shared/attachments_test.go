@@ -89,3 +89,52 @@ func TestAttachmentCopyRoundTripWithNativePaths(t *testing.T) {
 		t.Fatal("attachment bytes changed")
 	}
 }
+
+func TestAttachmentWithURIKeepsBytesAcrossTwoCopies(t *testing.T) {
+	root := t.TempDir()
+	source := filepath.Join(root, "原始报告.txt")
+	data := []byte("independent attachment 中文🐙\x00\xff")
+	if err := os.WriteFile(source, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	h := hub.New()
+	parts := []core.Part{{"type": "file", "name": "原始报告.txt", "mediaType": "application/octet-stream", "uri": FileURL(source).String(), "blob": h.PutBlob(data)}}
+	var link, finalDir string
+	no := false
+	for _, name := range []string{"first", "second"} {
+		dir := filepath.Join(root, name)
+		event := &core.Event{ID: name, Kind: "message", Actor: "user", Attrs: core.JsonObject{}, Parts: parts}
+		projection := planner.Project([]*core.Event{event}, planner.Options{SinkHarness: "pi", ReadBlob: h.Blob, DeferIncomplete: &no, Capabilities: core.Capabilities{Write: &core.WriteCaps{Images: true, Tools: "native"}}})
+		prepared, files := PrepareAttachments(engine.PlanInput{Hub: h, Projection: projection}, dir, func(core.Part, string) bool { return false })
+		if len(files) != 1 {
+			t.Fatalf("%s copy kept a source link instead of independent bytes: %#v", name, prepared.Projection.Items)
+		}
+		if err := ApplyAttachments(&engine.DeliveryPlan{Extra: core.JsonObject{"attachments": files}}); err != nil {
+			t.Fatal(err)
+		}
+		link = core.S(prepared.Projection.Items[0].Parts[0]["text"])
+		h = hub.New()
+		parts = DecodeAttachmentText(link, dir, h.PutBlob)
+		if len(parts) != 1 || parts[0]["blob"] == nil {
+			t.Fatal("copied attachment did not read back")
+		}
+		// Native readers may keep both the native path and its resolved bytes.
+		parts[0]["uri"] = FileURL(core.S(core.Obj(files[0])["path"])).String()
+		finalDir = dir
+	}
+	if err := os.Remove(source); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(filepath.Join(root, "first")); err != nil {
+		t.Fatal(err)
+	}
+	fresh := hub.New()
+	decoded := DecodeAttachmentText(link, finalDir, fresh.PutBlob)
+	if len(decoded) != 1 {
+		t.Fatalf("second copy lost attachment: %#v", decoded)
+	}
+	got, ok := fresh.Blob(core.S(core.Obj(decoded[0]["blob"])["sha256"]))
+	if !ok || !reflect.DeepEqual(got, data) {
+		t.Fatal("second copy still depends on a previous conversation's files")
+	}
+}

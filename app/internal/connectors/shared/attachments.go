@@ -126,6 +126,17 @@ var assetHash = regexp.MustCompile(`^[0-9a-f]{64}$`)
 // directory, with realpath containment and checksum verification. Ordinary message paths/URLs
 // are never read. Missing assets remain visible instead of turning into empty text.
 func DecodeAttachmentText(text string, dir string, put func([]byte) core.JsonObject) []core.Part {
+	return decodeAttachmentText(text, dir, put, false)
+}
+
+// DecodeAttachmentTextIndex preserves the same prompt/file boundaries for list
+// metadata without opening or decoding any material. Views and copies use the
+// full checked reader above.
+func DecodeAttachmentTextIndex(text, dir string) []core.Part {
+	return decodeAttachmentText(text, dir, nil, true)
+}
+
+func decodeAttachmentText(text string, dir string, put func([]byte) core.JsonObject, indexOnly bool) []core.Part {
 	out := []core.Part{}
 	at := 0
 	for _, m := range attachmentLink.FindAllStringSubmatchIndex(text, -1) {
@@ -146,6 +157,11 @@ func DecodeAttachmentText(text string, dir string, put func([]byte) core.JsonObj
 			out = append(out, core.Part{"type": "text", "text": text[at:m[0]]})
 		}
 		p := core.Part{"type": "file", "name": text[m[2]:m[3]], "mediaType": "application/octet-stream"}
+		if indexOnly {
+			out = append(out, p)
+			at = m[1]
+			continue
+		}
 		real, e := filepath.EvalSymlinks(path)
 		root, re := filepath.EvalSymlinks(dir)
 		if e == nil && re == nil && strings.HasPrefix(real, root+string(filepath.Separator)) {

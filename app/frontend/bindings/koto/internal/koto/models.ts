@@ -4,6 +4,9 @@
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as core$0 from "../core/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as engine$0 from "../engine/models.js";
 
 /**
  * AnalysisLabel identifies a generated display line, never a line from native content.
@@ -68,6 +71,8 @@ export interface CarryRequest {
     "selector"?: string;
     "from"?: string;
     "to": string;
+    "targetProfile"?: string;
+    "targetAccount"?: string;
     "level"?: string;
     "dryRun"?: boolean;
     "maxTokens"?: number;
@@ -83,6 +88,8 @@ export interface ConnectorInfo {
     "id": string;
     "harness": string;
     "version": string;
+    "variant": string;
+    "default": boolean;
     "root"?: string;
     "status": string;
     "enabled": boolean;
@@ -91,6 +98,25 @@ export interface ConnectorInfo {
     "sink": boolean;
     "removable": boolean;
     "capabilities": core$0.Capabilities;
+}
+
+/**
+ * Profile is a registered native storage namespace, independent of login state.
+ */
+export interface Profile {
+    "id": string;
+    "harness": string;
+    "root": string;
+    "label": string;
+    "kind": string;
+    "variant": string;
+    "default": boolean;
+    "writable": boolean;
+    "enabled": boolean;
+    "accountSelectable": boolean;
+    "accounts": core$0.IdentityClaim[] | null;
+    "targetAccounts": core$0.IdentityClaim[] | null;
+    "targetAccountsError"?: string;
 }
 
 /**
@@ -104,6 +130,12 @@ export interface Resume {
     "env": { [_ in string]?: string } | null;
     "shell": string;
     "instructions"?: string;
+}
+
+export interface ScanStatus {
+    "scanning": boolean;
+    "progress"?: engine$0.ScanProgress | null;
+    "report"?: engine$0.ScanReport | null;
 }
 
 /**
@@ -125,6 +157,7 @@ export interface ThreadDetail {
  */
 export interface ThreadListing {
     "id": string;
+    "revision": string;
     "events": number;
     "updated": number | null;
     "turns": number;

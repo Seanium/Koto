@@ -6,16 +6,22 @@
 
 | Agent | 読み込み | コピー作成 |
 | --- | --- | --- |
-| Claude Code / Desktop Code | JSONL とネイティブの分岐 | 新しい UUID とネイティブ JSONL |
+| Claude Code / Claude Desktop | JSONL とネイティブの分岐 | 新しい UUID とネイティブ JSONL |
 | pi | v3 JSONL ツリー | 新しい ID・親チェーンを持つセッション |
 | Codex | rollout JSONL / zstd | 新しいネイティブ rollout を作成し、app-server で読み込み検証 |
 | DeepSeek Harness | v4 JSONL / zstd | 新しいディレクトリとネイティブ圧縮ログ |
 | Antigravity CLI | SQLite と protobuf 軌跡 | 新しい対話データベースと要約エントリー |
 | OpenCode | SQLite v1（`session`、`message`、`part`） | ネイティブ DB に新しいセッション行を作成 |
+| Cursor CLI | セッションごとの SQLite `store.db` | 新しいネイティブ CLI セッション |
+| Cursor Desktop | `state.vscdb` の会話・メッセージ blob | 新しい IDE 対話。App で開く |
+| WorkBuddy / WorkBuddy AI | 中国版・国際版別のルート、SQLite 索引と JSONL | 既存のネイティブアカウントに新規作成 |
+| ZCode | App / CLI 共通の SQLite 履歴と App タスク索引 | 新規セッションと対応するタスク項目 |
 
 OpenCode 1.19.3 の v1 形式に対応しています。v2 の保存形式は明示的に拒否します。コピー先には OpenCode CLI と既定モデルの設定が必要です。続きの対話にはコピー先のモデルを使います。
 
 コピーは新しいネイティブセッションを作成し、既存のセッション ID や個別ファイルを上書きしません。コピー先の Agent が自身の設定を読み込みます。元のシステム・開発者・環境・設定・権限の文脈はコピーしません。ツールや推論に互換性のあるネイティブ表現がない場合は、読めるテキストへ変換することがあります。
+
+Cursor Desktop と CLI は保存先と継続方法が異なります。ZCode は製品版のネイティブ Agent に対応し、Preview や ZCode から起動する外部 Agent は対象外です。WorkBuddy 中国版と国際版は別のコピー先です。履歴のアカウント表示は、継続時の認証情報を変更しません。
 
 ## 添付ファイル
 
@@ -25,6 +31,12 @@ OpenCode 1.19.3 の v1 形式に対応しています。v2 の保存形式は明
 | PDF、UTF-8 テキスト | ネイティブ文書 | 完全なファイル | 完全なファイル | ネイティブファイル添付 | ネイティブ Media | ネイティブファイル |
 | 音声 | 完全なファイル | 完全なファイル | ネイティブ音声 | ネイティブファイル添付 | ネイティブ Media | ネイティブファイル |
 | DOCX、ZIP、JSON、その他のバイナリ | 完全なファイル | 完全なファイル | 完全なファイル | ネイティブファイル添付 | ネイティブ Media | ネイティブファイル |
+
+| 追加の Agent | 添付の形式 |
+| --- | --- |
+| Cursor CLI / Cursor Desktop | ネイティブ画像、完全なファイルまたはファイル参照 |
+| WorkBuddy / WorkBuddy AI | ネイティブ画像とユーザーファイル参照。ツールのファイルには検証済み参照を使用 |
+| ZCode | ネイティブメディアとコピー先セッション内の完全なファイル |
 
 ロールやコピー先がファイルの埋め込みに対応しない場合は、新しいセッションの添付ディレクトリに完全なバイト列を保存し、ファイル参照を追加します。ツール記録をテキストに変換した場合も、ツール結果の添付は保持します。
 

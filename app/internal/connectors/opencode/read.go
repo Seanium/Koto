@@ -11,6 +11,7 @@ import (
 
 	"koto/internal/connectors/shared"
 	"koto/internal/core"
+	"koto/internal/engine"
 )
 
 type nativeMessage struct {
@@ -20,6 +21,7 @@ type nativeMessage struct {
 }
 
 func (c *connector) Tail(ctx context.Context, ref core.NativeRef, from *core.SourceOffset, yield func(core.SourceBatch) error) error {
+	indexOnly := engine.IsIndexOnly(ctx)
 	db, err := c.open(ctx, false)
 	if err != nil {
 		return err
@@ -80,7 +82,14 @@ func (c *connector) Tail(ctx context.Context, ref core.NativeRef, from *core.Sou
 		b, _ := json.Marshal(core.JsonObject{"record": raw, "attrs": attrs})
 		sha := core.SHA256Hex(b)
 		prefix = core.ChainPrefix(prefix, sha)
-		batch.Records = append(batch.Records, core.BatchRecord{NativeID: id, Index: index, Raw: b, SHA256: sha, Bytes: len(b)})
+		rawBytes, rawSize := b, len(b)
+		if indexOnly {
+			rawBytes = nil
+			if kind != "message" || actor != "user" {
+				parts = nil
+			}
+		}
+		batch.Records = append(batch.Records, core.BatchRecord{NativeID: id, Index: index, Raw: rawBytes, SHA256: sha, Bytes: rawSize})
 		index++
 		batch.Drafts = append(batch.Drafts, core.DraftEvent{NativeID: id, Kind: kind, Actor: actor, Parts: parts, Attrs: attrs, Time: &ts})
 	}
@@ -98,17 +107,26 @@ func (c *connector) Tail(ctx context.Context, ref core.NativeRef, from *core.Sou
 			attrs["stopReason"] = "in_progress"
 		}
 		put := func(b []byte) core.JsonObject {
+			if indexOnly {
+				return nil
+			}
 			batch.Blobs = append(batch.Blobs, b)
 			return core.JsonObject{"sha256": core.SHA256Hex(b), "bytes": len(b)}
 		}
 		if system := core.S(m.Info["system"]); system != "" {
 			appendRecord(m.ID+":system", "context", "system", []core.Part{{"type": "text", "text": system}}, nil, system, ts)
 		}
+		decodeText := func(text string) []core.Part {
+			if indexOnly {
+				return shared.DecodeAttachmentTextIndex(text, c.assetDir(ref.Session))
+			}
+			return shared.DecodeAttachmentText(text, c.assetDir(ref.Session), put)
+		}
 		decode := func(p core.JsonObject) []core.Part {
 			if core.S(p["type"]) == "text" && p["ignored"] != true {
-				return shared.DecodeAttachmentText(core.S(p["text"]), c.assetDir(ref.Session), put)
+				return decodeText(core.S(p["text"]))
 			}
-			return decodePart(p, put)
+			return decodePart(p, put, indexOnly)
 		}
 		if role == "user" {
 			ps := []core.Part{}
@@ -137,14 +155,14 @@ func (c *connector) Tail(ctx context.Context, ref core.NativeRef, from *core.Sou
 							outcome = "error"
 							text = core.S(state["error"])
 						}
-						ps := shared.DecodeAttachmentText(text, c.assetDir(ref.Session), put)
+						ps := decodeText(text)
 						for _, a := range core.Arr(state["attachments"]) {
-							ps = append(ps, decodePart(core.Obj(a), put)...)
+							ps = append(ps, decodePart(core.Obj(a), put, indexOnly)...)
 						}
 						appendRecord(id+":result", "message", "tool", []core.Part{{"type": "tool_result", "callId": call, "outcome": outcome, "parts": core.PartsJSON(ps)}}, core.JsonObject{"toolName": name}, core.JsonObject{"part": p, "stage": "result"}, ts)
 					}
 				} else {
-					ps := decodePart(p, put)
+					ps := decodePart(p, put, indexOnly)
 					if len(ps) > 0 {
 						appendRecord(id, "message", "assistant", ps, partAttrs, p, ts)
 					}
@@ -196,7 +214,8 @@ func (c *connector) Tail(ctx context.Context, ref core.NativeRef, from *core.Sou
 	return flush(true)
 }
 
-func decodePart(p core.JsonObject, put func([]byte) core.JsonObject) []core.Part {
+func decodePart(p core.JsonObject, put func([]byte) core.JsonObject, indexMode ...bool) []core.Part {
+	indexOnly := len(indexMode) > 0 && indexMode[0]
 	switch core.S(p["type"]) {
 	case "text":
 		if p["ignored"] == true {
@@ -212,6 +231,9 @@ func decodePart(p core.JsonObject, put func([]byte) core.JsonObject) []core.Part
 			typ = "image"
 		}
 		out := core.Part{"type": typ, "mediaType": mime, "name": core.S(p["filename"])}
+		if indexOnly {
+			return []core.Part{out}
+		}
 		uri := core.S(p["url"])
 		if strings.HasPrefix(uri, "data:") {
 			if comma := strings.IndexByte(uri, ','); comma > 0 {

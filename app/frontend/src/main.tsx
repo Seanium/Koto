@@ -21,7 +21,7 @@ function App() {
   useEffect(observeSystemAppearance, [])
   useEffect(() => { let live = true; void shell.prefs().then(p => { if (live) { setLanguage(p.language); setAppearance(p.appearance); setReady(true) } }, () => { if (live) setReady(true) }); const changed = () => setLanguage(getLanguage()); window.addEventListener('languagechange', changed); return () => { live = false; window.removeEventListener('languagechange', changed) } }, [])
   useEffect(() => { if (ready) void shell.setUILocale(locale) }, [ready, locale])
-  return ready ? <MainWindow hub={hub} /> : null
+  return <MainWindow hub={hub} />
 }
 
 createRoot(document.getElementById('root')!).render(<StrictMode><App /></StrictMode>)

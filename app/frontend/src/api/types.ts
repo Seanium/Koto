@@ -4,6 +4,36 @@
 export type Level = 'L0' | 'L1' | 'L2' | 'L3'
 export type JsonObject = { [k: string]: unknown }
 
+export interface IdentityClaim {
+  kind: 'account' | 'organization' | 'api-configuration'
+  id: string
+  label?: string
+  scope: 'creator' | 'storage' | 'session' | 'message'
+  evidence: string
+}
+export interface SessionIdentity {
+  status: 'known' | 'unknown'
+  claims?: IdentityClaim[]
+  providers?: { id: string; model?: string; baseUrl?: string; scope: 'session' | 'message' | 'current-config'; evidence: string }[]
+}
+export interface SourceProfile {
+  id: string
+  harness: string
+  variant: string
+  default: boolean
+  root: string
+  label: string
+  kind: string
+}
+export interface AgentProfile extends SourceProfile {
+  writable: boolean
+  enabled: boolean
+  accountSelectable: boolean
+  accounts: IdentityClaim[]
+  targetAccounts: IdentityClaim[]
+  targetAccountsError?: string
+}
+
 // ---------------------------------------------------------------- connectors
 
 export type WriteMode = 'native-file' | 'none'
@@ -20,9 +50,11 @@ export interface Capabilities {
 }
 
 export interface Connector {
-  /** Instance id: 'claude-code', or 'claude-code@1a2b3c4d' for an added directory. */
+  /** Stable native profile id, derived from its product variant and storage root. */
   id: string
   harness: string
+  variant: string
+  default: boolean
   version: string
   /** Storage root this instance reads/writes. */
   root?: string
@@ -45,7 +77,7 @@ export interface Binding {
   thread: string
   leaf: string | null
   path: string | null
-  meta: JsonObject & { title?: string; aiTitle?: string; cwd?: string; frontend?: string }
+  meta: JsonObject & { title?: string; aiTitle?: string; cwd?: string; frontend?: string; identity?: SessionIdentity; sourceProfile?: SourceProfile }
   /** How to continue this session in its harness; null where there is no command. */
   resume?: Resume | null
 }
@@ -62,6 +94,7 @@ export interface Resume {
 
 export interface ThreadSummary {
   id: string
+  revision?: string
   events: number
   updated: number | null
   bindings: Binding[]
@@ -123,12 +156,14 @@ export interface CarryRequest {
   eventIds?: string[]
   excludeEventIds?: string[]
   requestId?: string
-  /** Event id, th:… thread id, or harness:session. Either this or `from`. */
+  /** Event id, th:… thread id, or @profile:session. Either this or `from`. */
   selector?: string
   /** Any node (full or short ev:… id): carries root → that node. */
   from?: string
   /** Target connector id. */
   to: string
+  targetProfile?: string
+  targetAccount?: string
   level?: Level
   dryRun?: boolean
   maxTokens?: number
@@ -153,7 +188,7 @@ export interface DeliveryPlan {
   head: string
   level: Level
   mode: 'create' | 'noop' | 'reject'
-  target: { mode: string; session: string; path?: string; cwd?: string }
+  target: { mode: string; session: string; path?: string; cwd?: string; profile: string; account?: string }
   records: { nativeId: string; eventId: string; sha256: string }[]
   losses: Loss[]
   notes: string[]
@@ -217,6 +252,7 @@ export interface HubStats {
 /** One message returned by the event API. */
 /** A long scan (the first one reads every session) reports as it goes. */
 export interface ScanProgress { connector: string; harness: string; done: number; total: number; added: number }
+export interface ScanStatus { scanning: boolean; progress?: ScanProgress; report?: ScanReport }
 export type ServerEvent = { type: 'cycle'; report: ScanReport } | ({ type: 'progress' } & ScanProgress)
 
 export interface CoreStatus {

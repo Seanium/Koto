@@ -18,7 +18,7 @@ Copy sessions between agents. Compare them with a session tree and diff.
   <img src="site/assets/screenshots/en-light-tree.png" alt="koto — shared history and branches in a session tree" width="1120">
 </picture>
 
-Works with Claude Code (including Desktop Code), Codex, pi, DeepSeek Harness, Antigravity CLI, and OpenCode. More agents coming soon.
+Works with Antigravity CLI, Claude Code, Claude Desktop, Codex, Cursor CLI, Cursor Desktop, DeepSeek Harness, OpenCode, pi, WorkBuddy (China and international), and ZCode. More agents coming soon.
 
 There’s also koto CLI.<br>
 Copy a session. Just ask.

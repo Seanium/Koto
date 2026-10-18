@@ -72,6 +72,8 @@ type CarryOptions struct {
 	Thread          core.ThreadID
 	Head            core.EventID
 	To              string
+	TargetProfile   string
+	TargetAccount   string
 	Level           string
 	DryRun          bool
 	MaxTokens       int
@@ -119,8 +121,17 @@ func New(h *hub.Hub, r *Registry) *Engine {
 
 // exclusive runs fn as one operation: no other operation of this engine, nor of another process on this data, interleaves.
 func (e *Engine) exclusive(ctx context.Context, fn func() error) error {
-	e.mu.Lock()
+	for !e.mu.TryLock() {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
 	defer e.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if e.Locks != nil {
 		ttl := 60 * time.Second
 		deadline := time.Now().Add(e.LockWait)
@@ -145,8 +156,9 @@ func (e *Engine) exclusive(ctx context.Context, fn func() error) error {
 				wait = 500 * time.Millisecond
 			}
 		}
-		stop := make(chan struct{})
+		stop, stopped := make(chan struct{}), make(chan struct{})
 		go func() {
+			defer close(stopped)
 			t := time.NewTicker(ttl / 3)
 			defer t.Stop()
 			for {
@@ -158,7 +170,7 @@ func (e *Engine) exclusive(ctx context.Context, fn func() error) error {
 				}
 			}
 		}()
-		defer func() { close(stop); e.Locks.Unlock("engine") }()
+		defer func() { close(stop); <-stopped; e.Locks.Unlock("engine") }()
 	}
 	return fn()
 }
@@ -215,6 +227,8 @@ func (e *Engine) scanConnector(ctx context.Context, c *Connector, report *ScanRe
 	}
 	var refs []core.NativeRef
 	for _, r := range all {
+		r.Connector = c.ID
+		r.Meta = ProfileMeta(c, r.Meta)
 		if opts.Filter == nil || opts.Filter(r) {
 			refs = append(refs, r)
 		}
@@ -251,14 +265,14 @@ func (e *Engine) scanConnector(ctx context.Context, c *Connector, report *ScanRe
 		// Unchanged content can still carry new metadata from beside the file (a Codex rename).
 		if Unchanged(ref, fromp) {
 			if ref.Meta != nil {
-				e.Hub.MergeMeta(ref.Harness, ref.Session, ref.Meta)
+				e.Hub.MergeMeta(ref.Harness, ref.Session, ref.Meta, c.ID)
 			}
 			return
 		}
 		first := true
 		contentChanged := !ok
 		err := c.Source.Tail(ctx, ref, fromp, func(b core.SourceBatch) error {
-			if first && allowDefer && b.Lineage != nil && e.Hub.Binding(b.Lineage.Harness, b.Lineage.Session) == nil && known[[2]string{b.Lineage.Harness, b.Lineage.Session}] {
+			if first && allowDefer && b.Lineage != nil && e.Hub.Binding(b.Lineage.Harness, b.Lineage.Session, c.ID) == nil && known[[2]string{b.Lineage.Harness, b.Lineage.Session}] {
 				return errDefer
 			}
 			first = false
@@ -282,7 +296,7 @@ func (e *Engine) scanConnector(ctx context.Context, c *Connector, report *ScanRe
 			return
 		}
 		if ref.Meta != nil {
-			e.Hub.MergeMeta(ref.Harness, ref.Session, ref.Meta)
+			e.Hub.MergeMeta(ref.Harness, ref.Session, ref.Meta, c.ID)
 		}
 		if contentChanged {
 			report.Changed++
@@ -348,7 +362,7 @@ func (e *Engine) ResolveTarget(sink *Connector, thread core.ThreadID, head core.
 	}
 	key = sink.ID + "\x00" + key
 
-	return DeliveryTarget{Mode: "create", Session: sink.Sink.NewSessionID(key), Cwd: o.Cwd, Title: o.Title}, nil
+	return DeliveryTarget{Mode: "create", Session: sink.Sink.NewSessionID(key), Cwd: o.Cwd, Title: o.Title, Profile: sink.ID, Account: o.TargetAccount, Root: sink.Root}, nil
 }
 
 // Planned is a plan with its projection and sink.
@@ -369,21 +383,64 @@ func (e *Engine) Plan(ctx context.Context, o CarryOptions) (*Planned, error) {
 var HarnessNames = map[string]string{"claude-code": "Claude Code", "pi": "pi", "codex": "Codex", "dsh": "DeepSeek Harness", "antigravity": "Antigravity CLI", "opencode": "OpenCode"}
 
 func (e *Engine) planLocked(ctx context.Context, o CarryOptions) (*Planned, error) {
-	sink, err := e.Registry.Require(o.To)
-	if err != nil {
-		return nil, err
-	}
-	if sink.Sink == nil {
-		return nil, fmt.Errorf("%s cannot be a delivery target", o.To)
-	}
-	if !e.Registry.Enabled(o.To) {
-		return nil, fmt.Errorf("%s is disabled", o.To)
-	}
-	// Refresh first (stat-only for unchanged files): the source may have new turns, the target edits.
+	// Refresh and resolve the source before choosing a default destination profile.
 	e.ScanLocked(ctx, ScanOptions{})
 	thread, head, err := e.Resolve(o)
 	if err != nil {
 		return nil, err
+	}
+	if o.Cwd == "" {
+		if source := e.Hub.GetEvent(head); source != nil {
+			if b := e.Hub.Binding(source.Provenance.Source.Harness, source.Provenance.Native.Session, source.Provenance.Source.Connector); b != nil {
+				o.Cwd = core.CurrentDirectory(b.Meta)
+			}
+		}
+	}
+	to := o.To
+	if o.TargetProfile != "" {
+		to = o.TargetProfile
+	} else if source := e.Hub.GetEvent(head); source != nil && source.Provenance.Source.Harness == o.To {
+		to = source.Provenance.Source.Connector
+	}
+	sink, err := e.Registry.Require(to)
+	if err != nil {
+		return nil, err
+	}
+	if o.TargetProfile != "" && o.To != "" && o.To != sink.ID && o.To != sink.Harness {
+		return nil, fmt.Errorf("target profile does not belong to %s", o.To)
+	}
+	if sink.Sink == nil {
+		return nil, fmt.Errorf("%s cannot be a delivery target", o.To)
+	}
+	if !e.Registry.Enabled(sink.ID) {
+		return nil, fmt.Errorf("%s is disabled", sink.ID)
+	}
+	if accounts, ok := sink.Sink.(TargetAccounts); ok {
+		available, err := accounts.TargetAccounts(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if o.TargetAccount == "" {
+			if source := e.Hub.GetEvent(head); source != nil && source.Provenance.Source.Connector == sink.ID {
+				if b := e.Hub.Binding(source.Provenance.Source.Harness, source.Provenance.Native.Session, sink.ID); b != nil {
+					o.TargetAccount = uniqueStorageAccount(core.ReadIdentity(b.Meta).Claims, available)
+				}
+			}
+			if o.TargetAccount == "" && len(available) == 1 {
+				o.TargetAccount = available[0].ID
+			}
+		}
+		valid := false
+		for _, candidate := range available {
+			if candidate.Kind == "account" && candidate.ID == o.TargetAccount {
+				valid = true
+			}
+		}
+		if !valid {
+			return nil, fmt.Errorf("choose an existing account in target profile %s", sink.ID)
+		}
+	} else if o.TargetAccount != "" {
+		return nil, fmt.Errorf("%s does not support selecting a target account; choose its storage profile", sink.ID)
 	}
 	path := e.Hub.Path(head)
 	if o.EventIDs != nil && o.ExcludeEventIDs != nil {
@@ -459,7 +516,7 @@ func (e *Engine) planLocked(ctx context.Context, o CarryOptions) (*Planned, erro
 	if err != nil {
 		return nil, err
 	}
-	requestKey := core.SHA256Hex(core.ToJSON([]any{thread, head, o.EventIDs, o.ExcludeEventIDs, level, o.Cwd, o.Title, o.MaxTokens}))
+	requestKey := core.SHA256Hex(core.ToJSON([]any{thread, head, o.EventIDs, o.ExcludeEventIDs, level, o.Cwd, o.Title, o.MaxTokens, sink.ID, o.TargetAccount, sink.Root}))
 	if o.RequestID != "" {
 		if job := e.Jobs.get(o.RequestID); job != nil {
 			if job.fingerprint != requestKey || job.plan.Sink != sink.ID {
@@ -481,10 +538,20 @@ func (e *Engine) planLocked(ctx context.Context, o CarryOptions) (*Planned, erro
 		},
 		MaxTokens: o.MaxTokens, KeepTurns: o.KeepTurns, FullHistory: o.FullHistory, Summarizer: o.Summarizer, DeferIncomplete: o.DeferIncomplete,
 	})
+	// Current application project membership is an explicit default, distinct
+	// from the historical cwd on each event. An explicit user target still wins.
+	for i := len(path) - 1; i >= 0; i-- {
+		if b := e.Hub.Binding(path[i].Provenance.Source.Harness, path[i].Provenance.Native.Session, path[i].Provenance.Source.Connector); b != nil {
+			if cwd := core.CurrentDirectory(b.Meta); cwd != "" {
+				proj.Hints.Cwd = cwd
+				break
+			}
+		}
+	}
 	// Harnesses that keep the working directory only in a session header put it in the binding.
 	if proj.Hints.Cwd == "" {
 		for i := len(path) - 1; i >= 0; i-- {
-			if b := e.Hub.Binding(path[i].Provenance.Source.Harness, path[i].Provenance.Native.Session); b != nil {
+			if b := e.Hub.Binding(path[i].Provenance.Source.Harness, path[i].Provenance.Native.Session, path[i].Provenance.Source.Connector); b != nil {
 				if c, ok := b.Meta["cwd"].(string); ok && c != "" {
 					proj.Hints.Cwd = c
 					break
@@ -503,7 +570,12 @@ func (e *Engine) planLocked(ctx context.Context, o CarryOptions) (*Planned, erro
 			}
 		}
 	}
-	plan, err := sink.Sink.Plan(PlanInput{Thread: thread, Head: effective, Level: level, Projection: proj, Target: target, Hub: e.Hub, Residual: e.Residual})
+	readCtx, closeReads := withRecordReads(ctx)
+	defer closeReads()
+	plan, err := sink.Sink.Plan(PlanInput{Thread: thread, Head: effective, Level: level, Projection: proj, Target: target, Hub: e.Hub, Residual: func(ev *core.Event) []byte { return e.residual(readCtx, ev) }})
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -522,6 +594,28 @@ func (e *Engine) planLocked(ctx context.Context, o CarryOptions) (*Planned, erro
 		e.Jobs.put(o.RequestID, &copyJob{fingerprint: requestKey, plan: plan})
 	}
 	return &Planned{Plan: plan, Projection: proj, Sink: sink}, nil
+}
+
+// A historical source can have multiple identity claims. Only one distinct
+// native storage owner can be a default; claim order is never a selection rule.
+func uniqueStorageAccount(claims, available []core.IdentityClaim) string {
+	matches := map[string]bool{}
+	for _, claim := range claims {
+		if claim.Kind != "account" || (claim.Scope != "session" && claim.Scope != "storage") {
+			continue
+		}
+		for _, candidate := range available {
+			if candidate.Kind == "account" && candidate.ID == claim.ID {
+				matches[claim.ID] = true
+			}
+		}
+	}
+	if len(matches) == 1 {
+		for id := range matches {
+			return id
+		}
+	}
+	return ""
 }
 
 // Carry plans and (unless a dry run, noop or reject) applies a copy.
@@ -567,13 +661,20 @@ func (e *Engine) ApplyPlan(ctx context.Context, sink *Connector, plan *DeliveryP
 	}
 	result := &CarryResult{Plan: plan, Applied: true, Receipt: receipt}
 	if argv := ResumeArgv(sink, plan.Harness, session); argv != nil {
-		result.Resume = NativeShellLine(argv)
+		result.Resume = ShellCommand(argv, "", ResumeEnvironment(sink, plan.Harness, session))
 	}
 	return result, nil
 }
 
 // Residual re-reads a native record for L0 replay and checks its hash.
 func (e *Engine) Residual(ev *core.Event) []byte {
+	return e.residual(context.Background(), ev)
+}
+
+func (e *Engine) residual(ctx context.Context, ev *core.Event) []byte {
+	if ctx.Err() != nil {
+		return nil
+	}
 	r := ev.Provenance.Residual
 	if r == nil {
 		return nil
@@ -598,7 +699,13 @@ func (e *Engine) Residual(ev *core.Event) []byte {
 	if ev.Provenance.Native.Index != nil {
 		idx = *ev.Provenance.Native.Index
 	}
-	raw, err := rr.ReadRecord(ev.Provenance.Native.Session, idx, ev.Provenance.Native.Offset)
+	var raw []byte
+	var err error
+	if contextual, ok := c.Source.(ContextRecordReader); ok {
+		raw, err = contextual.ReadRecordContext(ctx, ev.Provenance.Native.Session, idx, ev.Provenance.Native.Offset)
+	} else {
+		raw, err = rr.ReadRecord(ev.Provenance.Native.Session, idx, ev.Provenance.Native.Offset)
+	}
 	if err != nil || raw == nil || core.SHA256Hex(raw) != r.SHA256 {
 		return nil
 	}

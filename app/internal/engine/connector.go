@@ -27,6 +27,11 @@ type RecordReader interface {
 	ReadRecord(session string, index int, offset *int64) ([]byte, error)
 }
 
+// ContextRecordReader allows cancellation and request-scoped streaming for L0 replay.
+type ContextRecordReader interface {
+	ReadRecordContext(ctx context.Context, session string, index int, offset *int64) ([]byte, error)
+}
+
 // DeliveryTarget is where a delivery lands: a new native session.
 type DeliveryTarget struct {
 	Mode    string `json:"mode"` // create
@@ -34,6 +39,9 @@ type DeliveryTarget struct {
 	Cwd     string `json:"cwd,omitempty"`
 	Title   string `json:"title,omitempty"`
 	Path    string `json:"path,omitempty"`
+	Profile string `json:"profile,omitempty"`
+	Account string `json:"account,omitempty"`
+	Root    string `json:"root,omitempty"`
 }
 
 // PlanRecord is one record a plan writes and the node it stands for.
@@ -89,6 +97,12 @@ type Sink interface {
 // ResumeIDer: the id the harness resumes by, when the session key differs (a Codex rollout continuation).
 type ResumeIDer interface{ ResumeID(session string) string }
 
+// TargetAccounts is implemented only by products whose native writer can select
+// a historical storage owner. A provider or the creator of a session is not enough.
+type TargetAccounts interface {
+	TargetAccounts(context.Context) ([]core.IdentityClaim, error)
+}
+
 // OpenChecker: is this native session open in a running harness process right now? Returns why, or "".
 type OpenChecker interface{ OpenBy(s SessionRef) string }
 
@@ -108,6 +122,10 @@ type Connector struct {
 	ID           string
 	Harness      string
 	Root         string
+	ProfileLabel string
+	ProfileKind  string
+	Variant      string
+	Default      bool
 	Version      string
 	Capabilities core.Capabilities
 	Vocabulary   core.ToolVocabulary
@@ -163,10 +181,27 @@ func (r *Registry) Unregister(id string) {
 func (r *Registry) Get(id string) *Connector {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if s := r.items[id]; s != nil {
+	if s := r.stateLocked(id); s != nil {
 		return s.Connector
 	}
 	return nil
+}
+
+// Product names are input aliases only; all stored references use actual IDs.
+func (r *Registry) stateLocked(id string) *ConnectorState {
+	if s := r.items[id]; s != nil {
+		return s
+	}
+	var found *ConnectorState
+	for _, s := range r.items {
+		if s.Connector.Harness == id && s.Connector.Default {
+			if found != nil {
+				return nil
+			}
+			found = s
+		}
+	}
+	return found
 }
 
 func (r *Registry) Require(id string) (*Connector, error) {
@@ -214,7 +249,7 @@ func (r *Registry) ByHarness(h string) []*Connector {
 func (r *Registry) SetEnabled(id string, on bool) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	s := r.items[id]
+	s := r.stateLocked(id)
 	if s == nil {
 		return fmt.Errorf("unknown connector %s", id)
 	}
@@ -229,7 +264,7 @@ func (r *Registry) SetEnabled(id string, on bool) error {
 func (r *Registry) Enabled(id string) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	s := r.items[id]
+	s := r.stateLocked(id)
 	return s == nil || s.Status != "disabled"
 }
 

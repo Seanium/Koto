@@ -23,7 +23,8 @@ EXACT = {
     "app/frontend/index.html", "app/frontend/package.json",
     "app/frontend/package-lock.json", "app/frontend/tsconfig.json",
     "app/frontend/vite.config.ts", ".github/workflows/pages.yml", ".github/workflows/ci.yml",
-    "app/scripts/dmg-requirements.txt", "app/scripts/render-installer-emoji.swift", "app/scripts/render-app-emoji.swift",
+    "app/scripts/dmg-requirements.txt", "app/scripts/render-installer-emoji.swift", "app/scripts/generate-icons.cjs",
+    "site/install.sh", "site/install.ps1",
 }
 TREES = {
     "docs": {".md"},
@@ -39,6 +40,11 @@ TREES = {
     "site": {".html", ".css", ".js", ".mjs", ".svg", ".png", ".webp", ".md"},
 }
 FIXTURES = {
+    "app/internal/connectors/cursor/testdata/native-cli-2026.10.json",
+    "app/internal/connectors/cursor/testdata/native-3.25.json",
+    "app/internal/connectors/workbuddy/testdata/schema-5.8.sql",
+    "app/internal/connectors/workbuddy/testdata/project-key-oracle.json",
+    "app/internal/connectors/zcode/testdata/schema-0.16.9.sql",
     "app/internal/core/testdata/ev1.json",
     "app/internal/koto/testdata/cc_session.jsonl",
     "app/internal/koto/testdata/cc_session_plain.jsonl",

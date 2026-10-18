@@ -20,6 +20,12 @@ func ResumeEnvVar(harness string) string {
 func ResumeArgv(c *Connector, harness, session string) []string {
 	tpl := strings.TrimSpace(os.Getenv(ResumeEnvVar(harness)))
 	if tpl == "" && c != nil && c.Sink != nil {
+		if native, ok := c.Sink.(nativeResumer); ok {
+			argv, _ := native.NativeResume(session)
+			return argv
+		}
+	}
+	if tpl == "" && c != nil && c.Sink != nil {
 		tpl = c.Sink.ResumeCommand()
 	}
 	if tpl == "" {
@@ -36,6 +42,25 @@ func ResumeArgv(c *Connector, harness, session string) []string {
 		out = append(out, strings.ReplaceAll(w, "{id}", id))
 	}
 	return out
+}
+
+type nativeResumer interface {
+	NativeResume(session string) ([]string, map[string]string)
+}
+
+// ResumeEnvironment keeps executable-specific settings separate from argv.
+// Explicit user command overrides do not inherit the bundled runtime settings.
+func ResumeEnvironment(c *Connector, harness, session string) map[string]string {
+	env := map[string]string{}
+	if strings.TrimSpace(os.Getenv(ResumeEnvVar(harness))) == "" && c != nil && c.Sink != nil {
+		if native, ok := c.Sink.(nativeResumer); ok {
+			_, values := native.NativeResume(session)
+			for key, value := range values {
+				env[key] = value
+			}
+		}
+	}
+	return env
 }
 
 var plainArg = regexp.MustCompile(`^[\w@%+=:,./-]+$`)
@@ -96,6 +121,13 @@ func shellCommandWithInputPrompt(argv []string, cwd string, envs map[string]stri
 			// Names are connector-owned constants; quoting values keeps paths literal.
 			parts = append(parts, "$env:"+key+"="+PowerShellQ(envs[key])+";")
 		}
+		if len(argv) > 0 && envs["ELECTRON_RUN_AS_NODE"] == "1" && prompt == "" {
+			// Electron is a GUI-subsystem executable even in its Node mode.
+			// PowerShell's ordinary invocation can return before the CLI exits.
+			// Wait in the current console without piping away its interactive TTY.
+			parts = append(parts, windowsConsoleWait(argv))
+			return commandInDirectory(strings.Join(parts, " "), cwd, goos)
+		}
 		if len(argv) > 0 {
 			if prompt != "" {
 				// .NET Framework initializes native stdin using Console.InputEncoding
@@ -127,6 +159,20 @@ func shellCommandWithInputPrompt(argv []string, cwd string, envs map[string]stri
 		parts = append(parts, ShellLine(argv))
 	}
 	return commandInDirectory(strings.Join(parts, " "), cwd, goos)
+}
+
+func windowsConsoleWait(argv []string) string {
+	args := make([]string, 0, len(argv)-1)
+	for _, arg := range argv[1:] {
+		args = append(args, PowerShellQ(arg))
+	}
+	// Start-Process joins ArgumentList with spaces. Encode each argument using
+	// Windows CRT rules, including empty values, quotes and trailing slashes.
+	// Quote appended @args by the same rules, so headless options remain usable.
+	return "& { $kotoArgs = @(" + strings.Join(args, ", ") + ") + @($args); " +
+		"$kotoStart = @{ FilePath = " + PowerShellQ(argv[0]) + "; WorkingDirectory = [System.Management.Automation.WildcardPattern]::Escape((Get-Location).ProviderPath); NoNewWindow = $true; Wait = $true; PassThru = $true; ErrorAction = 'Stop' }; " +
+		`if ($kotoArgs.Count) { $kotoStart.ArgumentList = ($kotoArgs | ForEach-Object { $kotoArg = [regex]::Replace([string]$_, '(\\*)"', '$1$1\"'); '"' + [regex]::Replace($kotoArg, '(\\+)$', '$1$1') + '"' }) -join ' ' }; ` +
+		"$kotoProcess = Start-Process @kotoStart; $global:LASTEXITCODE = $kotoProcess.ExitCode }"
 }
 
 func CommandInDirectory(command, cwd string) string {

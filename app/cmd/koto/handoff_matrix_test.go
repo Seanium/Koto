@@ -19,20 +19,24 @@ import (
 	"koto/internal/koto"
 )
 
-var matrixAgents = []string{"claude-code", "pi", "codex", "dsh", "antigravity", "opencode"}
+var matrixAgents = []string{"claude-code", "pi", "codex", "dsh", "antigravity", "opencode", "zcode"}
 
 // This is a CLI native-write/readback matrix. Codex destinations use the real app-server in
 // an isolated HOME; no test runs a model or claims that a generated resume command was run.
 func TestHandoffCLINativeMatrix(t *testing.T) {
+	// Native schema initialization only: a dead local endpoint prevents model calls.
+	t.Setenv("OPENCODE_CONFIG_CONTENT", `{"model":"fixture/model","provider":{"fixture":{"npm":"@ai-sdk/openai-compatible","models":{"model":{"name":"fixture"}},"options":{"baseURL":"http://127.0.0.1:9/v1","apiKey":"fixture"}}}}`)
+
 	codexBin, _ := exec.LookPath("codex")
 	for _, from := range matrixAgents {
 		t.Run(from, func(t *testing.T) {
 			s := newHandoffSandbox(t)
-			cfg := koto.Config{DataDir: filepath.Join(s.root, "bootstrap"), ClaudeRoot: filepath.Join(s.root, "cc"), PiRoot: s.pi, CodexHome: s.codex, CodexShadow: filepath.Join(s.root, "shadow"), CodexBin: codexBin, DshHome: filepath.Join(s.root, "dsh"), AntigravityRoot: filepath.Join(s.root, "agy"), OpenCodeRoot: filepath.Join(s.root, "opencode"), NoDesktop: true, Enable: matrixAgents}
-			s.flags = append(s.flags, "--only", strings.Join(matrixAgents, ","), "--claude-root", cfg.ClaudeRoot, "--dsh-home", cfg.DshHome, "--agy-root", cfg.AntigravityRoot, "--opencode-root", cfg.OpenCodeRoot, "--codex-shadow", cfg.CodexShadow)
+			cfg := koto.Config{DataDir: filepath.Join(s.root, "bootstrap"), ClaudeRoot: filepath.Join(s.root, "cc"), PiRoot: s.pi, CodexHome: s.codex, CodexShadow: filepath.Join(s.root, "shadow"), CodexBin: codexBin, DshHome: filepath.Join(s.root, "dsh"), AntigravityRoot: filepath.Join(s.root, "agy"), OpenCodeRoot: filepath.Join(s.root, "opencode"), ZCodeRoot: filepath.Join(s.root, "zcode"), NoDesktop: true, Enable: matrixAgents}
+			s.flags = append(s.flags, "--only", strings.Join(matrixAgents, ","), "--claude-root", cfg.ClaudeRoot, "--dsh-home", cfg.DshHome, "--agy-root", cfg.AntigravityRoot, "--opencode-root", cfg.OpenCodeRoot, "--zcode-root", cfg.ZCodeRoot, "--codex-shadow", cfg.CodexShadow)
 			if codexBin != "" {
 				s.flags = append(s.flags, "--codex-bin", codexBin)
 			}
+			initHandoffZCode(t, cfg.ZCodeRoot)
 			s.writeCodex(t, testThread, "MATRIX PRESERVED", false)
 			sel := "codex:" + testThread
 			app, err := koto.New(cfg)
@@ -40,7 +44,7 @@ func TestHandoffCLINativeMatrix(t *testing.T) {
 				t.Fatal(err)
 			}
 			ctx := context.Background()
-			if report, err := app.Engine.Scan(ctx, engine.ScanOptions{Connectors: []string{"codex"}}); err != nil || len(report.Errors) != 0 {
+			if report, err := app.Engine.Scan(ctx, engine.ScanOptions{Connectors: []string{app.Registry.Get("codex").ID}}); err != nil || len(report.Errors) != 0 {
 				t.Fatalf("bootstrap scan: %v %+v", err, report)
 			}
 			if from != "codex" {
@@ -50,7 +54,7 @@ func TestHandoffCLINativeMatrix(t *testing.T) {
 				}
 				sel = from + ":" + r.Plan.Target.Session
 			}
-			native, _, err := discoverSource(ctx, app, sel, "explicit")
+			native, _, err := discoverSource(ctx, app, sel, "explicit", "")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -62,7 +66,7 @@ func TestHandoffCLINativeMatrix(t *testing.T) {
 				env = map[string]string{key: strings.TrimPrefix(sel, from+":")}
 			}
 			current, code, raw := s.run(t, []string{"current"}, nil, env)
-			if code != 0 || current.Source.Selector != sel {
+			if code != 0 || current.Source.Selector != core.SessionSelector(native.connector.ID, from, native.ref.Session) {
 				t.Fatalf("current source: %d %s", code, raw)
 			}
 			for _, to := range matrixAgents {
@@ -75,8 +79,16 @@ func TestHandoffCLINativeMatrix(t *testing.T) {
 						t.Fatalf("preview: %d %s", code, raw)
 					}
 					result, code, raw := s.run(t, []string{"copy"}, []string{"--current", "--to", to}, env)
-					if code != 0 || !result.OK || result.State != "copied" || result.Counts.Turns != 2 || result.Resume == nil || result.Resume.Shell == "" || result.Resume.Cwd == nil || *result.Resume.Cwd != s.cwd || result.Destination.Selector == sel {
+					if code != 0 || !result.OK || result.State != "copied" || result.Counts.Turns != 2 || result.Destination.Selector == sel {
 						t.Fatalf("copy: %d %s", code, raw)
+					}
+					if result.Resume == nil {
+						if to != "zcode" {
+							t.Fatal("missing native resume command")
+						}
+						t.Log("ZCode runtime absent: copy readback tested, native resume not available")
+					} else if result.Resume.Shell == "" || result.Resume.Cwd == nil || *result.Resume.Cwd != s.cwd {
+						t.Fatal("invalid resume command")
 					}
 					if raw := matrixSourceBytes(t, native.ref); !bytes.Equal(raw, before) {
 						t.Fatal("source native session changed")
@@ -88,7 +100,7 @@ func TestHandoffCLINativeMatrix(t *testing.T) {
 						t.Fatal(err)
 					}
 					defer readback.Close()
-					ref, refs, err := discoverSource(ctx, readback, result.Destination.Selector, "explicit")
+					ref, refs, err := discoverSource(ctx, readback, result.Destination.Selector, "explicit", "")
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -169,7 +181,7 @@ func appendMatrixHandoff(t *testing.T, ref core.NativeRef) {
 		for i, row := range rows {
 			row["seq"], row["time"], row["surfaceOp"] = state.Seq+i, time.Now().UnixMilli(), "append"
 		}
-	case "opencode":
+	case "opencode", "zcode":
 		appendOpenCodeHandoff(t, ref, texts, ids)
 		return
 	case "antigravity":
@@ -228,4 +240,24 @@ func matrixPB(field int, body []byte) []byte {
 	var key, size [binary.MaxVarintLen64]byte
 	n, m := binary.PutUvarint(key[:], uint64(field<<3|2)), binary.PutUvarint(size[:], uint64(len(body)))
 	return append(append(append([]byte{}, key[:n]...), size[:m]...), body...)
+}
+
+func initHandoffZCode(t *testing.T, root string) {
+	t.Helper()
+	dir := filepath.Join(root, "cli", "db")
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	db, err := sql.Open("sqlite", filepath.Join(dir, "db.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	schema, err := os.ReadFile(filepath.Join("..", "..", "internal", "connectors", "zcode", "testdata", "schema-0.16.9.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.Exec(string(schema)); err != nil {
+		t.Fatal(err)
+	}
 }

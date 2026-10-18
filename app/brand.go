@@ -3,10 +3,9 @@ package main
 // Product identity, in one place. The name, description and icons below are everything that says
 // "koto"; the command line next to it is `koto` too (cmd/koto).
 //
-// macOS renders the system 💬 emoji in memory for its running Dock and menu-bar icons.
-// The packaged Apple emoji PNGs serve Finder, Windows and Linux (see ASSETS.md).
-// brand/appicon.png feeds the ICNS and ICO bundles.
-// Regenerate packaged assets with scripts/generate-icons.cjs.
+// The checked-in Apple speech-balloon PNG is the fixed source for all platforms,
+// including the running Dock/menu bar, packaged icons, and website.
+// Regenerate derivative sizes with scripts/generate-icons.cjs.
 
 import _ "embed"
 
@@ -14,6 +13,9 @@ const (
 	productName        = "koto"
 	productDescription = "Continue a coding-agent session in another agent"
 )
+
+//go:embed brand/appicon.png
+var appIconPNG []byte
 
 //go:embed brand/trayicon.png
 var trayIconPNG []byte

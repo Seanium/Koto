@@ -6,7 +6,7 @@ Screenshots are unedited real app captures using synthetic sandbox sessions, wit
 
 The screenshot tabs use Primer Octicons `copy-24`, `git-branch-24`, and `diff-24` (MIT), included inline without a runtime dependency.
 
-Agent SVGs come from LobeHub Icons via magpie. The speech-bubble mark and favicon contain the Unicode 💬 character, rendered by the visitor's system emoji font; neither embeds a font or glyph image. Attribution is in `THIRD_PARTY_NOTICES.md` and `licenses/assets/`.
+Agent SVGs come from LobeHub Icons via magpie. The speech-bubble mark and favicon are fixed PNGs derived from the same Apple artwork as the App (`app/brand/appicon.png`); they do not depend on the visitor's emoji font. Attribution is in `THIRD_PARTY_NOTICES.md` and `licenses/assets/`.
 
 From the repository root:
 

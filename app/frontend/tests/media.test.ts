@@ -23,4 +23,17 @@ assert.ok(peak <= 2)
 const error = acquireMedia(async () => { throw Error('unavailable') }, 'x')
 await assert.rejects(error.promise, /unavailable/); error.release()
 assert.equal(urls.size, 0)
+let cancelled = 0
+const slowSource = async (_sha: string, signal?: AbortSignal) => {
+  await new Promise<void>((_resolve, reject) => signal!.addEventListener('abort', () => {
+    cancelled++; reject(signal!.reason)
+  }, { once: true }))
+  return 'data:text/plain;base64,a290bw=='
+}
+const pendingA = acquireMedia(slowSource, 'native-pending'), pendingB = acquireMedia(slowSource, 'native-pending')
+pendingA.release(); assert.equal(cancelled, 0, 'another mounted consumer still owns the native read')
+pendingB.release()
+assert.equal(cancelled, 1, 'last unmount cancels the native read instead of merely ignoring its result')
+assert.deepEqual(await Promise.all([pendingA.promise, pendingB.promise]), ['', ''])
+assert.equal(urls.size, 0)
 console.log('Media lifecycle: shared loads, max two concurrent requests, 300 cancellations, no retained object URLs passed')

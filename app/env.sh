@@ -6,6 +6,9 @@ export GOPATH="$APP_DIR/.cache/gopath"
 export GOMODCACHE="$APP_DIR/.cache/gomod"
 export GOCACHE="$APP_DIR/.cache/gobuild"
 export GOBIN="$APP_DIR/.tools/bin"
+export TMPDIR="$APP_DIR/.cache/tmp"
+export GOTMPDIR="$TMPDIR/go"
+mkdir -p "$GOTMPDIR"
 export GOTOOLCHAIN=local
 export GOFLAGS=-modcacherw
-export PATH="$GOBIN:$GOROOT/bin:$APP_DIR/node_modules/.bin:$PATH"
+export PATH="$GOBIN:$GOROOT/bin:$APP_DIR/.tools/agents/node_modules/.bin:$APP_DIR/node_modules/.bin:$PATH"

@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"koto/internal/connectors/claudecode"
+	"koto/internal/core"
 	"koto/internal/engine"
 )
 
@@ -25,12 +27,18 @@ func TestDesktopIndexAndCowork(t *testing.T) {
 	cowork := filepath.Join(desk, "local-agent-mode-sessions", "acct", "org", "local_cw1", ".claude")
 	writeCcSession(t, cowork, "22222222-2222-4333-8444-555555555555", true)
 	a := s.app(enable("claude-code"), func(c *Config) { c.NoDesktop, c.ClaudeDesktopDirs = false, []string{desk} })
-	ok(t, a.Registry.Get("claude-code@cowork:cw1") != nil, "cowork root registered")
+	roots := claudecode.DiscoverCoworkRoots([]string{desk})
+	eq(t, len(roots), 1)
+	ok(t, a.Registry.Get(roots[0].ID) != nil, "cowork root registered")
+	profiles := claudecode.DiscoverDesktopProfiles([]string{desk}, s.Claude)
+	eq(t, len(profiles), 1)
 	scan(t, a)
-	b := binding(t, a.Hub, "claude-code", CCSession)
+	b := a.Hub.Binding("claude-code", CCSession, profiles[0].ID)
+	ok(t, b != nil)
+	eq(t, core.ReadIdentity(b.Meta).Claims[0].ID, "acct")
 	eq(t, b.Meta["desktopTitle"], any("Desktop title"))
 	eq(t, b.Meta["frontend"], any("claude-desktop"))
-	eq(t, binding(t, a.Hub, "claude-code", "22222222-2222-4333-8444-555555555555").Connector, "claude-code@cowork:cw1")
+	eq(t, binding(t, a.Hub, "claude-code", "22222222-2222-4333-8444-555555555555").Connector, roots[0].ID)
 }
 
 func TestDesktopProfiles(t *testing.T) {
@@ -41,14 +49,19 @@ func TestDesktopProfiles(t *testing.T) {
 	writeCcSession(t, filepath.Join(acct, "local-agent-mode-sessions", "acct", "org", "local_cw1", ".claude"), "22222222-2222-4333-8444-555555555555", true)
 	writeCcSession(t, filepath.Join(gw, "local-agent-mode-sessions", "acct", "org", "local_cw1", ".claude"), "33333333-2222-4333-8444-555555555555", true)
 	a := s.app(enable("claude-code"), func(c *Config) { c.NoDesktop, c.ClaudeDesktopDirs = false, []string{acct, gw} })
-	ok(t, a.Registry.Get("claude-code@cowork:cw1") != nil && a.Registry.Get("claude-code@cowork-3p:cw1") != nil)
+	roots := claudecode.DiscoverCoworkRoots([]string{acct, gw})
+	eq(t, len(roots), 2)
+	ok(t, a.Registry.Get(roots[0].ID) != nil && a.Registry.Get(roots[1].ID) != nil)
+	profiles := claudecode.DiscoverDesktopProfiles([]string{acct, gw}, s.Claude)
+	eq(t, len(profiles), 1)
 	scan(t, a)
-	b := binding(t, a.Hub, "claude-code", CCSession)
+	b := a.Hub.Binding("claude-code", CCSession, profiles[0].ID)
+	ok(t, b != nil)
 	eq(t, b.Meta["desktopTitle"], any("via gateway"))
 	eq(t, b.Meta["desktopProfile"], any("Claude-3p"))
-	eq(t, binding(t, a.Hub, "claude-code", "33333333-2222-4333-8444-555555555555").Connector, "claude-code@cowork-3p:cw1")
+	eq(t, binding(t, a.Hub, "claude-code", "33333333-2222-4333-8444-555555555555").Connector, roots[1].ID)
 	// a Cowork session from the account profile can be carried into the gateway profile's root
-	r := carry(t, a, engine.CarryOptions{Selector: "claude-code:22222222", To: "claude-code@cowork-3p:cw1"})
+	r := carry(t, a, engine.CarryOptions{Selector: "claude-code:22222222", To: roots[1].ID})
 	ok(t, r.Applied && strings.HasPrefix(r.Plan.Target.Path, gw))
 }
 

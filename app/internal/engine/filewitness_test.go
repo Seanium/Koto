@@ -91,28 +91,32 @@ func TestOldLargeFileWitnessHasBoundedRead(t *testing.T) {
 }
 
 func TestWitnessIncludesSQLiteWAL(t *testing.T) {
-	file := filepath.Join(t.TempDir(), "session.db")
-	if err := os.WriteFile(file, bytes.Repeat([]byte("d"), 4096), 0600); err != nil {
-		t.Fatal(err)
-	}
-	wal := file + "-wal"
-	if err := os.WriteFile(wal, bytes.Repeat([]byte("a"), 4096), 0600); err != nil {
-		t.Fatal(err)
-	}
-	ref := core.NativeRef{Harness: "antigravity", Path: file}
-	one, _, err := SourceWitness(ref)
-	if err != nil {
-		t.Fatal(err)
-	}
-	st, _ := os.Stat(wal)
-	if err := os.WriteFile(wal, bytes.Repeat([]byte("b"), 4096), 0600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chtimes(wal, st.ModTime(), st.ModTime()); err != nil {
-		t.Fatal(err)
-	}
-	two, _, err := SourceWitness(ref)
-	if err != nil || one == two {
-		t.Fatalf("WAL overwrite not detected: %v", err)
+	for _, harness := range []string{"antigravity", "opencode", "zcode", "cursor"} {
+		t.Run(harness, func(t *testing.T) {
+			file := filepath.Join(t.TempDir(), "session.db")
+			if err := os.WriteFile(file, bytes.Repeat([]byte("d"), 4096), 0600); err != nil {
+				t.Fatal(err)
+			}
+			wal := file + "-wal"
+			if err := os.WriteFile(wal, bytes.Repeat([]byte("a"), 4096), 0600); err != nil {
+				t.Fatal(err)
+			}
+			ref := core.NativeRef{Harness: harness, Path: file}
+			one, _, err := SourceWitness(ref)
+			if err != nil {
+				t.Fatal(err)
+			}
+			st, _ := os.Stat(wal)
+			if err := os.WriteFile(wal, bytes.Repeat([]byte("b"), 4096), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Chtimes(wal, st.ModTime(), st.ModTime()); err != nil {
+				t.Fatal(err)
+			}
+			two, _, err := SourceWitness(ref)
+			if err != nil || one == two {
+				t.Fatalf("WAL overwrite not detected: %v", err)
+			}
+		})
 	}
 }

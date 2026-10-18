@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { catalogs, getLanguage, getLocale, languages, resolveLocale, setLanguage, subscribeLanguage, tr } from '../src/i18n/core.ts'
 
-for (const [system, expected] of [['zh-CN', 'zh'], ['zh-Hans-SG', 'zh'], ['zh-Hant', 'zh-TW'], ['zh-Hant-HK', 'zh-TW'], ['zh_TW', 'zh-TW'], ['zh-MO', 'zh-TW'], ['ja-JP', 'ja'], ['de-AT', 'de'], ['fr-FR', 'en']]) {
+for (const [system, expected] of [['zh-CN', 'zh'], ['zh-Hans-US', 'zh'], ['zh-Hans-SG', 'zh'], ['zh-Hant', 'zh-TW'], ['zh-Hant-HK', 'zh-TW'], ['zh_TW', 'zh-TW'], ['zh-MO', 'zh-TW'], ['ja-JP', 'ja'], ['de-AT', 'de'], ['fr-FR', 'en']]) {
   assert.equal(resolveLocale('system', system), expected)
   assert.equal(resolveLocale('en', system), 'en', 'explicit preference overrides the system')
 }

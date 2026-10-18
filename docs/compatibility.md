@@ -6,16 +6,22 @@ The tables describe supported storage formats. Agent updates can change those fo
 
 | Agent | Read | Create a copy |
 | --- | --- | --- |
-| Claude Code / Desktop Code | JSONL and native forks | New UUID and native JSONL |
+| Claude Code / Claude Desktop | JSONL and native forks | New UUID and native JSONL |
 | pi | v3 JSONL trees | New session with a new ID/parent chain |
 | Codex | rollout JSONL / zstd | New native rollout, then app-server read validation |
 | DeepSeek Harness | v4 JSONL / zstd | New directory and native compressed log |
 | Antigravity CLI | SQLite and protobuf trajectories | New conversation database and summary entry |
 | OpenCode | SQLite v1 (`session`, `message`, `part`) | New session rows in the native database |
+| Cursor CLI | Per-session SQLite `store.db` | New native CLI session |
+| Cursor Desktop | `state.vscdb` with composer and message blobs | New IDE conversation; open it in the App |
+| WorkBuddy / WorkBuddy AI | Separate China/international roots, SQLite index and JSONL | New session under an existing native account |
+| ZCode | Shared App/CLI SQLite history and App task index | New native session and matching task entry |
 
 OpenCode 1.19.3 uses the supported v1 schema. v2 session storage is rejected explicitly. OpenCode copies require its CLI and a configured default model; continuation uses the destination model.
 
 All copies create a new native session; existing session IDs and standalone files are not overwritten. The target agent loads its own settings; source system/developer/environment/configuration and permission context are not copied. Tools and reasoning may be converted to readable text where the target has no compatible native representation.
+
+Cursor Desktop and CLI use separate stores and continuation methods. ZCode support covers the production native agent, not Preview or external agents launched by ZCode. WorkBuddy and WorkBuddy AI remain separate destinations. Historical account labels do not change the credentials used for continuation.
 
 ## Attachments
 
@@ -25,6 +31,12 @@ All copies create a new native session; existing session IDs and standalone file
 | PDF, UTF-8 text | Native document | Complete file | Complete file | Native file attachment | Native Media | Native file |
 | Audio | Complete file | Complete file | Native audio | Native file attachment | Native Media | Native file |
 | DOCX, ZIP, JSON, other binary | Complete file | Complete file | Complete file | Native file attachment | Native Media | Native file |
+
+| Additional Agent | Attachment representation |
+| --- | --- |
+| Cursor CLI / Cursor Desktop | Native images; complete files or file references |
+| WorkBuddy / WorkBuddy AI | Native images and user-file references; tool files use verified references |
+| ZCode | Native media and complete files in the destination session |
 
 When a role or destination cannot embed a file, koto keeps the complete bytes in the new session's attachment directory and adds a file reference. Tool-result attachments are preserved even when the tool transcript is converted to text.
 

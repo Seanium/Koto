@@ -9,7 +9,7 @@ import (
 func TestPendingContextLifetime(t *testing.T) {
 	h := New()
 	ref := core.NativeRef{Harness: "claude-code", Session: "synthetic"}
-	key := sessKey{ref.Harness, ref.Session}
+	key := sessKey{ref.Harness, ref.Session, "claude-code"}
 	conn := ConnectorInfo{ID: "claude-code", Harness: "claude-code"}
 	batch := core.SourceBatch{Ref: ref,
 		Records: []core.BatchRecord{{NativeID: "context", SHA256: "context", Index: 0, Bytes: 100, Raw: []byte("not retained")}},

@@ -7,15 +7,15 @@
   <meta name="color-scheme" content="light dark">
   <link rel="canonical" href="https://kotoai.site/">
   <title>koto — copy sessions between agents</title>
-  <link rel="icon" href="favicon.svg?v=native-emoji" type="image/svg+xml">
+  <link rel="icon" href="favicon.png?v=apple-fixed-1" type="image/png" sizes="64x64">
   <script>try{const p=localStorage.getItem("koto-site-appearance")||"system";document.documentElement.dataset.theme=p==="dark"||p!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}catch{document.documentElement.dataset.theme=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}</script>
-  <link rel="stylesheet" href="style.css?v=downloads-3">
+  <link rel="stylesheet" href="style.css?v=apple-fixed-1">
   <script type="module" src="main.js?v=beta-0.1.0-2-28ac01627d11"></script>
 </head>
 <body>
   <a class="skip" href="#main" data-i18n="skip">Skip to content</a>
   <header class="header wrap">
-    <a class="wordmark" href="#" aria-label="koto home"><span class="wordmark-icon" aria-hidden="true">💬</span><span class="wordmark-name">koto<span class="wordmark-dot">.</span></span></a>
+    <a class="wordmark" href="#" aria-label="koto home"><img class="wordmark-icon" src="assets/koto.png" alt="" width="28" height="28"><span class="wordmark-name">koto<span class="wordmark-dot">.</span></span></a>
     <nav aria-label="Main navigation">
       <a class="github-link" href="https://github.com/Seanium/koto" target="_blank" rel="noopener noreferrer" aria-label="GitHub repository" title="GitHub"><svg aria-hidden="true" fill="currentColor" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M6.766 11.328c-2.063-.25-3.516-1.734-3.516-3.656 0-.781.281-1.625.75-2.188-.203-.515-.172-1.609.063-2.062.625-.078 1.468.25 1.968.703.594-.187 1.219-.281 1.985-.281.765 0 1.39.094 1.953.265.484-.437 1.344-.765 1.969-.687.218.422.25 1.515.046 2.047.5.593.766 1.39.766 2.203 0 1.922-1.453 3.375-3.547 3.64.531.344.89 1.094.89 1.954v1.625c0 .468.391.734.86.547C13.781 14.359 16 11.53 16 8.03 16 3.61 12.406 0 7.984 0 3.563 0 0 3.61 0 8.031a7.88 7.88 0 0 0 5.172 7.422c.422.156.828-.125.828-.547v-1.25c-.219.094-.5.156-.75.156-1.031 0-1.64-.562-2.078-1.609-.172-.422-.36-.672-.719-.719-.187-.015-.25-.093-.25-.187 0-.188.313-.328.625-.328.453 0 .844.281 1.25.86.313.452.64.655 1.031.655s.641-.14 1-.5c.266-.265.47-.5.657-.656"/></svg></a>
       <div class="preferences">
@@ -66,7 +66,6 @@
     <section class="cli wrap" aria-labelledby="cli-title">
       <div class="cli-intro">
         <h2 id="cli-title"><span data-i18n="cliTitleLead">There’s also koto CLI.</span> <span class="cli-title-action"><span data-i18n="cliTitleActionIntro">Copy a session. </span><span data-i18n="cliTitleActionEnd">Just ask.</span></span></h2>
-        <p data-i18n="cliScope">Download it separately.</p>
       </div>
       <figure class="cli-demo" aria-label="Example of copying a conversation with koto CLI">
         <blockquote class="cli-message cli-request"><span class="sr-only" data-i18n="cliRequest">Use koto to copy this session to pi.</span><span class="dialogue-typed" id="cli-request-typed" aria-hidden="true">Use koto to copy this session to pi.</span></blockquote>
@@ -92,9 +91,10 @@
       <div class="download-status">
         <div class="download-products" role="group" aria-label="Download" data-download-products><button type="button" data-product="app" aria-pressed="true">App</button><button type="button" data-product="cli" aria-pressed="false">CLI</button></div>
         <div class="download-controls"><label class="sr-only" for="release-asset" data-i18n="downloadPlatform">Platform and architecture</label><select id="release-asset"><option value="" disabled selected data-i18n="downloadChoose">Choose a version</option></select><a class="download-button" id="release-download" role="link" aria-disabled="true" data-i18n="downloadPending">Coming soon</a></div>
+        <div class="cli-install" id="cli-install" hidden><span data-i18n="cliInstall">Or install from your terminal</span><div class="install-command"><code id="cli-install-command"></code><button type="button" id="cli-install-copy" aria-label="Copy install command"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div><span class="install-feedback" id="cli-install-feedback" role="status"></span></div>
       </div>
     </section>
   </main>
-  <footer class="wrap"><a class="wordmark" href="#" aria-label="koto home"><span class="wordmark-icon" aria-hidden="true">💬</span><span class="wordmark-name">koto<span class="wordmark-dot">.</span></span></a><span>MIT © Seanium</span></footer>
+  <footer class="wrap"><a class="wordmark" href="#" aria-label="koto home"><img class="wordmark-icon" src="assets/koto.png" alt="" width="28" height="28"><span class="wordmark-name">koto<span class="wordmark-dot">.</span></span></a><span>MIT © Seanium</span></footer>
 </body>
 </html>

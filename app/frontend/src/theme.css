@@ -9,6 +9,7 @@
   --bg-list: #fcfcfb;
   --bg-hover: rgba(23, 23, 26, 0.045);
   --bg-selected: #efefed;
+  --sidebar-selected: #deded9;
   --selection-bg: #e8e8e2;
   --bg-sunken: #f6f6f4;      /* tool lines, code boxes, inputs */
   --bubble: #f2f2ef;         /* your messages in the timeline */
@@ -62,6 +63,7 @@
     --bg-list: #212123;
     --bg-hover: rgba(255, 255, 255, 0.05);
     --bg-selected: #30302f;
+    --sidebar-selected: #46464a;
     --selection-bg: #3b3c38;
     --bg-sunken: #29292c;
     --bubble: #2f2f32;

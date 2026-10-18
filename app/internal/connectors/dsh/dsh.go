@@ -179,12 +179,18 @@ func blocks(content any, ctx *engine.DecodeContext) []core.Part {
 				out = append(out, core.Part{"type": "text", "text": s})
 			}
 		case "reasoning":
+			if ctx.IndexOnly {
+				continue
+			}
 			p := core.Part{"type": "reasoning"}
 			if s := core.S(b["text"]); s != "" {
 				p["text"] = s
 			}
 			out = append(out, p)
 		case "tool-call":
+			if ctx.IndexOnly {
+				continue
+			}
 			name := core.S(b["name"])
 			argStr, ok := b["arguments"].(string)
 			if !ok {
@@ -272,8 +278,14 @@ func (Decoder) Decode(r0 any, raw []byte, ctx *engine.DecodeContext) engine.Deco
 		if d["interrupted"] == true {
 			attrs["stopReason"] = "aborted"
 		}
+		if ctx.IndexOnly {
+			return ev("message", "assistant", nil, attrs)
+		}
 		return ev("message", "assistant", blocks(m["content"], ctx), attrs)
 	case "tool/result":
+		if ctx.IndexOnly {
+			return ev("tool_result", "tool", nil, nil)
+		}
 		m := core.Obj(d["message"])
 		outcome := "success"
 		if e := d["error"]; m["isError"] == true || (e != nil && e != false && e != "" && e != float64(0)) {
@@ -536,15 +548,24 @@ func (c *dshConn) Tail(ctx context.Context, ref core.NativeRef, from *core.Sourc
 func (c *dshConn) WatchRoots() []string { return []string{c.root} }
 
 func (c *dshConn) ReadRecord(session string, index int, offset *int64) ([]byte, error) {
+	return c.ReadRecordContext(context.Background(), session, index, offset)
+}
+
+func (c *dshConn) ReadRecordContext(ctx context.Context, session string, index int, offset *int64) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	p, ok := c.files.Get(session)
 	if !ok {
-		_, _ = c.Discover(context.Background())
+		if _, err := c.Discover(ctx); err != nil {
+			return nil, err
+		}
 		p, ok = c.files.Get(session)
 	}
 	if !ok || offset == nil {
 		return nil, nil
 	}
-	return engine.ReadRecordAt(p, *offset)
+	return engine.ReadRecordAtContext(ctx, p, *offset)
 }
 
 // Files: a dsh session is its own directory (every generation, the lock file).

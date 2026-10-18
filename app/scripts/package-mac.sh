@@ -55,8 +55,10 @@ UV=${KOTO_UV:-$(command -v uv || true)}
 [ -n "$UV" ] || { echo 'macOS packaging requires uv; set KOTO_UV to a project-local executable.' >&2; exit 1; }
 export UV_CACHE_DIR="$APP_DIR/.cache/uv"
 export UV_PYTHON_INSTALL_DIR="$APP_DIR/.tools/uv-python"
-if [ ! -x "$APP_DIR/.tools/dmgbuild/bin/python" ]; then
-  "$UV" venv --no-python-downloads --python python3 "$APP_DIR/.tools/dmgbuild"
+if [ ! -x "$APP_DIR/.tools/dmgbuild/bin/python" ] || ! "$APP_DIR/.tools/dmgbuild/bin/python" -c 'import sys; assert sys.version_info >= (3, 10)' >/dev/null 2>&1; then
+  # dmgbuild requires Python 3.10+, while macOS may still ship Python 3.9.
+  # uv keeps its managed interpreter and this disposable environment in the project.
+  "$UV" venv --clear --python 3.12 "$APP_DIR/.tools/dmgbuild"
 fi
 "$UV" pip sync --python "$APP_DIR/.tools/dmgbuild/bin/python" "$APP_DIR/scripts/dmg-requirements.txt"
 BUNDLE="$STAGE/koto.app"
@@ -67,6 +69,7 @@ export CGO_LDFLAGS="${CGO_LDFLAGS:-} -mmacosx-version-min=12.0"
 export MACOSX_DEPLOYMENT_TARGET=12.0
 go build -tags production -trimpath -buildvcs=false -ldflags="-w -s" -o "$BUNDLE/Contents/MacOS/koto" .
 cp build/darwin/icons.icns "$BUNDLE/Contents/Resources/"
+/usr/bin/tiffutil -cathidpicheck brand/installer.png brand/installer@2x.png -out "$BUNDLE/Contents/Resources/installer.tiff"
 mkdir -p "$BUNDLE/Contents/Resources/legal"
 cp "$APP_DIR/../LICENSE" "$APP_DIR/../THIRD_PARTY_NOTICES.md" "$BUNDLE/Contents/Resources/legal/"
 cp -R "$APP_DIR/../licenses" "$BUNDLE/Contents/Resources/legal/"
@@ -83,10 +86,8 @@ lipo "$BUNDLE/Contents/MacOS/koto" -verify_arch "$MACH_ARCH"
 codesign --force --deep --sign - "$BUNDLE"
 codesign --verify --deep --strict "$BUNDLE"
 
-TMPDIR="$STAGE" "$APP_DIR/.tools/dmgbuild/bin/dmgbuild" \
-  -s "$APP_DIR/scripts/dmg-settings.py" \
-  -D "app=$BUNDLE" -D "background=$APP_DIR/brand/installer.png" \
-  "koto $VERSION" "$STAGE/koto.dmg"
+TMPDIR="$STAGE" "$APP_DIR/.tools/dmgbuild/bin/python" "$APP_DIR/scripts/build-mac-dmg.py" \
+  "$BUNDLE" "$STAGE/koto.dmg" "$VERSION"
 hdiutil verify "$STAGE/koto.dmg"
 "$APP_DIR/.tools/dmgbuild/bin/python" "$APP_DIR/scripts/verify-mac-installer.py" "$STAGE/koto.dmg"
 # Replace existing generated artifacts only after both the bundle and image pass.

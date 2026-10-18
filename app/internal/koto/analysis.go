@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"koto/internal/core"
-	"koto/internal/hub"
 )
 
 type AnalysisSession struct {
@@ -51,14 +50,19 @@ func (a *API) Analyze(ctx context.Context, selectors []string) (*AnalysisResult,
 	seen := map[string]bool{}
 	nodes := map[string]int{}
 	for _, sel := range selectors {
-		h, _, ok := strings.Cut(sel, ":")
-		if !ok || h == "th" || seen[sel] {
+		r, resolveErr := a.App.ResolveSession(sel)
+		if resolveErr != nil {
+			return nil, AsAPIError(resolveErr)
+		}
+		h := r.Harness
+		canonical := core.SessionSelector(r.Connector, r.Harness, r.Session)
+		if seen[canonical] {
 			return nil, apiErr(400, "select distinct native sessions")
 		}
 		if out.Harness != "" && out.Harness != h {
 			return nil, apiErr(400, "analysis requires sessions from the same Agent")
 		}
-		seen[sel], out.Harness = true, h
+		seen[canonical], out.Harness = true, h
 		events, title, err := a.analysisEvents(ctx, sel)
 		if err != nil {
 			return nil, err
@@ -74,10 +78,10 @@ func (a *API) Analyze(ctx context.Context, selectors []string) (*AnalysisResult,
 				contextEvents = append(contextEvents, e)
 				continue
 			}
-			if e.Kind != "message" && e.Kind != "compaction" && e.Kind != "tool_result" {
+			if e.Kind != "message" && e.Kind != "compaction" && e.Kind != "tool_result" && e.Kind != "notification" {
 				continue
 			}
-			if e.Actor == "user" && hasUserText(e) || len(turns) == 0 {
+			if e.Kind == "message" && e.Actor == "user" && hasUserText(e) || len(turns) == 0 {
 				turns = append(turns, nil)
 			}
 			turns[len(turns)-1] = append(turns[len(turns)-1], e)
@@ -117,45 +121,25 @@ func (a *API) Analyze(ctx context.Context, selectors []string) (*AnalysisResult,
 
 // Decode actual native contents, following only same-Agent ancestry needed to reconstruct a fork.
 func (a *API) analysisEvents(ctx context.Context, selector string) ([]*core.Event, string, error) {
-	harness, session, _ := strings.Cut(selector, ":")
-	h := hub.New()
-	defer h.Close()
-	seen := map[string]bool{}
-	var read func(string) error
-	read = func(id string) error {
-		if seen[id] {
-			return fmt.Errorf("cyclic native ancestry")
-		}
-		seen[id] = true
-		r, ok := a.App.Store.Session(harness, id)
-		if !ok {
-			return apiErr(404, "session not in index: "+harness+":"+id)
-		}
-		if r.Parent != nil && r.Parent.Harness == harness {
-			if err := read(r.Parent.Session); err != nil {
-				return err
-			}
-		}
-		c := a.App.Registry.Get(r.Connector)
-		if c == nil || c.Source == nil {
-			return apiErr(400, "source unavailable")
-		}
-		return c.Source.Tail(ctx, core.NativeRef{Harness: harness, Connector: c.ID, Session: id, Path: r.Path, Size: r.Size, MtimeMs: r.Mtime, Meta: r.Meta}, nil, func(batch core.SourceBatch) error {
-			if err := ctx.Err(); err != nil {
-				return err
-			}
-			h.Ingest(batch, hub.ConnectorInfo{ID: c.ID, Harness: harness, Version: c.Version})
-			return nil
-		})
+	source, err := a.App.ResolveSession(selector)
+	if err != nil {
+		return nil, "", AsAPIError(err)
 	}
-	if err := read(session); err != nil {
+	harness, session, connector := source.Harness, source.Session, source.Connector
+	v, err := a.App.OpenThread(ctx, core.SessionSelector(connector, harness, session))
+	if err != nil {
 		return nil, "", err
 	}
-	b := h.Binding(harness, session)
-	if b == nil {
+	var events []*core.Event
+	v.Engine.Read(func() {
+		if b := v.Hub.Binding(harness, session, connector); b != nil {
+			events = v.Hub.Path(b.Leaf)
+		}
+	})
+	if events == nil {
 		return nil, "", apiErr(404, "session has no readable content")
 	}
-	r, _ := a.App.Store.Session(harness, session)
+	r, _ := a.App.Store.Session(harness, session, connector)
 	title := r.Title
 	if title == "" {
 		title = r.FirstPrompt
@@ -163,7 +147,7 @@ func (a *API) analysisEvents(ctx context.Context, selector string) ([]*core.Even
 	if title == "" {
 		title = selector
 	}
-	return h.Path(b.Leaf), title, nil
+	return events, title, nil
 }
 func hasUserText(e *core.Event) bool {
 	for _, p := range e.Parts {

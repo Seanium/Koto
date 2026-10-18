@@ -14,6 +14,20 @@ koto 读取设置中已启用的 Agent 目录。搜索支持已索引的标题�
 
 缺失文件和不支持的内容会在转换说明中提示，详见[附件支持](compatibility.md)。
 
+## 账号与目录
+
+在会话列表中按来源目录或已识别账号筛选；其他 Agent 目录可在设置中添加。无法识别账号的会话仍会显示，服务商或模型名称不会被当成账号。
+
+复制时可选择目标目录，同产品默认使用来源目录。仅当目标按账号存储会话时才需要选账号；只有一个合法账号会自动选中。续聊使用目标自己的登录或 API 配置，koto 不复制凭据。
+
+```sh
+koto profiles --json
+koto threads --profile '<profile-id>' --json
+koto copy '@<source-profile>:<session-id>' --to pi --to-profile '<target-profile>' --json
+```
+
+使用 koto 返回的准确 profile 和会话标识。`--to-root <目录>` 注册现有 Agent 数据目录并复制到其中；`--to-account <id>` 仅用于支持选择账号的目标。多个目录出现相同会话 ID 时，须明确指定 profile。
+
 ## 对比会话
 
 进入「会话对比」，选择同一 Agent 的 2–32 条会话。用树查看共同历史与分叉，再任选两条会话逐行对比。
@@ -24,18 +38,31 @@ koto 读取设置中已启用的 Agent 目录。搜索支持已索引的标题�
 
 App 和 CLI 从 [Releases](https://github.com/Seanium/koto/releases) 分别下载。CLI 不依赖 App 或 WebView，`--help` 内含 Agent 操作说明。
 
-| 平台 | CLI 配置 |
-| --- | --- |
-| macOS / Linux | 下载 `koto-cli-<系统>-<架构>`，改名为 `koto`，执行 `chmod +x koto`。 |
-| Windows | 下载 `koto-cli-windows-<架构>.exe`，改名为 `koto.exe`。 |
+也可以通过命令行安装 CLI：
+
+macOS / Linux:
+
+```sh
+curl -fsSL https://kotoai.site/install.sh | sh
+```
+
+Windows (PowerShell):
+
+```powershell
+irm https://kotoai.site/install.ps1 | iex
+```
+
+默认安装到 macOS/Linux 的 `~/.local/bin` 或 Windows 的 `%LOCALAPPDATA%\Programs\koto\bin`。若安装器提示，请将该目录加入 PATH。
 
 将 CLI 放到 PATH 中的目录，或把完整路径告诉 Agent。Windows 续聊命令在 PowerShell 中执行。Windows App 是直接运行的 `.exe`；Linux App 提供二进制和 DEB，均不捆绑 CLI。运行 Linux App 二进制前，先执行 `chmod +x koto-linux-<架构>`。
 
 直接说：**「用 koto 复制当前会话到 pi」**
 
-OpenCode 未提供宿主会话 ID 时，koto 通过正在运行的工具调用确认当前会话，无需安装 Skill。
+OpenCode 未提供宿主会话 ID 时，koto 通过正在运行的工具调用确认当前会话。
 
-自动识别使用宿主提供的 `CODEX_THREAD_ID`、`PI_SESSION_ID`、`DSH_SESSION_ID`、`ANTIGRAVITY_CONVERSATION_ID` 或 `CLAUDE_CODE_SESSION_ID`。没有这些信息时，需要准确的 `agent:session-id`，可直接指定或通过 `KOTO_SESSION` 提供。明确设置的 `KOTO_SESSION` 优先；多个宿主 ID 冲突时会报错。koto 不按时间或项目目录猜测会话。
+自动识别使用宿主提供的 `CODEX_THREAD_ID`、`PI_SESSION_ID`、`DSH_SESSION_ID`、`ANTIGRAVITY_CONVERSATION_ID`、`CURSOR_CONVERSATION_ID` 或 `CLAUDE_CODE_SESSION_ID`。没有这些信息时，需要准确的 `agent:session-id`，可直接指定或通过 `KOTO_SESSION` 提供。明确设置的 `KOTO_SESSION` 优先；多个宿主 ID 冲突时会报错。koto 不按时间或项目目录猜测会话。
+
+WorkBuddy 使用 `CODEBUDDY_SESSION_ID` 与匹配的 `WORKBUDDY_CONFIG_DIR` 确认来源；仅有会话 ID 不能确定 WorkBuddy 目录。
 
 回复会说明复制数量、转换情况，并给出继续聊的命令。当前未完成的轮次（包括这条复制请求）不会带入新会话。原会话保持不变，目标 Agent 不会自动启动。
 
@@ -58,14 +85,31 @@ koto copy 'claude-code:<session-id>' --to pi --json
 koto analyze 'claude-code:<session-a>' 'claude-code:<session-b>' --json
 ```
 
-`koto` 不在 PATH 时，替换为表中的完整路径。`--json` 仅在复制成功后返回 `state: "copied"`，预览返回 `state: "preview"`；失败会返回错误和非零退出码。任意选择提问、回复等内容请使用 App。
+`koto` 不在 PATH 时，替换为已安装程序的完整路径。`--json` 仅在复制成功后返回 `state: "copied"`，预览返回 `state: "preview"`；失败会返回错误和非零退出码。任意选择提问、回复等内容请使用 App。
 
 `koto trash <selector>` 将会话移入回收站或 Agent 归档区。`koto restore <trash-id>` 恢复会话，拒绝覆盖已有路径。测试时通过 `--data`、Agent 根目录和 `--only` 指向可丢弃的目录。
 
 `koto mcp` 通过 stdio JSON-RPC 提供只读的 `list_sessions` 和 `get_session` 工具。
+
+## 更新
+
+在 App「设置 → 通用」中检查更新，有新版时点击「更新并重启」。
+
+更新 CLI：
+
+```sh
+koto update --check
+koto update
+```
+
+App 和 CLI 分别从 GitHub Releases 下载，安装前校验 SHA-256。正式版默认只更新到正式版；添加 `--channel beta` 可接收预发布版。
 
 ## 设置与存储
 
 语言可选英语、简体中文、繁体中文、日语、德语或跟随系统；外观可选跟随系统、浅色和深色。
 
 koto 在本地保存索引、偏好、对比引用和回收站信息，不保存对话备份或复制历史。复制的附件归新 Agent 会话所有。复制只由用户手动触发。
+
+索引结构或读取规则变化时会自动重建，会话逐步显示；原 Agent 文件和已保存设置保持不变。
+
+App 和 CLI 共用本地数据目录：macOS 为 `~/Library/Application Support/koto`，Windows 为 `%LOCALAPPDATA%\koto`，Linux 为 `$XDG_DATA_HOME/koto`（默认 `~/.local/share/koto`）。可通过 `KOTO_HOME` 或 `--data` 指定其他目录。

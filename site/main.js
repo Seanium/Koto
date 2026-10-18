@@ -12,6 +12,10 @@ cycleAgentLogos([...document.querySelectorAll('.hero-agent img')], reducedMotion
 const dialogue = createDialogue(['cli-request-typed', 'cli-response-typed', 'cli-instruction-typed', 'cli-command-typed'].map(id => document.getElementById(id)), reducedMotion);
 const releaseSelect = document.getElementById('release-asset');
 const releaseLink = document.getElementById('release-download');
+const installPanel = document.getElementById('cli-install');
+const installCommand = document.getElementById('cli-install-command');
+const installCopy = document.getElementById('cli-install-copy');
+const installFeedback = document.getElementById('cli-install-feedback');
 let activeProduct = 'app';
 let detectedSystem = null;
 const productChoices = new Map();
@@ -41,7 +45,27 @@ function renderDownload(text = translations[activeLocale]) {
   releaseLink.textContent = url ? text.download : publication.published ? text.downloadChoose : text.downloadPending;
   if (url) { releaseLink.href = url; releaseLink.removeAttribute('aria-disabled'); }
   else { releaseLink.removeAttribute('href'); releaseLink.setAttribute('aria-disabled', 'true'); }
+  installPanel.hidden = activeProduct !== 'cli' || !releaseSelect.value;
+  installCommand.textContent = releaseSelect.value.startsWith('cli-windows-')
+    ? 'irm https://kotoai.site/install.ps1 | iex'
+    : 'curl -fsSL https://kotoai.site/install.sh | sh';
+  installCopy.title = text.cliInstallCopy;
+  installCopy.setAttribute('aria-label', text.cliInstallCopy);
+  installFeedback.textContent = '';
 }
+installCopy.addEventListener('click', async () => {
+  const command = installCommand.textContent;
+  try {
+    await navigator.clipboard.writeText(command);
+    if (installCommand.textContent === command && !installPanel.hidden) installFeedback.textContent = translations[activeLocale].cliInstallCopied;
+  } catch {
+    installFeedback.textContent = translations[activeLocale].cliInstallSelect;
+    const range = document.createRange();
+    range.selectNodeContents(installCommand);
+    window.getSelection()?.removeAllRanges();
+    window.getSelection()?.addRange(range);
+  }
+});
 releaseSelect.addEventListener('change', () => { releaseManuallySelected = true; productChoices.set(activeProduct, releaseSelect.value); renderDownload(); });
 const screenshots = [...document.querySelectorAll('.screenshot')];
 // Refresh this content revision whenever screenshot assets are replaced.

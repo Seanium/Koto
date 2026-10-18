@@ -7,5 +7,6 @@ export type {
     DeliveryTarget,
     PlanRecord,
     ScanError,
+    ScanProgress,
     ScanReport
 } from "./models.js";

@@ -14,9 +14,12 @@ import (
 	"koto/internal/connectors/antigravity"
 	"koto/internal/connectors/claudecode"
 	"koto/internal/connectors/codex"
+	"koto/internal/connectors/cursor"
 	"koto/internal/connectors/dsh"
 	"koto/internal/connectors/opencode"
 	"koto/internal/connectors/pi"
+	"koto/internal/connectors/workbuddy"
+	"koto/internal/connectors/zcode"
 	"koto/internal/core"
 	"koto/internal/engine"
 	"koto/internal/hub"
@@ -25,7 +28,10 @@ import (
 
 // Config for New. Empty fields take the platform defaults.
 type Config struct {
-	DataDir, ClaudeRoot, PiRoot, CodexHome, CodexShadow, CodexBin, DshHome, AntigravityRoot, OpenCodeRoot string
+	DataDir, ClaudeRoot, PiRoot, CodexHome, CodexShadow, CodexBin, DshHome, AntigravityRoot, OpenCodeRoot, ZCodeRoot string
+	WorkBuddyRoot, WorkBuddyAIRoot, ZCodeBin                                                                         string
+	CursorRoot, CursorBin                                                                                            string
+	CursorAppRoot                                                                                                    string
 	// ClaudeDesktopDirs: nil = every existing profile (unless ClaudeRoot is given); NoDesktop disables.
 	ClaudeDesktopDirs []string
 	NoDesktop         bool
@@ -44,6 +50,8 @@ type ConnectorInfo struct {
 	ID           string            `json:"id"`
 	Harness      string            `json:"harness"`
 	Version      string            `json:"version"`
+	Variant      string            `json:"variant"`
+	Default      bool              `json:"default"`
 	Root         string            `json:"root,omitempty"`
 	Status       string            `json:"status"`
 	Enabled      bool              `json:"enabled"`
@@ -74,6 +82,7 @@ type BindingView struct {
 // ThreadListing is one conversation in the list, from the index alone.
 type ThreadListing struct {
 	ID       string        `json:"id"`
+	Revision string        `json:"revision"`
 	Events   int           `json:"events"`
 	Updated  *float64      `json:"updated"`
 	Turns    int           `json:"turns"`
@@ -83,12 +92,13 @@ type ThreadListing struct {
 var rootEnv = map[string]string{"claude-code": "CLAUDE_CONFIG_DIR", "pi": "PI_CODING_AGENT_DIR", "codex": "CODEX_HOME", "dsh": "DSH_HOME"}
 
 // RootHarnesses accept an extra storage root.
-var RootHarnesses = []string{"claude-code", "pi", "codex", "dsh", "antigravity", "opencode"}
+var RootHarnesses = []string{"claude-code", "pi", "codex", "dsh", "antigravity", "opencode", "zcode", "workbuddy", "workbuddy-ai", "cursor"}
 
 type extraRoot struct {
 	ID      string `json:"id"`
 	Harness string `json:"harness"`
 	Root    string `json:"root"`
+	Variant string `json:"variant,omitempty"`
 }
 
 // App is one koto instance over a data dir.
@@ -149,6 +159,32 @@ func New(cfg Config) (*App, error) {
 	}
 	a := &App{Cfg: cfg, Defaults: d, DataDir: dataDir, Store: st, Registry: engine.NewRegistry(), extras: map[string]bool{}}
 	r := a.Registry
+	registerPrimary := func(c *engine.Connector) {
+		variant := engine.DefaultVariant(c.Harness)
+		id := engine.ProfileID(c.Harness, c.Root, variant)
+		database := ""
+		if native, ok := c.Source.(interface{ DatabasePath() string }); ok && c.Harness == "opencode" {
+			database = native.DatabasePath()
+			if normalizedRoot(database) != normalizedRoot(filepath.Join(c.Root, "opencode.db")) {
+				id = engine.ProfileID(c.Harness, c.Root, variant+"\x00database:"+normalizedRoot(database))
+			}
+		}
+		primary, err := a.makeExtra(extraRoot{ID: id, Harness: c.Harness, Root: c.Root, Variant: variant})
+		if err != nil {
+			return
+		}
+		if c.Harness == "codex" {
+			primary = codex.New(codex.Options{ID: id, Home: c.Root, Shadow: or(cfg.CodexShadow, filepath.Join(dataDir, "codex-shadow")), Bin: cfg.CodexBin})
+		}
+		if database != "" {
+			primary = opencode.New(opencode.Options{ID: id, Root: c.Root, DBPath: database})
+			if id != engine.ProfileID(c.Harness, c.Root, variant) {
+				primary.ProfileLabel = database
+			}
+		}
+		primary.Default, primary.Variant = true, variant
+		_ = r.Register(primary)
+	}
 	desktop := cfg.ClaudeDesktopDirs
 	if cfg.NoDesktop {
 		desktop = nil
@@ -156,27 +192,63 @@ func New(cfg Config) (*App, error) {
 		desktop = existing(d.ClaudeDesktopDirs)
 	}
 	if on(cfg.Enable, "claude-code") {
-		_ = r.Register(claudecode.New(claudecode.Options{Root: or(cfg.ClaudeRoot, d.ClaudeRoot), DesktopDir: desktop}))
+		claudeRoot := or(cfg.ClaudeRoot, d.ClaudeRoot)
+		registerPrimary(claudecode.New(claudecode.Options{Root: claudeRoot}))
+		for _, p := range claudecode.DiscoverDesktopProfiles(desktop, claudeRoot) {
+			c := claudecode.New(claudecode.Options{Root: p.Root, ID: p.ID, DesktopScope: p.Scope, Identity: p.Identity})
+			c.ProfileLabel, c.ProfileKind = p.Label, "desktop-account"
+			_ = r.Register(c)
+		}
 		// Each Claude Desktop Cowork session is its own storage root.
 		for _, c := range claudecode.DiscoverCoworkRoots(desktop) {
-			_ = r.Register(claudecode.New(claudecode.Options{Root: c.Root, ID: c.ID}))
+			connector := claudecode.New(claudecode.Options{Root: c.Root, ID: c.ID, Identity: c.Identity})
+			connector.ProfileLabel, connector.ProfileKind = c.Label, "cowork"
+			_ = r.Register(connector)
 		}
 	}
 	if on(cfg.Enable, "pi") {
-		_ = r.Register(pi.New(pi.Options{Root: or(cfg.PiRoot, d.PiRoot)}))
+		registerPrimary(pi.New(pi.Options{Root: or(cfg.PiRoot, d.PiRoot)}))
 	}
 	if on(cfg.Enable, "codex") {
-		_ = r.Register(codex.New(codex.Options{Home: or(cfg.CodexHome, d.CodexHome), Shadow: or(cfg.CodexShadow, filepath.Join(dataDir, "codex-shadow")), Bin: cfg.CodexBin}))
+		registerPrimary(codex.New(codex.Options{Home: or(cfg.CodexHome, d.CodexHome), Shadow: or(cfg.CodexShadow, filepath.Join(dataDir, "codex-shadow")), Bin: cfg.CodexBin}))
 	}
 	if on(cfg.Enable, "dsh") {
-		_ = r.Register(dsh.New(dsh.Options{Home: or(cfg.DshHome, d.DshHome)}))
+		registerPrimary(dsh.New(dsh.Options{Home: or(cfg.DshHome, d.DshHome)}))
 	}
 	if on(cfg.Enable, "antigravity") {
-		_ = r.Register(antigravity.New(antigravity.Options{Root: or(cfg.AntigravityRoot, d.AntigravityRoot)}))
+		registerPrimary(antigravity.New(antigravity.Options{Root: or(cfg.AntigravityRoot, d.AntigravityRoot)}))
 	}
 	if on(cfg.Enable, "opencode") {
-		_ = r.Register(opencode.New(opencode.Options{Root: cfg.OpenCodeRoot}))
+		registerPrimary(opencode.New(opencode.Options{Root: cfg.OpenCodeRoot}))
 	}
+	if on(cfg.Enable, "zcode") {
+		registerPrimary(zcode.New(zcode.Options{Root: cfg.ZCodeRoot, Command: optionalCommand(cfg.ZCodeBin)}))
+	}
+	if on(cfg.Enable, "workbuddy") {
+		registerPrimary(workbuddy.New(workbuddy.Options{Root: cfg.WorkBuddyRoot}))
+	}
+	if on(cfg.Enable, "workbuddy-ai") {
+		registerPrimary(workbuddy.New(workbuddy.Options{Root: cfg.WorkBuddyAIRoot, Edition: "international"}))
+	}
+	if on(cfg.Enable, "cursor") {
+		registerPrimary(cursor.NewCLI(cursor.CLIOptions{Root: cfg.CursorRoot, ID: "cursor", Command: optionalCommand(cfg.CursorBin)}))
+	}
+	if on(cfg.Enable, "cursor") && !cfg.NoDesktop {
+		if cfg.CursorAppRoot != "" {
+			variant := "ide"
+			c := cursor.New(cursor.Options{Root: cfg.CursorAppRoot, ID: engine.ProfileID("cursor", cfg.CursorAppRoot, variant)})
+			c.Variant, c.ProfileKind = variant, "app"
+			_ = r.Register(c)
+		} else if cfg.CursorRoot == "" {
+			for _, found := range cursor.DefaultAppProfiles() {
+				variant := "ide"
+				c := cursor.New(cursor.Options{Root: found.Root, ID: engine.ProfileID("cursor", found.Root, variant)})
+				c.Variant, c.ProfileKind = variant, "app"
+				_ = r.Register(c)
+			}
+		}
+	}
+	a.registerDefaultProfiles()
 	for _, c := range cfg.Extra {
 		_ = r.Register(c)
 	}
@@ -204,7 +276,7 @@ func New(cfg Config) (*App, error) {
 	a.Trash = &store.Trash{Store: st, Registry: r, Dir: filepath.Join(dataDir, "trash"), Rename: cfg.TrashRename}
 	a.Hub = hub.New()
 	a.Engine = engine.New(a.Hub, r)
-	a.Engine.Log, a.Engine.Locks = cfg.Log, store.EngineLocks{S: st}
+	a.Engine.Log, a.Engine.Locks = cfg.Log, store.NewEngineLocks(st)
 	a.Sessions.Jobs = a.Engine.Jobs
 	if cfg.LiveMs != nil {
 		a.Engine.LiveMs = *cfg.LiveMs
@@ -216,7 +288,7 @@ func New(cfg Config) (*App, error) {
 func (a *App) notTrashed(ref core.NativeRef) bool {
 	for _, e := range a.Store.Trash(false) {
 		for _, i := range e.Items {
-			if i.Harness == ref.Harness && i.Session == ref.Session {
+			if i.Harness == ref.Harness && i.Session == ref.Session && (i.Connector == ref.Connector || i.Connector == "" && ref.Connector == ref.Harness) {
 				return false
 			}
 		}
@@ -227,6 +299,15 @@ func (a *App) notTrashed(ref core.NativeRef) bool {
 var unsafeID = regexp.MustCompile(`[^\w.-]`)
 
 func (a *App) makeExtra(x extraRoot) (*engine.Connector, error) {
+	if x.Variant != "" && x.Variant != engine.DefaultVariant(x.Harness) {
+		if x.Harness != "cursor" || x.Variant != "ide" {
+			return nil, fmt.Errorf("unsupported %s variant %s", x.Harness, x.Variant)
+		}
+		c := cursor.New(cursor.Options{Root: x.Root, ID: x.ID})
+		c.Variant, c.ProfileKind = x.Variant, "app"
+		return c, nil
+	}
+
 	switch x.Harness {
 	case "claude-code":
 		return claudecode.New(claudecode.Options{Root: x.Root, ID: x.ID}), nil
@@ -241,8 +322,23 @@ func (a *App) makeExtra(x extraRoot) (*engine.Connector, error) {
 		return antigravity.New(antigravity.Options{Root: x.Root, ID: x.ID}), nil
 	case "opencode":
 		return opencode.New(opencode.Options{Root: x.Root, ID: x.ID}), nil
+	case "zcode":
+		return zcode.New(zcode.Options{Root: x.Root, ID: x.ID, Command: optionalCommand(a.Cfg.ZCodeBin)}), nil
+	case "workbuddy":
+		return workbuddy.New(workbuddy.Options{Root: x.Root, ID: x.ID}), nil
+	case "workbuddy-ai":
+		return workbuddy.New(workbuddy.Options{Root: x.Root, ID: x.ID, Edition: "international"}), nil
+	case "cursor":
+		return cursor.NewCLI(cursor.CLIOptions{Root: x.Root, ID: x.ID, Command: optionalCommand(a.Cfg.CursorBin)}), nil
 	}
 	return nil, fmt.Errorf("%s does not take extra roots; supported: %s", x.Harness, strings.Join(RootHarnesses, ", "))
+}
+
+func optionalCommand(bin string) []string {
+	if bin == "" {
+		return nil
+	}
+	return []string{bin}
 }
 
 // OpenThread opens one native conversation's in-memory view.
@@ -252,7 +348,7 @@ func (a *App) OpenThread(ctx context.Context, selector string) (*store.OpenThrea
 
 func (a *App) info(s engine.ConnectorState) ConnectorInfo {
 	c := s.Connector
-	return ConnectorInfo{ID: c.ID, Harness: c.Harness, Version: c.Version, Root: c.Root, Status: s.Status, Enabled: s.Status != "disabled", Error: s.Error,
+	return ConnectorInfo{ID: c.ID, Harness: c.Harness, Version: c.Version, Variant: engine.ProfileVariant(c), Default: c.Default, Root: c.Root, Status: s.Status, Enabled: s.Status != "disabled", Error: s.Error,
 		Source: c.Source != nil, Sink: c.Sink != nil, Removable: a.extras[c.ID], Capabilities: c.Capabilities}
 }
 
@@ -266,6 +362,9 @@ func (a *App) Connectors() []ConnectorInfo {
 }
 
 func (a *App) connectorInfo(id string) (ConnectorInfo, error) {
+	if c := a.Registry.Get(id); c != nil {
+		id = c.ID
+	}
 	for _, s := range a.Registry.List() {
 		if s.Connector.ID == id {
 			return a.info(s), nil
@@ -276,6 +375,9 @@ func (a *App) connectorInfo(id string) (ConnectorInfo, error) {
 
 // SetConnectorEnabled enables or disables a connector, kept in the settings.
 func (a *App) SetConnectorEnabled(id string, enabled bool) (ConnectorInfo, error) {
+	if c := a.Registry.Get(id); c != nil {
+		id = c.ID
+	}
 	if err := a.Registry.SetEnabled(id, enabled); err != nil {
 		return ConnectorInfo{}, err
 	}
@@ -301,6 +403,35 @@ func (a *App) SetConnectorEnabled(id string, enabled bool) (ConnectorInfo, error
 
 // WithResume adds how to open a binding in its harness.
 func (a *App) WithResume(b hub.Binding) BindingView {
+	return a.withResume(b, true)
+}
+
+func (a *App) withResume(b hub.Binding, refreshProject bool) BindingView {
+	// Mutable native project metadata can change while the message view stays
+	// cached. Return a fresh presentation map without modifying that shared Hub.
+	meta := core.JsonObject{}
+	for k, v := range b.Meta {
+		meta[k] = v
+	}
+	if historical, ok := meta["historicalCwd"].(string); ok {
+		meta["cwd"] = historical
+	}
+	if refreshProject && a.Store != nil {
+		if row, ok := a.Store.Session(b.Harness, b.Session, b.Connector); ok {
+			if historical, ok := row.Meta["cwd"].(string); ok {
+				meta["cwd"] = historical
+			}
+			for _, k := range []string{"currentCwd", "currentProject"} {
+				if v, exists := row.Meta[k]; exists {
+					meta[k] = v
+				}
+			}
+		}
+	}
+	if current := core.CurrentDirectory(meta); current != "" {
+		meta["historicalCwd"], meta["cwd"] = meta["cwd"], current
+	}
+	b.Meta = meta
 	c := a.Registry.Get(b.Connector)
 	if c == nil {
 		if cs := a.Registry.ByHarness(b.Harness); len(cs) > 0 {
@@ -316,7 +447,7 @@ func (a *App) WithResume(b hub.Binding) BindingView {
 	if s, ok := b.Meta["cwd"].(string); ok && s != "" {
 		cwd = &s
 	}
-	envs := map[string]string{}
+	envs := engine.ResumeEnvironment(c, b.Harness, b.Session)
 	defaults := map[string]string{"claude-code": a.Defaults.ClaudeRoot, "pi": a.Defaults.PiRoot, "codex": a.Defaults.CodexHome, "dsh": a.Defaults.DshHome}
 	if v, ok := rootEnv[b.Harness]; ok && c != nil && c.Root != "" {
 		r1, _ := filepath.Abs(c.Root)
@@ -330,6 +461,12 @@ func (a *App) WithResume(b hub.Binding) BindingView {
 	if b.Harness == "opencode" && c != nil {
 		if db, ok := c.Source.(interface{ DatabasePath() string }); ok {
 			envs["OPENCODE_DB"] = db.DatabasePath()
+		}
+	}
+	if b.Harness == "zcode" && c != nil {
+		envs["ZCODE_STORAGE_DIR"] = c.Root
+		if db, ok := c.Source.(interface{ DatabasePath() string }); ok {
+			envs["ZCODE_SESSION_DB_PATH"] = db.DatabasePath()
 		}
 	}
 	dir := ""
@@ -367,24 +504,35 @@ func (a *App) ListThreads() []ThreadListing {
 // SearchThreads searches only indexed metadata, before applying the recent-list limit.
 // No native conversation or attachment is opened for a keystroke.
 func (a *App) SearchThreads(query, scope, project string, limit int) []ThreadListing {
+	return a.SearchThreadsFiltered(query, scope, project, "", "", limit)
+}
+
+func (a *App) SearchThreadsFiltered(query, scope, project, profile, account string, limit int) []ThreadListing {
+	variant := ""
+	if i := strings.Index(scope, "/"); i >= 0 {
+		scope, variant = scope[:i], scope[i+1:]
+	}
 	query = strings.ToLower(strings.TrimSpace(query))
 	if strings.HasPrefix(query, "~/") {
 		if home, err := os.UserHomeDir(); err == nil {
 			query = strings.ToLower(filepath.Join(home, query[2:]))
 		}
 	}
-	names := map[string]string{"claude-code": "Claude Code", "pi": "Pi", "codex": "Codex", "dsh": "DeepSeek Harness", "antigravity": "Antigravity CLI", "opencode": "OpenCode"}
+	names := map[string]string{"claude-code": "Claude Code", "pi": "Pi", "codex": "Codex", "dsh": "DeepSeek Harness", "antigravity": "Antigravity CLI", "opencode": "OpenCode", "zcode": "ZCode", "workbuddy": "WorkBuddy", "workbuddy-ai": "WorkBuddy AI", "cursor": "Cursor CLI"}
 	trashed := map[string]bool{}
 	for _, e := range a.Store.Trash(false) {
 		for _, i := range e.Items {
-			trashed[i.Harness+":"+i.Session] = true
+			trashed[core.SessionSelector(i.Connector, i.Harness, i.Session)] = true
 		}
 	}
 
 	out := []ThreadListing{}
-	for _, m := range a.Store.Sessions() {
-		id := m.Harness + ":" + m.Session
-		if trashed[id] || m.Turns == 0 || core.S(m.Meta["supersededBy"]) != "" {
+	for _, m := range a.Sessions.Rows() {
+		id := core.SessionSelector(m.Connector, m.Harness, m.Session)
+		if trashed[id] || m.Turns == 0 && m.Offset != nil || core.S(m.Meta["supersededBy"]) != "" {
+			continue
+		}
+		if variant != "" && core.S(core.Obj(m.Meta["sourceProfile"])["variant"]) != variant {
 			continue
 		}
 		desktop := m.Harness == "claude-code" && core.S(m.Meta["frontend"]) == "claude-desktop"
@@ -394,8 +542,27 @@ func (a *App) SearchThreads(query, scope, project string, limit int) []ThreadLis
 		if project == "__no_project__" && m.Cwd != "" || project != "" && project != "__no_project__" && m.Cwd != project {
 			continue
 		}
+		if profile != "" && profile != m.Connector {
+			continue
+		}
+		if account != "" {
+			identity := core.ReadIdentity(m.Meta)
+			match := false
+			if account == "__unknown__" {
+				match = identity.Status == "unknown"
+			} else {
+				for _, claim := range identity.Claims {
+					if claim.Kind == "account" && claim.ID == account {
+						match = true
+					}
+				}
+			}
+			if !match {
+				continue
+			}
+		}
 		if query != "" {
-			text := id + "\n" + m.Title + "\n" + m.FirstPrompt + "\n" + m.Cwd + "\n" + names[m.Harness]
+			text := id + "\n" + m.Harness + ":" + m.Session + "\n" + m.Title + "\n" + m.FirstPrompt + "\n" + m.Cwd + "\n" + names[m.Harness]
 			if desktop {
 				text += "\nClaude Desktop"
 			}
@@ -411,10 +578,19 @@ func (a *App) SearchThreads(query, scope, project string, limit int) []ThreadLis
 		if title == "" {
 			title = m.FirstPrompt
 		}
-		meta["title"], meta["cwd"] = title, m.Cwd
-		b := a.WithResume(hub.Binding{Harness: m.Harness, Session: m.Session, Connector: m.Connector, Thread: id, Path: m.Path, Meta: meta})
+		if title == "" && m.Offset == nil {
+			title = m.Session
+		}
+		meta["title"] = title
+		if core.S(meta["cwd"]) == "" {
+			meta["cwd"] = m.Cwd
+		}
+		// This row is already the current index snapshot. Do not add one SQL
+		// lookup per list item to refresh metadata we have just read.
+		b := a.withResume(hub.Binding{Harness: m.Harness, Session: m.Session, Connector: m.Connector, Thread: id, Path: m.Path, Meta: meta}, false)
 		updated := m.Updated
-		out = append(out, ThreadListing{ID: id, Events: m.Turns, Turns: m.Turns, Updated: &updated, Bindings: []BindingView{b}})
+		revision := store.RowRevision(m)
+		out = append(out, ThreadListing{ID: id, Revision: revision, Events: m.Turns, Turns: m.Turns, Updated: &updated, Bindings: []BindingView{b}})
 	}
 	sort.SliceStable(out, func(i, j int) bool {
 		if *out[i].Updated != *out[j].Updated {
@@ -429,7 +605,14 @@ func (a *App) SearchThreads(query, scope, project string, limit int) []ThreadLis
 }
 
 // AddRoot registers an extra storage root for a harness (a second CLAUDE_CONFIG_DIR, …), kept in the settings.
-func (a *App) AddRoot(harness, root string) (ConnectorInfo, error) {
+func (a *App) AddRoot(harness, root string, variants ...string) (ConnectorInfo, error) {
+	variant := engine.DefaultVariant(harness)
+	if len(variants) > 0 && variants[0] != "" {
+		variant = variants[0]
+	}
+	if variant != engine.DefaultVariant(harness) && (harness != "cursor" || variant != "ide") {
+		return ConnectorInfo{}, fmt.Errorf("unsupported %s variant %s", harness, variant)
+	}
 	ok := false
 	for _, h := range RootHarnesses {
 		if h == harness {
@@ -458,18 +641,22 @@ func (a *App) AddRoot(harness, root string) (ConnectorInfo, error) {
 		return x == y || strings.HasPrefix(x, strings.TrimSuffix(y, string(filepath.Separator))+string(filepath.Separator))
 	}
 	for _, c := range a.Registry.ByHarness(harness) {
-		if c.Root == "" {
+		if c.Root == "" || engine.ProfileVariant(c) != variant {
 			continue
 		}
-		cr := real(c.Root)
-		if inside(abs, cr) || inside(cr, abs) {
-			if cr == abs {
+		cr := normalizedRoot(c.Root)
+		rootKey := normalizedRoot(abs)
+		if inside(rootKey, cr) || inside(cr, rootKey) {
+			if cr == rootKey {
+				if native, ok := c.Source.(interface{ DatabasePath() string }); ok && harness == "opencode" && normalizedRoot(native.DatabasePath()) != normalizedRoot(filepath.Join(abs, "opencode.db")) {
+					continue // The environment-selected database is a separate namespace.
+				}
 				return ConnectorInfo{}, fmt.Errorf("%s is already registered as %s", abs, c.ID)
 			}
 			return ConnectorInfo{}, fmt.Errorf("%s overlaps the root of %s", abs, c.ID)
 		}
 	}
-	x := extraRoot{ID: harness + "@" + core.SHA256Hex(abs)[:8], Harness: harness, Root: abs}
+	x := extraRoot{ID: engine.ProfileID(harness, abs, variant), Harness: harness, Root: abs, Variant: variant}
 	c, err := a.makeExtra(x)
 	if err != nil {
 		return ConnectorInfo{}, err
@@ -536,9 +723,9 @@ func (a *App) RemoveRoot(ctx context.Context, id string) error {
 
 // Close lets go of everything.
 func (a *App) Close() {
+	a.Sessions.Shutdown()
 	a.Registry.Dispose()
 	a.Engine.Jobs.Clear()
-	a.Sessions.Close()
 	a.Hub.Close()
 	a.Store.Close()
 }

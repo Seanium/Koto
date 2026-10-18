@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strings"
 	"sync"
-	"unicode/utf16"
 
 	"koto/internal/core"
 	"koto/internal/engine"
@@ -74,17 +73,54 @@ type API struct {
 	App  *App
 	Emit func(Event)
 
-	scanMu   sync.Mutex
-	scanning bool
+	scanMu    sync.Mutex
+	scanning  bool
+	stateMu   sync.Mutex
+	scanState ScanStatus
+	wakeOnce  sync.Once
+	wake      chan struct{}
+}
+
+type ScanStatus struct {
+	Scanning bool                 `json:"scanning"`
+	Progress *engine.ScanProgress `json:"progress,omitempty"`
+	Report   *engine.ScanReport   `json:"report,omitempty"`
+}
+
+func (a *API) ScanStatus() ScanStatus {
+	a.stateMu.Lock()
+	defer a.stateMu.Unlock()
+	return a.scanState
+}
+
+func (a *API) scanWake() chan struct{} {
+	a.wakeOnce.Do(func() { a.wake = make(chan struct{}, 1) })
+	return a.wake
+}
+
+func (a *API) requestScan() {
+	select {
+	case a.scanWake() <- struct{}{}:
+	default:
+	}
 }
 
 // Reindex re-reads the index (stat-only for unchanged files), one pass at a time.
 func (a *API) Reindex(ctx context.Context) engine.ScanReport {
 	a.scanMu.Lock()
 	defer a.scanMu.Unlock()
-	r := a.App.Sessions.Scan(ctx, nil, func(p engine.ScanProgress) {
+	a.stateMu.Lock()
+	a.scanState = ScanStatus{Scanning: true}
+	a.stateMu.Unlock()
+	r := a.App.ScanIndex(ctx, func(p engine.ScanProgress) {
+		a.stateMu.Lock()
+		a.scanState = ScanStatus{Scanning: true, Progress: &p}
+		a.stateMu.Unlock()
 		a.emit(Event{"type": "progress", "connector": p.Connector, "harness": p.Harness, "done": p.Done, "total": p.Total, "added": p.Added})
 	})
+	a.stateMu.Lock()
+	a.scanState = ScanStatus{Report: &r}
+	a.stateMu.Unlock()
 	a.emit(Event{"type": "cycle", "report": r})
 	return r
 }
@@ -138,14 +174,35 @@ func headIn(v *store.OpenThread, sel string) (string, error) {
 	return "", apiErr(404, "nothing matches "+sel)
 }
 
-func jsLen(s string) int { return len(utf16.Encode([]rune(s))) }
+func jsLen(s string) int {
+	n := 0
+	for _, r := range s {
+		n++
+		if r > 0xffff {
+			n++
+		}
+	}
+	return n
+}
 
 func jsSlice(s string, n int) string {
-	u := utf16.Encode([]rune(s))
-	if len(u) <= n {
-		return s
+	var b strings.Builder
+	units := 0
+	for _, r := range s {
+		width := 1
+		if r > 0xffff {
+			width = 2
+		}
+		if units+width > n {
+			if units < n {
+				b.WriteRune('\ufffd')
+			}
+			return b.String()
+		}
+		b.WriteRune(r)
+		units += width
 	}
-	return string(utf16.Decode(u[:n]))
+	return s
 }
 
 // brief cuts tool output and reasoning to what a timeline can show (the working copy keeps everything).
@@ -210,12 +267,12 @@ func (a *API) Health() map[string]any { return map[string]any{"ok": true} }
 func (a *API) Connectors() []ConnectorInfo { return a.App.Connectors() }
 
 // AddRoot registers an extra storage root and re-reads the index.
-func (a *API) AddRoot(harness, root string) (ConnectorInfo, error) {
-	r, err := a.App.AddRoot(harness, root)
+func (a *API) AddRoot(harness, root string, variant ...string) (ConnectorInfo, error) {
+	r, err := a.App.AddRoot(harness, root, variant...)
 	if err != nil {
 		return r, apiErr(400, err.Error())
 	}
-	go a.Reindex(context.Background())
+	a.requestScan()
 	return r, nil
 }
 
@@ -274,9 +331,9 @@ func (a *API) Thread(ctx context.Context, sel string, turns int, before string) 
 			return
 		}
 		bs := a.App.Bindings(v.Hub, v.Thread)
-		if harness, session, native := strings.Cut(sel, ":"); native && harness != "th" && harness != "ev" {
+		if _, _, _, native := core.ParseSessionSelector(sel); native {
 			for _, b := range bs {
-				if b.Harness == harness && b.Session == session {
+				if core.MatchesSessionSelector(sel, b.Connector, b.Harness, b.Session) {
 					bs = []BindingView{b}
 					break
 				}
@@ -334,6 +391,8 @@ type CarryRequest struct {
 	Selector        string   `json:"selector,omitempty"`
 	From            string   `json:"from,omitempty"`
 	To              string   `json:"to"`
+	TargetProfile   string   `json:"targetProfile,omitempty"`
+	TargetAccount   string   `json:"targetAccount,omitempty"`
 	Level           string   `json:"level,omitempty"`
 	DryRun          bool     `json:"dryRun,omitempty"`
 	MaxTokens       int      `json:"maxTokens,omitempty"`
@@ -372,19 +431,25 @@ func (a *API) Carry(ctx context.Context, req CarryRequest) (*engine.CarryResult,
 	if len([]rune(req.Title)) > 200 {
 		req.Title = string([]rune(req.Title)[:200])
 	}
-	r, err := v.Engine.Carry(ctx, engine.CarryOptions{Thread: v.Thread, Head: head, To: req.To, Level: req.Level, DryRun: req.DryRun, RequestID: req.RequestID, EventIDs: req.EventIDs, ExcludeEventIDs: req.ExcludeEventIDs, MaxTokens: req.MaxTokens, Cwd: req.Cwd, Title: req.Title})
+	r, err := v.Engine.Carry(ctx, engine.CarryOptions{Thread: v.Thread, Head: head, To: req.To, TargetProfile: req.TargetProfile, TargetAccount: req.TargetAccount, Level: req.Level, DryRun: req.DryRun, RequestID: req.RequestID, EventIDs: req.EventIDs, ExcludeEventIDs: req.ExcludeEventIDs, MaxTokens: req.MaxTokens, Cwd: req.Cwd, Title: req.Title})
 	if err != nil {
 		return nil, AsAPIError(err)
 	}
 	if r.Applied {
-		a.Reindex(ctx)
 		session := r.Plan.Target.Session
 		if actual := core.S(r.Receipt["session"]); actual != "" {
 			session = actual
 		}
+		if err := a.App.Sessions.RefreshSession(ctx, r.Plan.Sink, session, func(fn func() error) error { return a.App.Engine.Locked(ctx, fn) }); err != nil {
+			r.Plan.Notes = append(r.Plan.Notes, "Copied session is saved; list refresh will retry: "+err.Error())
+			a.requestScan()
+		} else {
+			a.emit(Event{"type": "cycle", "report": engine.ScanReport{Sessions: 1, Changed: 1, Errors: []engine.ScanError{}}})
+		}
+
 		for _, item := range a.App.ListThreads() {
 			for _, b := range item.Bindings {
-				if b.Harness == r.Plan.Harness && b.Session == session && b.Resume != nil {
+				if b.Connector == r.Plan.Sink && b.Harness == r.Plan.Harness && b.Session == session && b.Resume != nil {
 					r.Resume = b.Resume.Shell
 				}
 			}

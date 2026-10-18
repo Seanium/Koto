@@ -114,7 +114,7 @@ func TestUnmodeledArgumentIsTextualized(t *testing.T) {
 	for _, m := range msgs {
 		roles = append(roles, core.S(m["role"]))
 	}
-	jsonEq(t, roles, []string{"user", "assistant", "toolResult", "toolResult", "user", "user", "assistant"})
+	jsonEq(t, roles, []string{"user", "assistant", "toolResult", "toolResult", "assistant"})
 	var names, texts []string
 	for _, c := range core.Arr(msgs[1]["content"]) {
 		cm := core.Obj(c)
@@ -130,7 +130,7 @@ func TestUnmodeledArgumentIsTextualized(t *testing.T) {
 	ok(t, strings.Contains(text, "run_in_background"))
 	ok(t, strings.Contains(text, `"-i":true`))
 	var later []string
-	for _, m := range msgs[4:6] {
+	for _, m := range msgs[4:] {
 		var s []string
 		for _, c := range core.Arr(m["content"]) {
 			s = append(s, core.S(core.Obj(c)["text"]))

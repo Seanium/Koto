@@ -56,8 +56,8 @@ type IDRow struct {
 	Origin string       // observed | alias
 }
 
-type nativeKey struct{ harness, session, native string }
-type sessKey struct{ harness, session string }
+type nativeKey struct{ harness, session, native, connector string }
+type sessKey struct{ harness, session, connector string }
 
 type node struct {
 	id       core.EventID
@@ -188,15 +188,17 @@ var ordinalRe = regexp.MustCompile(`^o(\d+)$`)
 // Ingest adds what one read of a native session yields.
 func (h *Hub) Ingest(batch core.SourceBatch, conn ConnectorInfo) IngestResult {
 	ref := batch.Ref
+	ref.Connector = conn.ID
+	batch.Ref.Connector = conn.ID
 	harness := ref.Harness
-	binding := h.bindings[sessKey{harness, ref.Session}]
+	binding := h.bindings[sessKey{harness, ref.Session, conn.ID}]
 	lineage := batch.Lineage
 	// A new Claude Code session whose first message reuses another session's uuid is a copy of it
 	// (/branch before forkedFrom existed, a hand copy): CC uuids are random v4, so they never collide.
 	if binding == nil && lineage == nil && harness == "claude-code" && len(batch.Records) > 0 && batch.Records[0].Index == 0 && len(batch.Drafts) > 0 {
 		for _, k := range h.byNative[[2]string{harness, batch.Drafts[0].NativeID}] {
 			r := h.idmap[k]
-			if k.session != ref.Session && r.Event != "" && r.Origin != "alias" {
+			if k.connector == conn.ID && k.session != ref.Session && r.Event != "" && r.Origin != "alias" {
 				lineage = &core.Lineage{Kind: "fork", Harness: harness, Session: k.session, Copied: true}
 				break
 			}
@@ -204,9 +206,9 @@ func (h *Hub) Ingest(batch core.SourceBatch, conn ConnectorInfo) IngestResult {
 	}
 	lineageBase := ""
 	if lineage != nil {
-		pb := h.bindings[sessKey{lineage.Harness, lineage.Session}]
+		pb := h.bindings[sessKey{lineage.Harness, lineage.Session, conn.ID}]
 		if lineage.AfterNative != "" {
-			if r := h.idmap[nativeKey{lineage.Harness, lineage.Session, lineage.AfterNative}]; r != nil {
+			if r := h.idmap[nativeKey{lineage.Harness, lineage.Session, lineage.AfterNative, conn.ID}]; r != nil {
 				lineageBase = r.Event
 			}
 			// An ordinal on a record that made no event (a Codex task_complete): the last event at or before it.
@@ -214,7 +216,7 @@ func (h *Hub) Ingest(batch core.SourceBatch, conn ConnectorInfo) IngestResult {
 				want, _ := strconv.Atoi(m[1])
 				best := -1
 				for k, r := range h.idmap {
-					if k.harness != lineage.Harness || k.session != lineage.Session || r.Event == "" {
+					if k.connector != conn.ID || k.harness != lineage.Harness || k.session != lineage.Session || r.Event == "" {
 						continue
 					}
 					if mm := ordinalRe.FindStringSubmatch(k.native); mm != nil {
@@ -233,7 +235,7 @@ func (h *Hub) Ingest(batch core.SourceBatch, conn ConnectorInfo) IngestResult {
 		}
 	}
 	if binding == nil {
-		binding = h.createBinding(harness, ref.Session, conn.ID, core.ThreadIDFor(harness, ref.Session), ref.Path)
+		binding = h.createBinding(harness, ref.Session, conn.ID, core.ThreadIDFor(conn.ID, ref.Session), ref.Path)
 	}
 	thread := binding.Thread
 	res := IngestResult{Thread: thread, Leaf: binding.Leaf}
@@ -257,10 +259,10 @@ func (h *Hub) Ingest(batch core.SourceBatch, conn ConnectorInfo) IngestResult {
 		blobBytes[core.SHA256Hex(b)] = b
 	}
 	edited := false
-	holder := harness + "/" + ref.Session
+	holder := conn.ID + "/" + ref.Session
 	for _, rec := range h.causalRecords(batch, drafts, blobBytes) {
 		d := drafts[rec.NativeID]
-		key := nativeKey{harness, ref.Session, rec.NativeID}
+		key := nativeKey{harness, ref.Session, rec.NativeID, conn.ID}
 		existing := h.idmap[key]
 		if d == nil {
 			// A record without an event but with a native id: an alias, so children pointing at it
@@ -268,7 +270,7 @@ func (h *Hub) Ingest(batch core.SourceBatch, conn ConnectorInfo) IngestResult {
 			if rec.NativeID != "" && !strings.HasPrefix(rec.NativeID, "#") && existing == nil {
 				target := prev
 				if rec.Alias != nil {
-					ps := h.resolveParent(rec.Alias, prev, harness, ref.Session)
+					ps := h.resolveParent(rec.Alias, prev, harness, ref.Session, conn.ID)
 					target = ""
 					if len(ps) > 0 {
 						target = ps[0]
@@ -287,10 +289,10 @@ func (h *Hub) Ingest(batch core.SourceBatch, conn ConnectorInfo) IngestResult {
 				continue
 			}
 		}
-		parents := h.resolveParent(d.Parent, prev, harness, ref.Session)
+		parents := h.resolveParent(d.Parent, prev, harness, ref.Session, conn.ID)
 		var replaces *core.Replaces
 		if d.Replaces != nil {
-			replaces = h.resolveReplaces(d.Replaces, harness, ref.Session)
+			replaces = h.resolveReplaces(d.Replaces, harness, ref.Session, conn.ID)
 		}
 		supersedes := ""
 		if existing != nil && existing.Event != "" && existing.Origin != "alias" {
@@ -334,10 +336,23 @@ func (h *Hub) Ingest(batch core.SourceBatch, conn ConnectorInfo) IngestResult {
 		meta[k] = v
 	}
 	for k, v := range batch.Meta {
+		if k == "identity" {
+			meta[k] = core.IdentityMeta(core.MergeIdentity(core.ReadIdentity(meta), core.ReadIdentity(batch.Meta)))
+			continue
+		}
 		meta[k] = v
 	}
 	for k, v := range ref.Meta {
+		if k == "identity" {
+			meta[k] = core.IdentityMeta(core.MergeIdentity(core.ReadIdentity(meta), core.ReadIdentity(ref.Meta)))
+			continue
+		}
 		meta[k] = v
+	}
+	for i := range batch.Drafts {
+		if identity := core.IdentityOfDraft(&batch.Drafts[i]); len(identity.Providers) > 0 {
+			meta["identity"] = core.IdentityMeta(core.MergeIdentity(core.ReadIdentity(meta), identity))
+		}
 	}
 	binding.Leaf = prev
 	if ref.Path != "" {
@@ -362,8 +377,8 @@ func hasText(d *core.DraftEvent) bool {
 	return false
 }
 
-func (h *Hub) resolveReplaces(r *core.DraftReplaces, harness, session string) *core.Replaces {
-	to := h.resolveRef(r.To, harness, session)
+func (h *Hub) resolveReplaces(r *core.DraftReplaces, harness, session, connector string) *core.Replaces {
+	to := h.resolveRef(r.To, harness, session, connector)
 	if to != "" && r.ToExclusive {
 		to = h.parentOf(to)
 	}
@@ -372,7 +387,7 @@ func (h *Hub) resolveReplaces(r *core.DraftReplaces, harness, session string) *c
 	}
 	from := ""
 	if r.From != nil {
-		from = h.resolveRef(r.From, harness, session)
+		from = h.resolveRef(r.From, harness, session, connector)
 	}
 	if from == "" {
 		from = h.RootOf(to)
@@ -410,7 +425,7 @@ func (h *Hub) parentOf(id core.EventID) core.EventID {
 // ParentOf is the first parent of id ("" for a root or an unknown node).
 func (h *Hub) ParentOf(id core.EventID) core.EventID { return h.parentOf(id) }
 
-func (h *Hub) resolveRef(r *core.ParentRef, harness, session string) core.EventID {
+func (h *Hub) resolveRef(r *core.ParentRef, harness, session, connector string) core.EventID {
 	if r == nil || r.Null {
 		return ""
 	}
@@ -424,13 +439,13 @@ func (h *Hub) resolveRef(r *core.ParentRef, harness, session string) core.EventI
 	if r.Session != "" {
 		ss = r.Session
 	}
-	if row := h.idmap[nativeKey{hs, ss, r.Native}]; row != nil {
+	if row := h.idmap[nativeKey{hs, ss, r.Native, connector}]; row != nil {
 		return row.Event
 	}
 	return ""
 }
 
-func (h *Hub) resolveParent(p *core.ParentRef, prev core.EventID, harness, session string) []core.EventID {
+func (h *Hub) resolveParent(p *core.ParentRef, prev core.EventID, harness, session, connector string) []core.EventID {
 	if p == nil {
 		if prev != "" {
 			return []core.EventID{prev}
@@ -440,7 +455,7 @@ func (h *Hub) resolveParent(p *core.ParentRef, prev core.EventID, harness, sessi
 	if p.Null {
 		return []core.EventID{}
 	}
-	if id := h.resolveRef(p, harness, session); id != "" {
+	if id := h.resolveRef(p, harness, session, connector); id != "" {
 		return []core.EventID{id}
 	}
 	// Dangling native parent (record not seen / skipped without alias): fall back to stream order.
@@ -503,20 +518,32 @@ func (h *Hub) insert(id core.EventID, thread core.ThreadID, kind, actor string, 
 func (h *Hub) createBinding(harness, session, connector string, thread core.ThreadID, path string) *Binding {
 	h.threads[thread] = true
 	b := &Binding{Harness: harness, Session: session, Connector: connector, Thread: thread, Path: path, Meta: core.JsonObject{}, updated: h.stamp()}
-	h.bindings[sessKey{harness, session}] = b
+	h.bindings[sessKey{harness, session, connector}] = b
 	return b
 }
 
 // ------------------------------------------------------------------ reads
 
 // LookupNative is the id_map row of a native record.
-func (h *Hub) LookupNative(harness, session, nativeID string) *IDRow {
-	return h.idmap[nativeKey{harness, session, nativeID}]
+func (h *Hub) LookupNative(harness, session, nativeID string, connector ...string) *IDRow {
+	if len(connector) > 0 {
+		return h.idmap[nativeKey{harness, session, nativeID, connector[0]}]
+	}
+	var found *IDRow
+	for key, row := range h.idmap {
+		if key.harness == harness && key.session == session && key.native == nativeID {
+			if found != nil {
+				return nil
+			}
+			found = row
+		}
+	}
+	return found
 }
 
 // NativeRef is a native record standing for an event.
 type NativeRef struct {
-	Session, NativeID, Origin string
+	Session, NativeID, Origin, Connector string
 }
 
 // NativeIDsOf are the native records (in one harness, optionally one session) that map to an event.
@@ -527,14 +554,29 @@ func (h *Hub) NativeIDsOf(eventID core.EventID, harness, session string) []Nativ
 		if r == nil || r.Origin == "alias" || k.harness != harness || (session != "" && k.session != session) {
 			continue
 		}
-		out = append(out, NativeRef{Session: k.session, NativeID: k.native, Origin: r.Origin})
+		out = append(out, NativeRef{Session: k.session, NativeID: k.native, Origin: r.Origin, Connector: k.connector})
 	}
 	return out
 }
 
 // Binding of a native session, or nil.
-func (h *Hub) Binding(harness, session string) *Binding {
-	b := h.bindings[sessKey{harness, session}]
+func (h *Hub) binding(harness, session string, connector ...string) *Binding {
+	if len(connector) > 0 {
+		return h.bindings[sessKey{harness, session, connector[0]}]
+	}
+	var found *Binding
+	for key, b := range h.bindings {
+		if key.harness == harness && key.session == session {
+			if found != nil {
+				return nil
+			}
+			found = b
+		}
+	}
+	return found
+}
+func (h *Hub) Binding(harness, session string, connector ...string) *Binding {
+	b := h.binding(harness, session, connector...)
 	if b == nil {
 		return nil
 	}
@@ -600,8 +642,8 @@ func (h *Hub) Leaves(thread core.ThreadID) []core.EventID {
 }
 
 // MergeMeta merges metadata into a binding.
-func (h *Hub) MergeMeta(harness, session string, meta core.JsonObject) {
-	b := h.bindings[sessKey{harness, session}]
+func (h *Hub) MergeMeta(harness, session string, meta core.JsonObject, connector ...string) {
+	b := h.binding(harness, session, connector...)
 	if b == nil {
 		return
 	}
@@ -750,7 +792,7 @@ func (h *Hub) IsTurnStart(id core.EventID) bool {
 	if n.turn {
 		return true
 	}
-	if h.TurnsAt(id) != 1 || (n.kind != "message" && n.kind != "tool_result" && n.kind != "compaction") {
+	if h.TurnsAt(id) != 1 || (n.kind != "message" && n.kind != "tool_result" && n.kind != "compaction" && n.kind != "notification") {
 		return false
 	}
 	return len(n.parents) == 0 || h.TurnsAt(n.parents[0]) == 0
@@ -774,7 +816,7 @@ func (h *Hub) TurnsAt(id core.EventID) int {
 				base = p.turnsTo
 			}
 		}
-		if n.turn || base == 0 && (n.kind == "message" || n.kind == "tool_result" || n.kind == "compaction") {
+		if n.turn || base == 0 && (n.kind == "message" || n.kind == "tool_result" || n.kind == "compaction" || n.kind == "notification") {
 			base++
 		}
 		n.turnsTo = base
@@ -882,18 +924,22 @@ func (h *Hub) ResolveHead(selector string) (core.ThreadID, core.EventID, error) 
 		}
 		return "", "", nil
 	}
-	if i := strings.Index(selector, ":"); i > 0 {
-		harness, session := selector[:i], selector[i+1:]
-		var best *Binding
-		for k, b := range h.bindings {
-			if k.harness == harness && strings.HasPrefix(k.session, session) && (best == nil || b.updated > best.updated) {
-				best = b
-			}
-		}
-		if best != nil && best.Leaf != "" {
-			return best.Thread, best.Leaf, nil
+	var best *Binding
+	var matches []string
+	for _, b := range h.bindings {
+		if core.MatchesSessionSelector(selector, b.Connector, b.Harness, b.Session) {
+			best = b
+			matches = append(matches, core.SessionSelector(b.Connector, b.Harness, b.Session))
 		}
 	}
+	if len(matches) > 1 {
+		sort.Strings(matches)
+		return "", "", fmt.Errorf("%w: %s matches profiles: %s", ErrAmbiguous, selector, strings.Join(matches, ", "))
+	}
+	if best != nil && best.Leaf != "" {
+		return best.Thread, best.Leaf, nil
+	}
+
 	return "", "", nil
 }
 
@@ -961,6 +1007,10 @@ func CollectBlobRefs(parts any) map[string]bool {
 			for _, e := range x {
 				walk(e)
 			}
+		case []core.Part:
+			for _, e := range x {
+				walk(e)
+			}
 		case map[string]any:
 			if b, ok := x["blob"].(map[string]any); ok {
 				if s, ok := b["sha256"].(string); ok {
@@ -970,7 +1020,7 @@ func CollectBlobRefs(parts any) map[string]bool {
 			if s, ok := x["sealed"]; ok {
 				walk([]any{s})
 			}
-			if ps, ok := x["parts"].([]any); ok {
+			if ps, ok := x["parts"]; ok {
 				walk(ps)
 			}
 		}

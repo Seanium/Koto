@@ -32,5 +32,7 @@ export function selectionSource(c: Conversation | undefined, s?: Selection): Cop
   if (selectionInvalid(c, s)) return // replaced source: never silently copy a different range
   const count = s.all ? s.through - turns.filter(t => selectionEvents(t, s).every(id => !selected(s, id))).length : turns.filter(t => selectionEvents(t, s).some(id => selected(s, id))).length
   if (!count) return
-  return { selector: s.head, ...(s.all ? s.ids.size ? { excludeEventIds: [...s.ids] } : {} : { eventIds: [...s.ids] }), label: s.all && !s.ids.size ? tr("全部 {0} 轮", [count]) : tr("所选 {0} 轮", [count]) }
+  const whole = s.all && !s.ids.size
+  const label = count === 1 ? tr(whole ? '全部 1 轮' : '所选 1 轮') : tr(whole ? '全部 {0} 轮' : '所选 {0} 轮', [count])
+  return { selector: s.head, ...(s.all ? s.ids.size ? { excludeEventIds: [...s.ids] } : {} : { eventIds: [...s.ids] }), label }
 }

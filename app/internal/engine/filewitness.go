@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 	"time"
 
 	"koto/internal/core"
@@ -14,6 +15,8 @@ import (
 // within this window must be verified again after the file becomes stable.
 const fileStabilityWindow = time.Second
 const witnessWindow = int64(32 * 1024)
+
+var witnessBuffers = sync.Pool{New: func() any { b := make([]byte, 32*1024); return &b }}
 
 // SourceWitness bounds ordinary cache checks to the first/last 32 KiB and
 // native file identity/change metadata. Small files are covered in full. A
@@ -27,7 +30,7 @@ func sourceWitnessAt(ref core.NativeRef, now time.Time) (string, bool, error) {
 	h := sha256.New()
 	stable := true
 	paths := []string{ref.Path}
-	if ref.Harness == "antigravity" || ref.Harness == "opencode" {
+	if ref.Harness == "antigravity" || ref.Harness == "opencode" || ref.Harness == "zcode" || ref.Harness == "cursor" {
 		paths = append(paths, ref.Path+"-wal")
 	}
 	for i, path := range paths {
@@ -63,11 +66,13 @@ func fileWitness(f *os.File, out io.Writer, now time.Time) (string, bool, error)
 	if st.Size() <= 2*witnessWindow {
 		first = st.Size()
 	}
-	if _, err := io.Copy(out, io.NewSectionReader(f, 0, first)); err != nil {
+	buffer := witnessBuffers.Get().(*[]byte)
+	defer witnessBuffers.Put(buffer)
+	if _, err := io.CopyBuffer(out, io.NewSectionReader(f, 0, first), *buffer); err != nil {
 		return "", false, err
 	}
 	if first < st.Size() {
-		if _, err := io.Copy(out, io.NewSectionReader(f, st.Size()-witnessWindow, witnessWindow)); err != nil {
+		if _, err := io.CopyBuffer(out, io.NewSectionReader(f, st.Size()-witnessWindow, witnessWindow), *buffer); err != nil {
 			return "", false, err
 		}
 	}

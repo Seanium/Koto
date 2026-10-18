@@ -18,7 +18,7 @@ Gespräche zwischen Agents kopieren. Sitzungen mit Baumansicht und Diff vergleic
   <img src="../../site/assets/screenshots/de-light-tree.png" alt="koto: Gemeinsame Verläufe und Abzweigungen im Sitzungsbaum" width="1120">
 </picture>
 
-Für Claude Code (einschließlich Desktop Code), Codex, pi, DeepSeek Harness, Antigravity CLI und OpenCode. Weitere Agents folgen bald.
+Für Antigravity CLI, Claude Code, Claude Desktop, Codex, Cursor CLI, Cursor Desktop, DeepSeek Harness, OpenCode, pi, WorkBuddy (China und international) und ZCode. Weitere Agents folgen bald.
 
 Auch mit koto CLI.<br>
 Kopieren. Ein Satz genügt.

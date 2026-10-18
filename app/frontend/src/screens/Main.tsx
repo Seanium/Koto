@@ -2,9 +2,10 @@ import { tr } from '../i18n/core.ts'
 import { shortcut } from '../ui/shortcut'
 // Sidebar selects a product workspace; Agent and project filters narrow session copying.
 
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { api, ApiError, onContextAction, onNavigate, onSettingsTab, shell, useOpeners } from '../api/client'
-import { clockTime, fromDesktop, projectName, relativeTime, tildePath } from '../api/model'
+import { clockTime, fromDesktop, originBinding, productName, productScopeName, projectName, relativeTime, tildePath } from '../api/model'
+import { accountLabel, accountName, storageAccount, matchesIdentity, matchesProduct, productKey, UNKNOWN_ACCOUNT } from '../api/identity'
 import type { TrashEntry } from '../api/types'
 import { buildSessions, useConversation, useSessionSearch, type Hub, type SessionItem } from '../store'
 import { AgentDisc, agentName, Button, Icon, ListRow, Menu, OperationError, SearchField, Skeleton, Toast } from '../ui'
@@ -13,17 +14,17 @@ import { Detail } from './Detail'
 import { Analysis } from './Analysis'
 import { isSettingsTab, Settings, type SettingsTab } from './Settings'
 import { SplitPane } from '../ui/SplitPane'
+import { useAgentOrder } from '../ui/useAgentOrder'
+import { destinationFilters, visibleSelection } from '../sessionNavigation'
 
 type Mode = { kind: 'analysis' } | { kind: 'sessions' } | { kind: 'trash' } | { kind: 'settings'; tab: SettingsTab }
 
-/** scope: 'all' or a harness. project: a project folder (or NO_PROJECT). Switching scope clears project. */
-interface Filters { scope: string; project?: string }
+/** scope: 'all' or a product key. Switching product clears its narrower filters. */
+interface Filters { scope: string; project?: string; profile?: string; account?: string }
 const NO_FILTERS: Filters = { scope: 'all' }
 const FILTERS_KEY = 'koto.filters'
-/** Claude Code's two front ends, as scopes under it: the CLI, and Claude Desktop's Code tab (same files). */
-const DESKTOP = 'claude-desktop'
-const CLI = 'claude-cli'
-const isCli = (s: SessionItem) => s.bindings.some(b => b.harness === 'claude-code' && !fromDesktop(b))
+/** Claude Desktop's Code tab has a separate product scope even when transcripts are shared. */
+const DESKTOP = 'claude-code/desktop'
 const NO_PROJECT = '__no_project__'
 /** Sessions group by their project folder; two folders with the same name stay apart. */
 const projectOf = (s: SessionItem) => s.cwd || NO_PROJECT
@@ -31,7 +32,10 @@ const projectLabel = (key: string) => key === NO_PROJECT ? tr("其他") : projec
 
 function useFilters(): [Filters, (f: Filters) => void] {
   const [f, setF] = useState<Filters>(() => {
-    try { return { ...NO_FILTERS, ...(JSON.parse(localStorage.getItem(FILTERS_KEY) ?? '{}') as Partial<Filters>) } } catch { return NO_FILTERS }
+    try {
+      const saved = { ...NO_FILTERS, ...(JSON.parse(localStorage.getItem(FILTERS_KEY) ?? '{}') as Partial<Filters>) }
+      return saved.scope === 'all' || saved.scope.includes('/') ? saved : NO_FILTERS
+    } catch { return NO_FILTERS }
   })
   const set = (next: Filters) => { setF(next); try { localStorage.setItem(FILTERS_KEY, JSON.stringify(next)) } catch { /* not kept; fine */ } }
   return [f, set]
@@ -61,6 +65,8 @@ export function MainWindow({ hub }: { hub: Hub }) {
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState<string>()
   const [destination, setDestination] = useState<SessionItem>()
+  const navigation = useRef<AbortController | undefined>(undefined)
+  useEffect(() => () => { navigation.current?.abort() }, [mode, filters, query, selected])
   // Only masks pending list/search refreshes after a successful move. Never persisted.
   const [removed, setRemoved] = useState<Map<string, boolean>>(() => new Map())
   const unmask = (id: string) => setRemoved(old => { const next = new Map(old); next.delete(id); return next })
@@ -70,16 +76,13 @@ export function MainWindow({ hub }: { hub: Hub }) {
   const search = useRef<HTMLInputElement>(null)
   const trash = useTrash(hub)
   const inTrash = mode.kind === 'trash'
-  const matches = useSessionSearch(mode.kind === 'sessions' ? query : '', filters.scope, filters.project, hub.version)
+  const matches = useSessionSearch(mode.kind === 'sessions' ? query : '', filters.scope, filters.project, hub.version, mode.kind === 'sessions' ? filters.profile : undefined, mode.kind === 'sessions' ? filters.account : undefined)
 
   // Sessions in the picked scope, and the projects among them (for 项目 ▾).
   // A newly copied old conversation can be outside the recent-list page. Keep just its summary
   // while selected, instead of fetching every indexed session to make the destination reachable.
   const sessions = useMemo(() => destination && !hub.sessions.some(s => s.id === destination.id) ? [destination, ...hub.sessions] : hub.sessions, [destination, hub.sessions])
-  const inScope = useMemo(() => filters.scope === 'all' ? sessions
-    : filters.scope === DESKTOP ? sessions.filter(s => s.desktop)
-    : filters.scope === CLI ? sessions.filter(isCli)
-    : sessions.filter(s => s.harness === filters.scope), [sessions, filters.scope])
+  const inScope = useMemo(() => sessions.filter(s => matchesProduct(s.bindings, filters.scope)), [sessions, filters.scope])
   useEffect(() => { if (destination && selected !== destination.id) setDestination(undefined) }, [selected, destination])
   const projects = useMemo(() => {
     const n = new Map<string, number>()
@@ -87,6 +90,9 @@ export function MainWindow({ hub }: { hub: Hub }) {
     return [...n].sort((a, b) => b[1] - a[1] || projectLabel(a[0]).localeCompare(projectLabel(b[0])))
   }, [inScope])
   const openers = useOpeners()
+  const profiles = hub.profiles.filter(p => filters.scope === 'all' || p.harness === filters.scope || productKey(p) === filters.scope)
+  const currentProfile = profiles.find(p => p.id === filters.profile)
+  const accounts = [...new Map(profiles.filter(p => !filters.profile || p.id === filters.profile).flatMap(p => p.accounts.filter(a => a.kind === 'account').map(a => ({ ...a, product: productKey(p) }))).map(a => [`${a.product}\0${a.id}`, a])).values()]
   // A project kept from an earlier run that has no sessions now would hide everything: drop it.
   useEffect(() => {
     if (hub.loaded && filters.project && !projects.some(([p]) => p === filters.project)) setFilters({ ...filters, project: undefined })
@@ -94,13 +100,15 @@ export function MainWindow({ hub }: { hub: Hub }) {
   }, [hub.loaded, projects, filters.project])
 
   const visible = useMemo(() => {
-    if (matches?.sessions) return matches.sessions.filter(s => !removed.has(s.id))
     const q = query.trim().toLowerCase()
-    return inScope.filter(s =>
- !removed.has(s.id) && (!filters.project || projectOf(s) === filters.project)
-      && (!q || s.id.toLowerCase().includes(q) || s.title.toLowerCase().includes(q) || s.project.toLowerCase().includes(q) || agentName(s.harness).toLowerCase().includes(q) || (s.desktop && 'claude desktop'.includes(q))
+    const rows = matches?.sessions ?? inScope
+    const serverMatches = matches?.sessions && new Set(matches.sessions.map(s => s.id))
+    const candidates = destination && selected === destination.id && !rows.some(s => s.id === destination.id) ? [destination, ...rows] : rows
+    return candidates.filter(s =>
+ !removed.has(s.id) && matchesProduct(s.bindings, filters.scope) && (!filters.project || projectOf(s) === filters.project) && matchesIdentity(s.bindings, filters.profile, filters.account)
+      && (serverMatches?.has(s.id) || !q || s.id.toLowerCase().includes(q) || s.title.toLowerCase().includes(q) || s.project.toLowerCase().includes(q) || agentName(s.harness).toLowerCase().includes(q) || (s.desktop && 'claude desktop'.includes(q))
         || (!!s.cwd && (s.cwd.toLowerCase().includes(q) || tildePath(s.cwd, openers?.home).toLowerCase().includes(q)))))
-  }, [inScope, filters, query, openers?.home, matches, removed])
+  }, [inScope, filters, query, openers?.home, matches, removed, destination, selected])
   useEffect(() => {
     const done = [...removed].filter(([id, refreshed]) => refreshed && !hub.sessions.some(s => s.id === id) && !matches?.sessions?.some(s => s.id === id)).map(([id]) => id)
     if (done.length) setRemoved(old => { const next = new Map(old); for (const id of done) next.delete(id); return next })
@@ -113,12 +121,12 @@ export function MainWindow({ hub }: { hub: Hub }) {
 
   // Keep a selection while the list changes.
   useEffect(() => {
-    if (!visible.length) return
-    if (!selected || !visible.some(s => s.id === selected)) setSelected(visible[0].id)
+    const next = visibleSelection(visible, selected)?.id
+    if (selected !== next) setSelected(next)
   }, [visible, selected])
 
-  const current = mode.kind === 'sessions' ? visible.find(s => s.id === selected) ?? visible[0] : undefined
-  const { conversation, error: detailError, loadEarlier } = useConversation(current?.id, hub.version)
+  const current = mode.kind === 'sessions' ? visibleSelection(visible, selected) : undefined
+  const { conversation, error: detailError, loadEarlier, reload: reloadDetail } = useConversation(current?.id, current?.revision)
 
   const reloadAll = useCallback(() => { void hub.reload(); void trash.reload() }, [hub, trash])
   const refresh = async () => {
@@ -157,10 +165,21 @@ export function MainWindow({ hub }: { hub: Hub }) {
   const [askTrash, setAskTrash] = useState(0)
 
   const openSession = async (id: string) => {
-    const d = await api.threadPage(id, 1)
+    navigation.current?.abort()
+    const request = new AbortController()
+    navigation.current = request
+    let d
+    try { d = await api.threadPage(id, 1, undefined, request.signal) }
+    catch (e) {
+      if (request.signal.aborted) return
+      if (navigation.current === request) navigation.current = undefined
+      throw e
+    }
+    if (request.signal.aborted) return
     const item = buildSessions([{ id, bindings: d.bindings, events: d.total ?? d.events.length, updated: d.events.at(-1)?.time ?? null }])[0]
     if (!item) throw Error(tr("新会话暂时不可用，请刷新后重试"))
-    setDestination(item); setMode({ kind: 'sessions' }); setFilters({ scope: item.harness }); setQuery(''); setSelected(id)
+    navigation.current = undefined
+    setDestination(item); setMode({ kind: 'sessions' }); setFilters(destinationFilters(originBinding(item.bindings), item.harness)); setQuery(''); setSelected(item.id)
   }
 
   const restore = async (e: TrashEntry) => {
@@ -175,12 +194,12 @@ export function MainWindow({ hub }: { hub: Hub }) {
     catch (x) { setToast({ text: trashError(x, tr("没能恢复")) }) }
   }
 
-  const openSettings = (tab?: string) => setMode(m => ({ kind: 'settings', tab: tab && isSettingsTab(tab) ? tab : m.kind === 'settings' ? m.tab : 'agents' }))
+  const openSettings = (tab?: string) => setMode({ kind: 'settings', tab: tab && isSettingsTab(tab) ? tab : 'general' })
 
   // Shell → window: tray 「复制到…」, right-click menu, ⌘, and 设置 from the menu bar.
   useEffect(() => {
     const offNavigate = onNavigate(n => {
-      if (n.thread) { setMode({ kind: 'sessions' }); setFilters(NO_FILTERS); setQuery(''); setSelected(n.thread) }
+      if (n.thread) void openSession(n.thread).catch(e => setToast({ text: tr("读取失败"), sub: String(e) }))
     })
     const offSettings = onSettingsTab(openSettings)
     // Native menu/tray requests can be replayed only after both listeners exist.
@@ -220,8 +239,8 @@ export function MainWindow({ hub }: { hub: Hub }) {
 
   const issue = issueOf(hub, { session: id => { setMode({ kind: 'sessions' }); setFilters(NO_FILTERS); setSelected(id) }, settings: openSettings })
 
-  const scopeTitle = inTrash ? tr("回收站") : filters.scope === 'all' ? tr("全部会话") : tr("{0} 会话", [filters.scope === DESKTOP ? 'Claude Desktop' : filters.scope === CLI ? tr("Claude Code · 命令行") : agentName(filters.scope)])
-  const pickScope = (scope: string) => { setMode({ kind: 'sessions' }); setFilters({ ...filters, scope, project: scope === filters.scope ? filters.project : undefined }) }
+  const scopeTitle = inTrash ? tr("回收站") : filters.scope === 'all' ? tr("全部会话") : tr("{0} 会话", [productScopeName(filters.scope)])
+  const pickScope = (scope: string) => { setMode({ kind: 'sessions' }); setFilters(scope === filters.scope ? filters : { scope }) }
 
   const down = hub.status.state === 'error' || !!hub.error
   return (
@@ -247,6 +266,17 @@ export function MainWindow({ hub }: { hub: Hub }) {
           </div>
           <SearchField ref={search} value={query} onChange={setQuery} placeholder={inTrash ? tr("搜索回收站") : tr("搜索会话")} />
           {!inTrash && <div className="row g1 list-filters">
+            {profiles.length > 1 && <Menu trigger="ghost" align="under" pressed={!!filters.profile} label={tr('筛选会话目录')} searchable={tr('搜索目录')}
+              items={[{ label: tr('全部目录'), checked: !filters.profile, onClick: () => setFilters({ ...filters, profile: undefined, account: undefined }) },
+                ...profiles.map(p => ({ key: p.id, label: p.label || agentName(p.harness), sub: tildePath(p.root, openers?.home), checked: filters.profile === p.id, onClick: () => setFilters({ ...filters, profile: p.id, account: undefined }) }))]}>
+              <span className="ellipsis">{currentProfile?.label || tr('目录')}</span> {Icon.chevron}
+            </Menu>}
+            {(accounts.length > 0 || filters.account) && <Menu trigger="ghost" align="under" pressed={!!filters.account} label={tr('筛选账号')} searchable={tr('搜索账号')}
+              items={[{ label: tr('全部账号'), checked: !filters.account, onClick: () => setFilters({ ...filters, account: undefined }) },
+                ...accounts.map(a => ({ key: `${a.product}:${a.id}`, label: accountName(a), sub: filters.scope === 'all' ? productScopeName(a.product) : a.scope === 'creator' ? tr('创建账号') : undefined, checked: filters.account === a.id, onClick: () => setFilters({ ...filters, scope: a.product, account: a.id }) })),
+                { label: tr('账号未知'), checked: filters.account === UNKNOWN_ACCOUNT, onClick: () => setFilters({ ...filters, account: UNKNOWN_ACCOUNT }) }]}>
+              <span className="ellipsis">{filters.account === UNKNOWN_ACCOUNT ? tr('账号未知') : accountName(accounts.find(a => a.id === filters.account) ?? { id: tr('账号'), kind: 'account', scope: 'storage', evidence: '' })}</span> {Icon.chevron}
+            </Menu>}
             {!inTrash && projects.length > 1 && (
               <Menu trigger="ghost" align="under" pressed={!!filters.project} label={tr("只看一个项目里的会话")} searchable={tr("搜索项目")}
                 items={[{ label: tr("全部"), checked: !filters.project, onClick: () => setFilters({ ...filters, project: undefined }) },
@@ -256,22 +286,25 @@ export function MainWindow({ hub }: { hub: Hub }) {
             )}
           </div>}
         </div>
-        {!inTrash && hub.scanning && (
+        {!inTrash && hub.status.state !== 'error' && (hub.initializing || (refreshing && hub.scanning)) && (
           <div className="scanline" title={tr("第一次打开要把各 Agent 的会话读一遍；读到的会话已经可以点开")}>
-            {tr(" 正在读取 ")}{agentName(hub.scanning.harness)} {tr(" 的会话 · ")}{hub.scanning.done.toLocaleString()} / {hub.scanning.total.toLocaleString()}
-            <span className="scanline-bar"><span style={{ width: `${Math.round(100 * hub.scanning.done / Math.max(1, hub.scanning.total))}%` }} /></span>
+            <span role="status">{hub.scanning ? <>{tr(" 正在读取 ")}{agentName(hub.scanning.harness)} {tr(" 的会话 · ")}{hub.scanning.done.toLocaleString()} / {hub.scanning.total.toLocaleString()}</> : tr("正在读取会话")}</span>
+            <span className={`scanline-bar${hub.scanning?.total ? '' : ' indeterminate'}`} role="progressbar" aria-label={tr("正在读取会话")} aria-valuemin={0} aria-valuemax={hub.scanning?.total || undefined} aria-valuenow={hub.scanning?.total ? hub.scanning.done : undefined}><span style={hub.scanning?.total ? { width: `${Math.round(100 * hub.scanning.done / hub.scanning.total)}%` } : undefined} /></span>
           </div>
         )}
         {matches?.error && <OperationError message={tr("读取失败")} detail={matches.error} />}
         {inTrash
           ? <TrashList trash={trash} entries={trashVisible} query={query} restore={restore} />
-          : <SessionList hub={hub} items={visible} selected={selected} onSelect={setSelected} query={query} filters={filters}
-              clear={() => { setFilters({ ...filters, project: undefined }); setQuery('') }} openSettings={() => openSettings('agents')} />}
+          : <SessionList hub={hub} items={visible} selected={current?.id} onSelect={setSelected} query={query} filters={filters}
+              clear={() => { setFilters({ scope: filters.scope }); setQuery('') }} openSettings={() => openSettings('agents')} />}
       </section>} second={
       <main className="col grow" style={{ background: 'var(--bg-window)', minWidth: 0, minHeight: 0 }}>
         {current ? (
-          <Detail key={current.id} hub={hub} item={current} conversation={conversation} detailError={detailError} loadEarlier={loadEarlier}
-            onCopy={source => setSheet({ title: current.title, source })}
+          <Detail key={current.id} item={current} conversation={conversation} detailError={detailError} loadEarlier={loadEarlier} onRetry={reloadDetail}
+            onCopy={source => {
+              const binding = originBinding(current.bindings)
+              setSheet({ title: current.title, source: { ...source, cwd: current.cwd, profile: binding?.connector, harness: binding?.harness, variant: binding?.meta.sourceProfile?.variant, account: storageAccount(binding) } })
+            }}
             onTrash={() => moveToTrash(current.id)} askTrash={askTrash} />
         ) : (
           <div className="drag col grow" style={{ alignItems: 'center', justifyContent: 'center', padding: 32 }}>
@@ -296,7 +329,9 @@ function Sidebar({ hub, mode, scope, pickScope, openTrash, openSettings, openAna
   hub: Hub; mode: Mode; scope: string; pickScope: (s: string) => void
   openTrash: () => void; openSettings: () => void; openAnalysis: () => void; openCopy: () => void; issue?: Issue
 }) {
-  const harnesses = [...new Set(hub.connectors.filter(c => c.enabled).map(c => c.harness))]
+  const scroll = useRef<HTMLDivElement>(null)
+  const products = new Map(hub.connectors.map(c => [productKey(c), c]))
+  const ordering = useAgentOrder([...products.keys()], [...new Set(hub.connectors.filter(c => c.enabled).map(productKey))], productScopeName, scroll)
   const at = (s: string) => mode.kind === 'sessions' && scope === s
   const [expanded, setExpanded] = useRemembered('koto.sidebar.allOpen', true)
   const nav = useRef<HTMLElement>(null)
@@ -305,7 +340,7 @@ function Sidebar({ hub, mode, scope, pickScope, openTrash, openSettings, openAna
   return (
     <nav ref={nav} className="col grow drag app-sidebar" style={{ background: 'var(--bg-sidebar)' }}>
       <div style={{ height: 52, flex: 'none' }} />
-      <div className="col no-drag scroll grow" style={{ padding: '0 8px', gap: 1 }} role="listbox" aria-label={tr("范围")}>
+      <div ref={scroll} className="col no-drag scroll grow" style={{ padding: '0 8px', gap: 1 }} role="listbox" aria-label={tr("范围")}>
         <ListRow compact selected={mode.kind === 'sessions' && !expanded} aria-expanded={expanded && mode.kind === 'sessions'}
           onClick={() => { if (mode.kind === 'sessions') setExpanded(!expanded); else { openCopy(); setExpanded(true) } }}
           onKeyDown={e => { if (e.key === 'ArrowLeft' && expanded) { e.preventDefault(); setExpanded(false) } if (e.key === 'ArrowRight' && !expanded) { e.preventDefault(); setExpanded(true) } }}>
@@ -315,20 +350,20 @@ function Sidebar({ hub, mode, scope, pickScope, openTrash, openSettings, openAna
         </ListRow>
         {mode.kind === 'sessions' && expanded && <div className="side-children col">
         <SideItem icon={Icon.all} label={tr("全部会话")} selected={at('all')} onClick={() => pickScope('all')} />
-        {harnesses.map(h => (
-          <Fragment key={h}>
-            <SideItem icon={<AgentDisc harness={h} size={16} title="" />} label={agentName(h)} selected={at(h)} onClick={() => pickScope(h)} title={agentName(h)} />
-            {h === 'claude-code' && hub.sessions.some(s => s.desktop) && <>
-              <SideItem indent icon={Icon.terminal} label={tr("命令行")} selected={at(CLI)} onClick={() => pickScope(CLI)}
-                title={tr("在终端里用 claude 命令开的会话")} />
-              <SideItem indent icon={Icon.desktop} label="Desktop" selected={at(DESKTOP)} onClick={() => pickScope(DESKTOP)}
-                title={tr("在 Claude Desktop 的 Code 标签里开的会话（和命令行用的是同一批文件，两边都能接着聊）")} />
-            </>}
-          </Fragment>
-        ))}
+        {ordering.visible.map(key => {
+          const product = products.get(key)!
+          const label = productName(product.harness, product.variant)
+          const title = key === 'claude-code/desktop' ? tr("在 Claude Desktop 的 Code 标签里开的会话，和 Claude Code 用的是同一批文件") : label
+          return <div key={key} className="side-agent-group col" {...ordering.group(key)} data-agent={product.harness} data-product={key} data-dragging={ordering.dragged === key || undefined} data-drop={ordering.drop?.id === key && ordering.dragged !== key ? (ordering.drop.after ? 'after' : 'before') : undefined}>
+            <SideItem icon={<AgentDisc harness={product.harness} size={16} title="" />} label={label} selected={at(key)} onClick={() => pickScope(key)} title={title} reorder={ordering.row(key)} />
+          </div>
+        })}
         </div>}
         <SideItem icon={Icon.branch} label={tr("会话对比")} selected={mode.kind === 'analysis'} onClick={openAnalysis} />
       </div>
+      <span className="sr-only" id="agent-order-help">{tr('拖动调整顺序，或按 Option / Alt + 上下方向键')}</span>
+      <span className="sr-only" role="status" aria-live="polite">{ordering.announcement}</span>
+      {ordering.error && <Toast text={ordering.error} onDone={ordering.clearError} />}
       {issue && (
         <button type="button" className={`issue no-drag ${issue.tone === 'bad' ? 't-red' : issue.tone === 'warn' ? 't-amber' : 't-3'}`} onClick={issue.run} disabled={!issue.run} title={issue.title}>
           <span className="grow ellipsis">{issue.text}</span>{issue.action && <span className="t-medium">{issue.action}</span>}
@@ -349,11 +384,11 @@ function useRemembered(key: string, initial: boolean): [boolean, (v: boolean) =>
 }
 
 /** A sidebar row: icon and label. */
-function SideItem({ icon, label, selected, onClick, title, indent }: {
-  icon: React.ReactNode; label: string; selected: boolean; onClick: () => void; title?: string; indent?: boolean | 2
+function SideItem({ icon, label, selected, onClick, title, indent, reorder }: {
+  icon: React.ReactNode; label: string; selected: boolean; onClick: () => void; title?: string; indent?: boolean | 2; reorder?: React.ButtonHTMLAttributes<HTMLButtonElement>
 }) {
   return (
-    <ListRow compact selected={selected} onClick={onClick} title={title} style={{ paddingLeft: indent === 2 ? 58 : indent ? 34 : undefined }}>
+    <ListRow compact selected={selected} onClick={onClick} title={title} {...reorder} style={{ paddingLeft: indent === 2 ? 58 : indent ? 34 : undefined }}>
       <span className="row" style={{ width: 16, justifyContent: 'center', color: 'var(--ghost-ink)' }}>{icon}</span>
       <span className="grow ellipsis">{label}</span>
     </ListRow>
@@ -451,12 +486,14 @@ function SessionList({ hub, items, selected, onSelect, query, filters, clear, op
     if (locate.current) document.getElementById(`s-${locate.current}`)?.scrollIntoView({ block: 'nearest' })
   }, [selected, items])
   const stopLocating = () => { locate.current = undefined }
-  if (!hub.loaded) return <ListSkeleton />
+  if (!hub.loaded) return hub.error || hub.status.state === 'error'
+    ? <Empty title={tr("读取失败")} why={hub.error || hub.status.error} />
+    : <ListSkeleton />
   if (!items.length) {
-    if (hub.scanning) return <Empty title={tr("正在读取会话")} why={tr("读到的会话会陆续出现在这里")} />
+    if (hub.initializing && !hub.error) return <Empty title={tr("正在读取会话")} why={tr("读到的会话会陆续出现在这里")} />
     if (query.trim()) return <Empty title={tr("没有找到“{0}”", [query.trim()])} why={tr("试试别的关键词")} />
-    if (filters.project) {
-      const what = [filters.project && tr("项目：{0}", [projectLabel(filters.project)])].filter(Boolean).join(' · ')
+    if (filters.project || filters.profile || filters.account) {
+      const what = [filters.project && tr("项目：{0}", [projectLabel(filters.project)]), filters.profile && tr('会话目录'), filters.account && tr('账号')].filter(Boolean).join(' · ')
       return <Empty title={tr("没有符合条件的会话")} why={what} action={<Button small onClick={clear}>{tr("清除筛选")}</Button>} />
     }
     if (filters.scope !== 'all') return <Empty title={tr("暂无会话")} />
@@ -482,6 +519,7 @@ function SessionList({ hub, items, selected, onSelect, query, filters, clear, op
               <span className="grow row g1 t-meta" style={{ minWidth: 0 }}>
                 <span className="ellipsis">{s.project || '—'}</span>
                 {s.desktop && filters.scope !== DESKTOP && <span className="tag" title={tr("在 Claude Desktop 的 Code 标签里开的会话，和 Claude Code 用的是同一批文件")}>Desktop</span>}
+                <span className="session-identity ellipsis" title={[accountLabel(originBinding(s.bindings)), originBinding(s.bindings)?.meta.sourceProfile?.root].filter(Boolean).join('\n')}>{accountLabel(originBinding(s.bindings))}</span>
               </span>
             </span>
           </span>

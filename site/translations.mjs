@@ -35,8 +35,7 @@ export const translations = {
     "hero1Suffix": "agents.",
     "downloadChoose": "Choose a version",
     "github": "GitHub repository",
-    "cliScope": "Download it separately.",
-    "cliRequest": "Use koto to copy this session to pi.",
+    "cliRequest": "Use koto CLI to copy this session to pi.",
     "cliResponse": "Copied 5 turns to pi.",
     "cliTitleLead": "There’s also koto CLI.",
     "cliTitleActionIntro": "Copy a session. ",
@@ -45,7 +44,11 @@ export const translations = {
     "cliDemo": "Example of copying a conversation with koto CLI",
     "cliInstruction": "Open the copied session in pi with this command:",
     "treeText": "See shared history and branches.",
-    "diffText": "Compare changes line by line."
+    "diffText": "Compare changes line by line.",
+    "cliInstall": "Or install from your terminal",
+    "cliInstallCopy": "Copy install command",
+    "cliInstallCopied": "Copied",
+    "cliInstallSelect": "Select and copy the command."
   },
   "zh": {
     "moreAgents": "还有更多，即将到来。",
@@ -83,8 +86,7 @@ export const translations = {
     "hero1Suffix": "Agent，",
     "downloadChoose": "选择版本",
     "github": "GitHub 仓库",
-    "cliScope": "CLI 单独下载，按需使用。",
-    "cliRequest": "用 koto 复制当前会话到 pi",
+    "cliRequest": "用 koto CLI 复制当前会话到 pi",
     "cliResponse": "已复制 5 轮对话到 pi。",
     "cliTitleLead": "还有 koto CLI，",
     "cliTitleActionIntro": "复制，",
@@ -93,7 +95,11 @@ export const translations = {
     "cliDemo": "使用 koto CLI 复制会话的对话演示",
     "cliInstruction": "用这条命令打开 pi 中复制好的会话：",
     "treeText": "看清共同历史与分叉。",
-    "diffText": "逐行比较内容变化。"
+    "diffText": "逐行比较内容变化。",
+    "cliInstall": "也可通过命令行安装",
+    "cliInstallCopy": "复制安装命令",
+    "cliInstallCopied": "已复制",
+    "cliInstallSelect": "请选择并复制命令。"
   },
   "zh-TW": {
     "moreAgents": "還有更多，即將到來。",
@@ -131,8 +137,7 @@ export const translations = {
     "hero1Suffix": "Agent，",
     "downloadChoose": "選擇版本",
     "github": "GitHub 儲存庫",
-    "cliScope": "CLI 獨立下載，按需使用。",
-    "cliRequest": "用 koto 複製目前的對話到 pi",
+    "cliRequest": "用 koto CLI 複製目前的對話到 pi",
     "cliResponse": "已複製 5 輪對話到 pi。",
     "cliTitleLead": "還有 koto CLI，",
     "cliTitleActionIntro": "複製，",
@@ -141,7 +146,11 @@ export const translations = {
     "cliDemo": "使用 koto CLI 複製對話的示範",
     "cliInstruction": "用這個指令開啟 pi 中複製好的對話：",
     "treeText": "看清共同歷史與分支。",
-    "diffText": "逐行比較內容變化。"
+    "diffText": "逐行比較內容變化。",
+    "cliInstall": "也可透過命令列安裝",
+    "cliInstallCopy": "複製安裝指令",
+    "cliInstallCopied": "已複製",
+    "cliInstallSelect": "請選取並複製指令。"
   },
   "ja": {
     "moreAgents": "さらに多くの Agent に近日対応。",
@@ -179,8 +188,7 @@ export const translations = {
     "hero1Suffix": "Agent を変えて、",
     "downloadChoose": "バージョンを選択",
     "github": "GitHub リポジトリ",
-    "cliScope": "CLI だけでもダウンロードできます。",
-    "cliRequest": "koto で今の対話を pi にコピーして。",
+    "cliRequest": "koto CLI で今の対話を pi にコピーして。",
     "cliResponse": "5 ターンを pi にコピーしました。",
     "cliTitleLead": "koto CLI も。",
     "cliTitleActionIntro": "コピーは、",
@@ -189,7 +197,11 @@ export const translations = {
     "cliDemo": "koto CLI で対話をコピーする例",
     "cliInstruction": "コピーした対話を pi で開くには、このコマンドを使ってください：",
     "treeText": "共通の履歴と分岐を確認。",
-    "diffText": "変更を一行ずつ比較。"
+    "diffText": "変更を一行ずつ比較。",
+    "cliInstall": "コマンドからもインストールできます",
+    "cliInstallCopy": "インストールコマンドをコピー",
+    "cliInstallCopied": "コピーしました",
+    "cliInstallSelect": "コマンドを選択してコピーしてください。"
   },
   "de": {
     "moreAgents": "Weitere Agents folgen bald.",
@@ -227,8 +239,7 @@ export const translations = {
     "hero1Suffix": "Agent wechseln.",
     "downloadChoose": "Version wählen",
     "github": "GitHub-Repository",
-    "cliScope": "CLI separat herunterladen.",
-    "cliRequest": "Kopiere dieses Gespräch mit koto nach pi.",
+    "cliRequest": "Kopiere dieses Gespräch mit koto CLI nach pi.",
     "cliResponse": "5 Gesprächsrunden zu pi kopiert.",
     "cliTitleLead": "Auch mit koto CLI.",
     "cliTitleActionIntro": "Kopieren. ",
@@ -237,6 +248,10 @@ export const translations = {
     "cliDemo": "Beispieldialog zum Kopieren mit koto CLI",
     "cliInstruction": "Öffne die kopierte Sitzung in pi mit diesem Befehl:",
     "treeText": "Gemeinsame Verläufe und Abzweigungen sehen.",
-    "diffText": "Änderungen Zeile für Zeile vergleichen."
+    "diffText": "Änderungen Zeile für Zeile vergleichen.",
+    "cliInstall": "Oder im Terminal installieren",
+    "cliInstallCopy": "Installationsbefehl kopieren",
+    "cliInstallCopied": "Kopiert",
+    "cliInstallSelect": "Befehl markieren und kopieren."
   }
 };

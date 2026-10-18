@@ -158,7 +158,7 @@ tasks:
       - wails3 generate bindings -f '{{.BUILD_FLAGS}}' -clean=true{{if eq .OBFUSCATED "true"}} -obfuscated{{end}} -ts -i
 
   generate:icons:
-    summary: Generates the Beta Windows ICO and macOS ICNS from brand/appicon.png.
+    summary: Generates Windows ICO and macOS ICNS from the fixed brand/appicon.png.
     run: once
     dir: build
     sources:

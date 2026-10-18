@@ -19,8 +19,8 @@ import * as store$0 from "./internal/store/models.js";
 // @ts-ignore: Unused imports
 import * as $models from "./models.js";
 
-export function AddConnectorRoot(harness: string, root: string): $CancellablePromise<koto$0.ConnectorInfo> {
-    return $Call.ByID(574158964, harness, root);
+export function AddConnectorRoot(harness: string, root: string, variant: string): $CancellablePromise<koto$0.ConnectorInfo> {
+    return $Call.ByID(574158964, harness, root, variant);
 }
 
 export function Analyses(): $CancellablePromise<store$0.AnalysisCollection[] | null> {
@@ -40,6 +40,10 @@ export function AppInfo(): $CancellablePromise<$models.AppInfo> {
 
 export function Carry(req: koto$0.CarryRequest): $CancellablePromise<engine$0.CarryResult | null> {
     return $Call.ByID(2967053665, req);
+}
+
+export function CheckUpdates(): $CancellablePromise<$models.UpdateState> {
+    return $Call.ByID(1344846848);
 }
 
 export function Connectors(): $CancellablePromise<koto$0.ConnectorInfo[] | null> {
@@ -76,6 +80,10 @@ export function Image(selector: string, sha: string): $CancellablePromise<string
     return $Call.ByID(1975841951, selector, sha);
 }
 
+export function InstallUpdate(): $CancellablePromise<void> {
+    return $Call.ByID(3729456840);
+}
+
 /**
  * LicenseNotices returns the complete notices embedded in the standalone app.
  */
@@ -84,7 +92,7 @@ export function LicenseNotices(): $CancellablePromise<string> {
 }
 
 /**
- * Mark is a development hook: the frontend reports UI milestones (used by the screenshot walk).
+ * Mark receives frontend readiness and verification milestones.
  */
 export function Mark(name: string): $CancellablePromise<void> {
     return $Call.ByID(2524806435, name);
@@ -147,6 +155,14 @@ export function PickDirectory(title: string): $CancellablePromise<string> {
     return $Call.ByID(4292351642, title);
 }
 
+export function Profiles(): $CancellablePromise<koto$0.Profile[] | null> {
+    return $Call.ByID(251923804);
+}
+
+export function RebuildIndex(): $CancellablePromise<engine$0.ScanReport> {
+    return $Call.ByID(3895236035);
+}
+
 export function RemoveConnector(id: string): $CancellablePromise<boolean> {
     return $Call.ByID(2467403617, id);
 }
@@ -177,8 +193,19 @@ export function Scan(): $CancellablePromise<engine$0.ScanReport> {
     return $Call.ByID(1141659903);
 }
 
-export function SearchThreads(query: string, scope: string, project: string): $CancellablePromise<koto$0.ThreadListing[] | null> {
-    return $Call.ByID(3255274047, query, scope, project);
+export function ScanStatus(): $CancellablePromise<koto$0.ScanStatus> {
+    return $Call.ByID(2667344201);
+}
+
+export function SearchThreads(query: string, scope: string, project: string, profile: string, account: string): $CancellablePromise<koto$0.ThreadListing[] | null> {
+    return $Call.ByID(3255274047, query, scope, project, profile, account);
+}
+
+/**
+ * SetAgentOrder only updates sidebar order, without restarting scans or changing other preferences.
+ */
+export function SetAgentOrder(ids: string[] | null): $CancellablePromise<void> {
+    return $Call.ByID(1362821425, ids);
 }
 
 export function SetConnectorEnabled(id: string, enabled: boolean): $CancellablePromise<koto$0.ConnectorInfo> {
@@ -220,4 +247,8 @@ export function TrashList(): $CancellablePromise<store$0.TrashEntry[] | null> {
 
 export function TrashThread(selector: string, harness: string): $CancellablePromise<store$0.TrashEntry | null> {
     return $Call.ByID(568078464, selector, harness);
+}
+
+export function UpdateState(): $CancellablePromise<$models.UpdateState> {
+    return $Call.ByID(413608052);
 }

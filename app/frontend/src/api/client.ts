@@ -3,10 +3,10 @@ import { tr } from '../i18n/core.ts'
 // (AppService); the core's events arrive as Wails events.
 
 import { useEffect, useState } from 'react'
-import { Browser, Events } from '@wailsio/runtime'
+import { Browser, Events, type CancellablePromise } from '@wailsio/runtime'
 import { AppService } from '../../bindings/koto'
 import type {
-  AnalysisCollection, AnalysisResult, CarryRequest, CarryResult, Connector, CoreStatus, ScanReport, ServerEvent, ThreadDetail, ThreadSummary, TrashEntry } from './types'
+  AgentProfile, AnalysisCollection, AnalysisResult, CarryRequest, CarryResult, Connector, CoreStatus, ScanReport, ScanStatus, ServerEvent, ThreadDetail, ThreadSummary, TrashEntry } from './types'
 
 /** A failed call: the core's message, with its `code` and the rest of what it said in `body`. */
 export class ApiError extends Error {
@@ -40,23 +40,30 @@ async function call<T>(p: PromiseLike<unknown>): Promise<T> {
   }
 }
 
+/** Forward view disposal to Wails and its Go request context, not just to React. */
+function read<T>(p: CancellablePromise<unknown>, signal?: AbortSignal): Promise<T> {
+  return call<T>(signal ? p.cancelOn(signal) : p)
+}
+
 export const api = {
   connectors: () => call<Connector[]>(AppService.Connectors()),
+  profiles: () => call<AgentProfile[]>(AppService.Profiles()),
   setConnectorEnabled: (id: string, enabled: boolean) => call<Connector>(AppService.SetConnectorEnabled(id, enabled)),
-  addConnectorRoot: (harness: string, root: string) => call<Connector>(AppService.AddConnectorRoot(harness, root)),
+  addConnectorRoot: (harness: string, root: string, variant = '') => call<Connector>(AppService.AddConnectorRoot(harness, root, variant)),
   removeConnector: (id: string) => call<boolean>(AppService.RemoveConnector(id)),
 
   threads: (limit = 500) => call<ThreadSummary[]>(AppService.Threads(limit)),
-  searchThreads: (query: string, scope: string, project = '') => call<ThreadSummary[]>(AppService.SearchThreads(query, scope, project)),
+  searchThreads: (query: string, scope: string, project = '', profile = '', account = '') => call<ThreadSummary[]>(AppService.SearchThreads(query, scope, project, profile, account)),
   /** A page of a native session's path from the end: the last `turns` turns, or the `turns` before node `before`. */
-  threadPage: (selector: string, turns: number, before?: string) => call<ThreadDetail>(AppService.ThreadPage(selector, turns, before ?? '')),
+  threadPage: (selector: string, turns: number, before?: string, signal?: AbortSignal) => read<ThreadDetail>(AppService.ThreadPage(selector, turns, before ?? ''), signal),
   analyze: (selectors: string[]) => call<AnalysisResult>(AppService.Analyze(selectors)),
   scan: () => call<ScanReport>(AppService.Scan()),
+  scanStatus: () => call<ScanStatus>(AppService.ScanStatus()),
 
-  carry: (req: CarryRequest) => call<CarryResult>(AppService.Carry(req as never)),
+  carry: (req: CarryRequest, signal?: AbortSignal) => read<CarryResult>(AppService.Carry(req as never), signal),
 
   /** A picture from a conversation as a data: URL (selector: the conversation or a node in it). */
-  image: (selector: string, sha: string) => call<string>(AppService.Image(selector, sha)),
+  image: (selector: string, sha: string, signal?: AbortSignal) => read<string>(AppService.Image(selector, sha), signal),
   forgetCopy: (id: string) => AppService.ForgetCopy(id),
   analyses: () => call<AnalysisCollection[]>(AppService.Analyses()),
   saveAnalysis: (c: AnalysisCollection) => call<AnalysisCollection>(AppService.SaveAnalysis(c as never)),
@@ -73,6 +80,9 @@ export const api = {
 export const shell = {
   licenseNotices: () => AppService.LicenseNotices(),
   appInfo: () => AppService.AppInfo() as Promise<AppInfo>,
+  updateState: () => AppService.UpdateState() as Promise<UpdateState>,
+  checkUpdates: () => AppService.CheckUpdates() as Promise<UpdateState>,
+  installUpdate: () => AppService.InstallUpdate(),
   /** Wails validates the URL and opens the system browser, keeping the app view in place. */
   openExternal: (url: string) => Browser.OpenURL(url),
   status: () => AppService.Status() as Promise<CoreStatus>,
@@ -93,14 +103,23 @@ export const shell = {
   setUILocale: (locale: string) => AppService.SetUILocale(locale),
   prefs: () => AppService.GetPrefs() as Promise<Prefs>,
   setPrefs: (p: Prefs) => AppService.SetPrefs(p),
+  setAgentOrder: (ids: string[]) => AppService.SetAgentOrder(ids),
   mcpConfig: () => AppService.McpConfig(),
   restart: () => AppService.Restart(),
 }
 
 export interface AppInfo { version: string; projectURL: string }
+export interface UpdateState {
+  revision: number; phase: 'idle' | 'checking' | 'current' | 'available' | 'downloading' | 'restarting' | 'error'
+  current: string; latest: string; url: string; error: string; downloaded: number; total: number
+}
+export function onUpdate(cb: (state: UpdateState) => void): () => void {
+  return Events.On('koto:update', event => cb(unwrap(event.data) as UpdateState))
+}
 
 export interface Prefs {
   liveMinutes: number
+  agentOrder?: string[]
   /** Opener ids (see OpenersInfo); '' = the first installed one. *Custom: the template for 'custom'. */
   terminal: string; terminalCustom: string; editor: string; editorCustom: string
   /** '' = follow the system. */

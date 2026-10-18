@@ -20,8 +20,8 @@ func mainWindowOptions() application.WebviewWindowOptions {
 	}
 }
 
-// Other platforms retain the icon embedded in their native bundle resources.
-func platformApplicationIcon() []byte { return nil }
+// Runtime and native bundle resources share the same fixed artwork.
+func platformApplicationIcon() []byte { return appIconPNG }
 
 func setTrayIcon(t *application.SystemTray, png []byte) {
 	t.SetIcon(png)

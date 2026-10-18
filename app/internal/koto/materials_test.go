@@ -93,40 +93,48 @@ func assertMaterialBytes(t *testing.T, a *App, harness, session string, items []
 	}
 }
 
+// Every native reader/writer pair must retain the exact attachment bytes, even
+// when a target represents a file as a local attachment link rather than inline.
 func TestMaterialCopyMatrix(t *testing.T) {
-	for _, to := range copyAgents {
-		t.Run(to, func(t *testing.T) {
-			requireCopyAgent(t, "antigravity", to)
+	for _, from := range copyAgents {
+		t.Run(from, func(t *testing.T) {
+			requireCopyAgent(t, "antigravity", from)
 			s := newSandbox(t)
 			items := materials(t)
-			source := materialSource(t, s, items)
-			before := text(t, source)
-			a := s.app(enable("antigravity", to))
+			original := materialSource(t, s, items)
+			originalBefore := text(t, original)
+			a := s.app(enable(copyAgents...))
 			scan(t, a)
-			r := carry(t, a, engine.CarryOptions{Selector: "antigravity:materials", To: to, Cwd: s.Root})
-			ok(t, r.Applied)
-			for _, l := range r.Plan.Losses {
-				ok(t, l.Kind != "dropped" && l.Kind != "truncated", "material must not be discarded: ", l)
+			source, session := original, "materials"
+			if from != "antigravity" {
+				seed := carry(t, a, engine.CarryOptions{Selector: "antigravity:materials", To: from, Cwd: s.Root})
+				ok(t, seed.Applied)
+				source, session = seed.Plan.Target.Path, seed.Plan.Target.Session
 			}
-			if to == "dsh" {
-				dshVerify(t, r.Plan.Target.Path)
+			before := nativeSessionSnapshot(t, source, from, session)
+			assertMaterialBytes(t, a, from, session, items)
+			for _, to := range copyAgents {
+				t.Run(to, func(t *testing.T) {
+					requireCopyAgent(t, from, to)
+					r := carry(t, a, engine.CarryOptions{Selector: from + ":" + session, To: to, Cwd: s.Root})
+					ok(t, r.Applied)
+					for _, loss := range r.Plan.Losses {
+						ok(t, loss.Kind != "dropped" && loss.Kind != "truncated", "material must not be discarded: ", loss)
+					}
+					if to == "dsh" {
+						dshVerify(t, r.Plan.Target.Path)
+					}
+					sid := core.S(r.Receipt["session"])
+					if sid == "" {
+						sid = r.Plan.Target.Session
+					}
+					assertMaterialBytes(t, a, to, sid, items)
+					eq(t, nativeSessionSnapshot(t, source, from, session), before, "source session unchanged")
+					_, err := os.Stat(filepath.Join(s.Root, "危险:文件.bin"))
+					ok(t, os.IsNotExist(err), "attachment filename must never escape its target directory")
+				})
 			}
-			sid := core.S(r.Receipt["session"])
-			if sid == "" {
-				sid = r.Plan.Target.Session
-			}
-			assertMaterialBytes(t, a, to, sid, items)
-			eq(t, text(t, source), before, "source unchanged")
-			// An independent subsequent copy must also retain assets after re-reading the target format.
-			again := carry(t, a, engine.CarryOptions{Selector: to + ":" + sid, To: to, Cwd: s.Root})
-			ok(t, again.Applied)
-			for _, l := range again.Plan.Losses {
-				ok(t, l.Kind != "dropped" && l.Kind != "truncated", "second copy lost material: ", l)
-			}
-			ok(t, again.Plan.Target.Session != sid, "second copy must be a new session")
-			assertMaterialBytes(t, a, to, again.Plan.Target.Session, items)
-			_, e := os.Stat(filepath.Join(s.Root, "危险:文件.bin"))
-			ok(t, os.IsNotExist(e), "attachment filename must never escape its target directory")
+			eq(t, text(t, original), originalBefore, "original fixture remains unchanged")
 		})
 	}
 }

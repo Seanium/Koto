@@ -17,7 +17,7 @@ func (h *Hub) causalRecords(batch core.SourceBatch, drafts map[string]*core.Draf
 	if batch.Ref.Harness != "claude-code" {
 		return batch.Records
 	}
-	key := sessKey{batch.Ref.Harness, batch.Ref.Session}
+	key := sessKey{batch.Ref.Harness, batch.Ref.Session, batch.Ref.Connector}
 	if batch.Rewritten != nil || (len(batch.Records) > 0 && batch.Records[0].Index == 0) {
 		delete(h.pending, key)
 	}
@@ -57,7 +57,7 @@ func (h *Hub) causalRecords(batch core.SourceBatch, drafts map[string]*core.Draf
 					return false
 				}
 			} else if d != nil && d.Kind == "context" && d.Actor == "harness" {
-				if _, exists := h.idmap[nativeKey{key.harness, key.session, parent.Native}]; !exists {
+				if _, exists := h.idmap[nativeKey{key.harness, key.session, parent.Native, key.connector}]; !exists {
 					state[i] = 3
 					return false
 				}

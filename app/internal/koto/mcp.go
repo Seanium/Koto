@@ -96,7 +96,7 @@ func (a *App) SessionRows(query, harness string, limit int) []SessionRow {
 				hasH = true
 			}
 		}
-		sel := origin.Harness + ":" + origin.Session
+		sel := core.SessionSelector(origin.Connector, origin.Harness, origin.Session)
 		if harness != "" && !hasH {
 			continue
 		}
@@ -161,7 +161,7 @@ func (a *App) Transcript(ctx context.Context, selector string, maxTokens int) (s
 		var hs []string
 		seen := map[string]bool{}
 		for _, b := range v.Hub.Bindings(v.Thread) {
-			k := b.Harness + ":" + b.Session
+			k := core.SessionSelector(b.Connector, b.Harness, b.Session)
 			if !seen[k] {
 				seen[k] = true
 				hs = append(hs, k)
@@ -233,7 +233,7 @@ func (a *App) ServeMCP(ctx context.Context, in io.Reader, out io.Writer) error {
 		case "tools/call":
 			name, _ := msg.Params["name"].(string)
 			args := core.Obj(msg.Params["arguments"])
-			a.Sessions.Scan(ctx, nil, nil)
+			a.ScanIndex(ctx, nil)
 			var text string
 			var err error
 			switch name {

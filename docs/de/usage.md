@@ -14,6 +14,20 @@ Auch Kopien zum selben Agent sind möglich. Jede Kopie erstellt eine neue Sitzun
 
 Fehlende Dateien und nicht unterstützte Inhalte werden in den Umwandlungshinweisen gemeldet. Details stehen unter [Anhänge](compatibility.md).
 
+## Konten und Ordner
+
+Die Sitzungsliste lässt sich nach Speicherordner und erkanntem Konto filtern. Weitere Agent-Ordner können in den Einstellungen hinzugefügt werden. Sitzungen mit unbekanntem Konto bleiben sichtbar; Anbieter- und Modellnamen gelten nicht als Kontoidentität.
+
+Im Kopierdialog wählst du den Zielordner. Beim selben Produkt ist der Quellordner voreingestellt. Ein Konto wird nur gewählt, wenn das Ziel Sitzungen nach Konto speichert; ein einzelnes gültiges Konto wird automatisch ausgewählt. Zum Fortsetzen nutzt das Ziel seine eigene Anmeldung oder API-Konfiguration. koto kopiert keine Zugangsdaten.
+
+```sh
+koto profiles --json
+koto threads --profile '<profile-id>' --json
+koto copy '@<source-profile>:<session-id>' --to pi --to-profile '<target-profile>' --json
+```
+
+Verwende die von koto ausgegebenen Profil- und Sitzungskennungen. `--to-root <Ordner>` registriert einen vorhandenen Agent-Datenordner als Ziel. `--to-account <id>` gilt nur für Ziele mit Kontoauswahl. Bei gleichen Sitzungs-IDs in verschiedenen Ordnern muss das Profil angegeben werden.
+
 ## Sitzungen vergleichen
 
 Unter **Sitzungen vergleichen** 2–32 Sitzungen desselben Agents auswählen. Der Baum zeigt gemeinsame Verläufe und Abzweigungen. Zwei beliebige Sitzungen lassen sich Zeile für Zeile vergleichen.
@@ -24,18 +38,31 @@ Ein gespeicherter Vergleich enthält nur Sitzungsreferenzen. Name und Sitzungsli
 
 App und CLI gibt es als getrennte Downloads unter [Releases](https://github.com/Seanium/koto/releases). Die CLI braucht weder App noch WebView. `--help` erklärt dem Agent den Ablauf.
 
-| Plattform | CLI einrichten |
-| --- | --- |
-| macOS / Linux | `koto-cli-<os>-<arch>` herunterladen, in `koto` umbenennen und `chmod +x koto` ausführen. |
-| Windows | `koto-cli-windows-<arch>.exe` herunterladen und in `koto.exe` umbenennen. |
+Die CLI lässt sich auch im Terminal installieren:
+
+macOS / Linux:
+
+```sh
+curl -fsSL https://kotoai.site/install.sh | sh
+```
+
+Windows (PowerShell):
+
+```powershell
+irm https://kotoai.site/install.ps1 | iex
+```
+
+Standardordner: `~/.local/bin` unter macOS/Linux, `%LOCALAPPDATA%\Programs\koto\bin` unter Windows. Diesen Ordner zum PATH hinzufügen, falls der Installer dazu auffordert.
 
 Die CLI in einen Ordner im PATH legen oder dem Agent den vollständigen Pfad geben. Windows-Befehle zum Fortsetzen in PowerShell ausführen. Die Windows-App ist eine direkt ausführbare `.exe`; die Linux-App gibt es als Binärdatei und DEB, jeweils ohne CLI. Die Linux-Binärdatei vor dem Start mit `chmod +x koto-linux-<arch>` ausführbar machen.
 
 Dann sagen: **„Kopiere dieses Gespräch mit koto nach pi.“**
 
-Wenn OpenCode keine Host-Sitzungs-ID liefert, prüft koto den laufenden Werkzeugaufruf. Ein Skill ist dafür nicht nötig.
+Wenn OpenCode keine Host-Sitzungs-ID liefert, prüft koto den laufenden Werkzeugaufruf.
 
-Die Erkennung nutzt `CODEX_THREAD_ID`, `PI_SESSION_ID`, `DSH_SESSION_ID`, `ANTIGRAVITY_CONVERSATION_ID` oder `CLAUDE_CODE_SESSION_ID`, sofern der Host eine davon bereitstellt. Andernfalls die genaue Angabe `agent:session-id` direkt oder über `KOTO_SESSION` verwenden. Ein ausdrücklich gesetztes `KOTO_SESSION` hat Vorrang; widersprüchliche Host-IDs werden abgelehnt. koto wählt keine Sitzung nach Aktualität oder Projektordner aus.
+Die Erkennung nutzt `CODEX_THREAD_ID`, `PI_SESSION_ID`, `DSH_SESSION_ID`, `ANTIGRAVITY_CONVERSATION_ID`, `CURSOR_CONVERSATION_ID` oder `CLAUDE_CODE_SESSION_ID`, sofern der Host eine davon bereitstellt. Andernfalls die genaue Angabe `agent:session-id` direkt oder über `KOTO_SESSION` verwenden. Ein ausdrücklich gesetztes `KOTO_SESSION` hat Vorrang; widersprüchliche Host-IDs werden abgelehnt. koto wählt keine Sitzung nach Aktualität oder Projektordner aus.
+
+WorkBuddy verwendet `CODEBUDDY_SESSION_ID` zusammen mit dem passenden `WORKBUDDY_CONFIG_DIR`. Die Sitzungs-ID allein bestimmt kein WorkBuddy-Profil.
 
 Die Antwort nennt die kopierte Anzahl, Umwandlungshinweise und den Befehl zum Fortsetzen. Die noch laufende Runde einschließlich des Kopierauftrags wird ausgelassen. Die Quelle bleibt unverändert; der Ziel-Agent wird nicht automatisch gestartet.
 
@@ -58,14 +85,31 @@ koto copy 'claude-code:<session-id>' --to pi --json
 koto analyze 'claude-code:<session-a>' 'claude-code:<session-b>' --json
 ```
 
-Ist `koto` nicht in PATH, den vollständigen Pfad aus der Tabelle verwenden. `--json` liefert `state: "copied"` nur nach erfolgreichem Kopieren, bei einer Vorschau `state: "preview"`. Fehler liefern eine Fehlermeldung und einen Exit-Code ungleich null. Einzelne Fragen oder Antworten lassen sich in der App auswählen.
+Ist `koto` nicht in PATH, den vollständigen Pfad der installierten Datei verwenden. `--json` liefert `state: "copied"` nur nach erfolgreichem Kopieren, bei einer Vorschau `state: "preview"`. Fehler liefern eine Fehlermeldung und einen Exit-Code ungleich null. Einzelne Fragen oder Antworten lassen sich in der App auswählen.
 
 `koto trash <selector>` verschiebt eine Sitzung in den Papierkorb oder das Archiv ihres Agents. `koto restore <trash-id>` stellt sie wieder her, ohne vorhandene Pfade zu überschreiben. Für Tests mit `--data`, Agent-Verzeichnissen und `--only` entbehrliche Verzeichnisse festlegen.
 
 `koto mcp` stellt die schreibgeschützten Werkzeuge `list_sessions` und `get_session` über stdio JSON-RPC bereit.
+
+## Updates
+
+In der App unter **Einstellungen → Allgemein** nach Updates suchen. Bei einer neuen Version **Aktualisieren und neu starten** wählen.
+
+CLI aktualisieren:
+
+```sh
+koto update --check
+koto update
+```
+
+App und CLI laden getrennt von GitHub Releases herunter und prüfen vor der Installation SHA-256. Stabile Versionen erhalten standardmäßig nur stabile Updates. Mit `--channel beta` auch Vorabversionen beziehen.
 
 ## Einstellungen und Speicherung
 
 Als Sprache stehen Englisch, vereinfachtes und traditionelles Chinesisch, Japanisch, Deutsch oder die Systemsprache zur Wahl. Das Erscheinungsbild kann System, Hell oder Dunkel sein.
 
 koto speichert Index, Einstellungen, Vergleichsreferenzen und Papierkorbinformationen lokal. Gesprächssicherungen und Kopierverläufe werden nicht gespeichert. Kopierte Anhänge gehören zur neuen Agent-Sitzung. Kopiert wird ausschließlich manuell.
+
+Bei geänderter Indexstruktur oder Leselogik wird der Index automatisch neu erstellt. Sitzungen erscheinen schrittweise; ursprüngliche Agent-Dateien und gespeicherte Einstellungen bleiben erhalten.
+
+App und CLI nutzen denselben Datenordner: `~/Library/Application Support/koto` unter macOS, `%LOCALAPPDATA%\koto` unter Windows und `$XDG_DATA_HOME/koto` (Standard: `~/.local/share/koto`) unter Linux. `KOTO_HOME` oder `--data` überschreibt diesen Pfad.

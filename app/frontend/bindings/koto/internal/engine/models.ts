@@ -53,6 +53,9 @@ export interface DeliveryTarget {
     "cwd"?: string;
     "title"?: string;
     "path"?: string;
+    "profile"?: string;
+    "account"?: string;
+    "root"?: string;
 }
 
 /**
@@ -67,6 +70,17 @@ export interface ScanError {
     "connector": string;
     "session"?: string;
     "error": string;
+}
+
+/**
+ * ScanProgress is where a scan stands.
+ */
+export interface ScanProgress {
+    "connector": string;
+    "harness": string;
+    "done": number;
+    "total": number;
+    "added": number;
 }
 
 /**

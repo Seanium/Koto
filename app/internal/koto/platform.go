@@ -3,6 +3,7 @@
 package koto
 
 import (
+	"koto/internal/connectors/claudecode"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -26,17 +27,14 @@ func env(k, def string) string {
 // PlatformDefaults for this machine.
 func PlatformDefaults() Defaults {
 	home, _ := os.UserHomeDir()
-	var dataHome, desktop string
+	var dataHome string
 	switch runtime.GOOS {
 	case "windows":
 		dataHome = env("LOCALAPPDATA", filepath.Join(home, "AppData", "Local"))
-		desktop = filepath.Join(env("APPDATA", filepath.Join(home, "AppData", "Roaming")), "Claude")
 	case "darwin":
-		dataHome = filepath.Join(home, ".local", "share") // CLI-style dotdirs on macOS too (like Codex/pi)
-		desktop = filepath.Join(home, "Library", "Application Support", "Claude")
+		dataHome = filepath.Join(home, "Library", "Application Support")
 	default:
 		dataHome = env("XDG_DATA_HOME", filepath.Join(home, ".local", "share"))
-		desktop = filepath.Join(env("XDG_CONFIG_HOME", filepath.Join(home, ".config")), "Claude")
 	}
 	return Defaults{
 		DataDir:           env("KOTO_HOME", filepath.Join(dataHome, "koto")),
@@ -46,6 +44,6 @@ func PlatformDefaults() Defaults {
 		DshHome:           env("DSH_HOME", filepath.Join(home, ".dsh")),
 		AntigravityRoot:   filepath.Join(home, ".gemini", "antigravity-cli"),
 		OpenCodeRoot:      filepath.Join(env("XDG_DATA_HOME", filepath.Join(home, ".local", "share")), "opencode"),
-		ClaudeDesktopDirs: []string{desktop, desktop + "-3p"},
+		ClaudeDesktopDirs: claudecode.DefaultDesktopDirs(runtime.GOOS, home, os.Getenv("APPDATA"), os.Getenv("LOCALAPPDATA"), os.Getenv("XDG_CONFIG_HOME")),
 	}
 }

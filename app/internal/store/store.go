@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -27,7 +28,7 @@ CREATE TABLE IF NOT EXISTS sessions (
   size INTEGER, mtime REAL, title TEXT, cwd TEXT, created INTEGER, updated INTEGER,
   turns INTEGER NOT NULL DEFAULT 0, first_prompt TEXT, first_native TEXT,
   parent_harness TEXT, parent_session TEXT, offset TEXT, meta TEXT, seen INTEGER,
-  PRIMARY KEY (harness, session)
+  PRIMARY KEY (connector, session)
 );
 CREATE INDEX IF NOT EXISTS sessions_first ON sessions(harness, first_native);
 CREATE TABLE IF NOT EXISTS trash (id TEXT PRIMARY KEY, thread TEXT NOT NULL, harness TEXT, title TEXT, items TEXT NOT NULL, trashed_at INTEGER NOT NULL, restored_at INTEGER);
@@ -99,27 +100,60 @@ type Store struct {
 
 // Open opens (creating) koto.sqlite in dir.
 func Open(dir string) (*Store, error) {
+	var err error
+	dir, err = filepath.Abs(dir)
+	if err != nil {
+		return nil, err
+	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, err
 	}
 	file := filepath.Join(dir, "koto.sqlite")
-	db, err := sql.Open("sqlite", "file:"+file+"?_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=busy_timeout(5000)&_txlock=immediate")
+	db, err := sql.Open("sqlite", (&url.URL{Scheme: "file", Path: filepath.ToSlash(file)}).String()+"?_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=busy_timeout(5000)&_txlock=immediate")
 	if err != nil {
 		return nil, err
 	}
 	db.SetMaxOpenConns(1)
-	if _, err := db.Exec(schema); err != nil {
+	if _, err := db.Exec("CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT)"); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("open %s: %w", file, err)
+	}
+	if err := resetProfileIndex(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("initialize session profiles: %w", err)
+	}
+	if _, err := db.Exec(schema); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("initialize index: %w", err)
 	}
 	b := make([]byte, 4)
 	_, _ = rand.Read(b)
 	return &Store{Dir: dir, File: file, db: db, Owner: fmt.Sprintf("%d|%s", os.Getpid(), hex.EncodeToString(b))}, nil
 }
 
+// The native index is disposable. An old index is rebuilt from native sources;
+// no account migration or alternate historical schema is maintained.
+func resetProfileIndex(db *sql.DB) error {
+	var version string
+	if err := db.QueryRow("SELECT v FROM meta WHERE k='native-index-version'").Scan(&version); err == nil && version == "profiles-1" {
+		return nil
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, q := range []string{"DROP TABLE IF EXISTS sessions", schema, "INSERT OR REPLACE INTO meta(k,v) VALUES('native-index-version','profiles-1')"} {
+		if _, err = tx.Exec(q); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 // Close drops this process's locks and closes the file.
 func (s *Store) Close() {
-	_, _ = s.db.Exec("DELETE FROM locks WHERE owner = ?", s.Owner)
+	_, _ = s.db.Exec("DELETE FROM locks WHERE owner = ? OR owner LIKE ?", s.Owner, s.Owner+"-%")
 	_ = s.db.Close()
 }
 
@@ -214,9 +248,25 @@ func (s *Store) Sessions() []SessionRow {
 }
 
 // Session is one row.
-func (s *Store) Session(harness, session string) (SessionRow, bool) {
-	r, err := scanSession(s.db.QueryRow("SELECT "+sessionCols+" FROM sessions WHERE harness = ? AND session = ?", harness, session))
-	return r, err == nil
+func (s *Store) Session(harness, session string, connector ...string) (SessionRow, bool) {
+	q, args := "SELECT "+sessionCols+" FROM sessions WHERE harness = ? AND session = ?", []any{harness, session}
+	if len(connector) > 0 {
+		q += " AND connector = ?"
+		args = append(args, connector[0])
+	}
+	rows, err := s.db.Query(q, args...)
+	if err != nil {
+		return SessionRow{}, false
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		return SessionRow{}, false
+	}
+	r, err := scanSession(rows)
+	if err != nil || rows.Next() {
+		return SessionRow{}, false
+	}
+	return r, rows.Err() == nil
 }
 
 func nullStr(s string) any {
@@ -234,7 +284,14 @@ func nullNum(f float64) any {
 }
 
 // PutSession writes a row.
-func (s *Store) PutSession(r SessionRow) {
+func (s *Store) PutSession(r SessionRow) error {
+	return putSession(s.db, r)
+}
+
+func putSession(db interface {
+	Exec(string, ...any) (sql.Result, error)
+}, r SessionRow) error {
+	r = compactSession(r)
 	var ph, ps, off any
 	if r.Parent != nil {
 		ph, ps = r.Parent.Harness, r.Parent.Session
@@ -252,16 +309,17 @@ func (s *Store) PutSession(r SessionRow) {
 	if r.Size != 0 {
 		size = r.Size
 	}
-	_, _ = s.db.Exec("INSERT OR REPLACE INTO sessions ("+sessionCols+", seen) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+	_, err := db.Exec("INSERT OR REPLACE INTO sessions ("+sessionCols+", seen) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		r.Harness, r.Session, r.Connector, nullStr(r.Path), size, nullNum(r.Mtime), nullStr(r.Title), nullStr(r.Cwd), nullNum(r.Created), nullNum(r.Updated), r.Turns,
 		nullStr(r.FirstPrompt), nullStr(r.FirstNative), ph, ps, off, string(mb), nowMs())
+	return err
 }
 
 // DropUnseen forgets a connector's sessions a full scan did not see (deleted or moved by their harness).
-func (s *Store) DropUnseen(connector string, seen map[string]bool) {
+func (s *Store) DropUnseen(connector string, seen map[string]bool) (int, error) {
 	rows, err := s.db.Query("SELECT harness, session FROM sessions WHERE connector = ?", connector)
 	if err != nil {
-		return
+		return 0, err
 	}
 	var gone [][2]string
 	for rows.Next() {
@@ -270,10 +328,18 @@ func (s *Store) DropUnseen(connector string, seen map[string]bool) {
 			gone = append(gone, [2]string{h, ss})
 		}
 	}
+	err = rows.Err()
 	rows.Close()
-	for _, g := range gone {
-		_, _ = s.db.Exec("DELETE FROM sessions WHERE harness = ? AND session = ?", g[0], g[1])
+	if err != nil {
+		return 0, err
 	}
+	for _, g := range gone {
+		_, err = s.db.Exec("DELETE FROM sessions WHERE harness = ? AND session = ? AND connector = ?", g[0], g[1], connector)
+		if err != nil {
+			return 0, err
+		}
+	}
+	return len(gone), nil
 }
 
 // ------------------------------------------------------------------ trash
@@ -351,6 +417,10 @@ type LockHolder struct {
 // TryLock takes or renews a named lock shared by every koto process on this data; returns the
 // live holder when someone else has it.
 func (s *Store) TryLock(name string, ttl time.Duration, info core.JsonObject) (*LockHolder, error) {
+	return s.tryLock(name, s.Owner, ttl, info)
+}
+
+func (s *Store) tryLock(name, leaseOwner string, ttl time.Duration, info core.JsonObject) (*LockHolder, error) {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return nil, err
@@ -360,7 +430,7 @@ func (s *Store) TryLock(name string, ttl time.Duration, info core.JsonObject) (*
 	var expires int64
 	var inf sql.NullString
 	err = tx.QueryRow("SELECT owner, expires, info FROM locks WHERE name = ?", name).Scan(&owner, &expires, &inf)
-	if err == nil && owner != s.Owner && expires > nowMs() && ownerAlive(owner) {
+	if err == nil && owner != leaseOwner && expires > nowMs() && ownerAlive(owner) {
 		h := &LockHolder{Owner: owner, Info: core.JsonObject{}}
 		if inf.Valid {
 			_ = json.Unmarshal([]byte(inf.String), &h.Info)
@@ -375,7 +445,7 @@ func (s *Store) TryLock(name string, ttl time.Duration, info core.JsonObject) (*
 		m[k] = v
 	}
 	b, _ := json.Marshal(m)
-	if _, err := tx.Exec("INSERT OR REPLACE INTO locks (name, owner, expires, info) VALUES (?, ?, ?, ?)", name, s.Owner, nowMs()+ttl.Milliseconds(), string(b)); err != nil {
+	if _, err := tx.Exec("INSERT OR REPLACE INTO locks (name, owner, expires, info) VALUES (?, ?, ?, ?)", name, leaseOwner, nowMs()+ttl.Milliseconds(), string(b)); err != nil {
 		return nil, err
 	}
 	return nil, tx.Commit()
@@ -395,11 +465,24 @@ func ownerAlive(owner string) bool {
 }
 
 // EngineLocks adapts the store's locks to the engine.
-type EngineLocks struct{ S *Store }
+type EngineLocks struct {
+	S     *Store
+	owner string
+}
+
+// Each engine has a distinct lease owner, including engines sharing one Store.
+// A renewal can only extend that engine’s lease, never another view’s operation.
+func NewEngineLocks(s *Store) EngineLocks {
+	b := make([]byte, 8)
+	_, _ = rand.Read(b)
+	return EngineLocks{S: s, owner: s.Owner + "-" + hex.EncodeToString(b)}
+}
 
 func (l EngineLocks) TryLock(name string, ttl time.Duration) (bool, error) {
-	h, err := l.S.TryLock(name, ttl, nil)
+	h, err := l.S.tryLock(name, l.owner, ttl, nil)
 	return h != nil, err
 }
 
-func (l EngineLocks) Unlock(name string) { l.S.Unlock(name) }
+func (l EngineLocks) Unlock(name string) {
+	_, _ = l.S.db.Exec("DELETE FROM locks WHERE name = ? AND owner = ?", name, l.owner)
+}

@@ -14,6 +14,20 @@ koto は設定で有効にした Agent フォルダーからセッションを�
 
 不足しているファイルや未対応の内容は変換説明に表示します。[添付ファイルの対応](compatibility.md)も確認してください。
 
+## アカウントとフォルダー
+
+セッション一覧では保存フォルダーや識別済みのアカウントで絞り込めます。別の Agent フォルダーは設定から追加できます。アカウント不明のセッションも表示し、プロバイダー名やモデル名をアカウントとして扱いません。
+
+コピー先のフォルダーを選べます。同じ製品へのコピーは元のフォルダーが既定です。コピー先がアカウント別に保存する場合のみアカウントを選び、有効な候補が 1 つなら自動選択します。続きにはコピー先のログインや API 設定を使い、認証情報はコピーしません。
+
+```sh
+koto profiles --json
+koto threads --profile '<profile-id>' --json
+koto copy '@<source-profile>:<session-id>' --to pi --to-profile '<target-profile>' --json
+```
+
+koto が返した正確な profile とセッション識別子を使ってください。`--to-root <folder>` は既存の Agent データフォルダーをコピー先として登録します。`--to-account <id>` はアカウント選択に対応するコピー先専用です。異なるフォルダーに同じセッション ID がある場合は profile を指定します。
+
 ## セッションを比較する
 
 「セッションの比較」で同じ Agent のセッションを 2〜32 個選びます。ツリーで共通の履歴と分岐を確認し、任意の 2 つを行ごとに比較できます。
@@ -24,18 +38,31 @@ koto は設定で有効にした Agent フォルダーからセッションを�
 
 App と CLI は [Releases](https://github.com/Seanium/koto/releases) から個別にダウンロードできます。CLI に App や WebView は不要です。`--help` に Agent 向けの手順があります。
 
-| プラットフォーム | CLI の準備 |
-| --- | --- |
-| macOS / Linux | `koto-cli-<os>-<arch>` をダウンロードし、`koto` に改名して `chmod +x koto` を実行します。 |
-| Windows | `koto-cli-windows-<arch>.exe` をダウンロードし、`koto.exe` に改名します。 |
+CLI はコマンドからもインストールできます。
+
+macOS / Linux:
+
+```sh
+curl -fsSL https://kotoai.site/install.sh | sh
+```
+
+Windows (PowerShell):
+
+```powershell
+irm https://kotoai.site/install.ps1 | iex
+```
+
+既定の保存先は macOS/Linux が `~/.local/bin`、Windows が `%LOCALAPPDATA%\Programs\koto\bin` です。インストーラーの案内に従って PATH に追加してください。
 
 CLI を PATH 内のフォルダーに置くか、Agent にフルパスを伝えてください。Windows の継続コマンドは PowerShell で実行します。Windows App は直接起動する `.exe`、Linux App はバイナリと DEB です。CLI は同梱しません。Linux App のバイナリは、起動前に `chmod +x koto-linux-<arch>` を実行してください。
 
 **「koto で今の対話を pi にコピーして。」**と頼みます。
 
-OpenCode がホストのセッション ID を提供しない場合は、実行中のツール呼び出しで現在のセッションを確認します。Skill のインストールは不要です。
+OpenCode がホストのセッション ID を提供しない場合は、実行中のツール呼び出しで現在のセッションを確認します。
 
-自動識別には、ホストが提供する `CODEX_THREAD_ID`、`PI_SESSION_ID`、`DSH_SESSION_ID`、`ANTIGRAVITY_CONVERSATION_ID`、`CLAUDE_CODE_SESSION_ID` を使います。提供されない場合は、正確な `agent:session-id` を直接、または `KOTO_SESSION` で指定します。明示的な `KOTO_SESSION` を優先し、複数のホスト ID が競合する場合はエラーを返します。更新日時やプロジェクトフォルダーからは推測しません。
+自動識別には、ホストが提供する `CODEX_THREAD_ID`、`PI_SESSION_ID`、`DSH_SESSION_ID`、`ANTIGRAVITY_CONVERSATION_ID`、`CURSOR_CONVERSATION_ID`、`CLAUDE_CODE_SESSION_ID` を使います。提供されない場合は、正確な `agent:session-id` を直接、または `KOTO_SESSION` で指定します。明示的な `KOTO_SESSION` を優先し、複数のホスト ID が競合する場合はエラーを返します。更新日時やプロジェクトフォルダーからは推測しません。
+
+WorkBuddy は `CODEBUDDY_SESSION_ID` と対応する `WORKBUDDY_CONFIG_DIR` でコピー元を確認します。セッション ID だけでは保存先を特定しません。
 
 回答にはコピー数、変換内容、続けるためのコマンドが含まれます。コピーの依頼を含む、未完了のターンは引き継ぎません。コピー元は変わらず、コピー先の Agent は自動起動しません。
 
@@ -58,14 +85,31 @@ koto copy 'claude-code:<session-id>' --to pi --json
 koto analyze 'claude-code:<session-a>' 'claude-code:<session-b>' --json
 ```
 
-`koto` が PATH にない場合は表のフルパスを使ってください。`--json` はコピー成功時にのみ `state: "copied"`、プレビュー時には `state: "preview"` を返します。失敗時はエラーと 0 以外の終了コードを返します。質問や回答を個別に選ぶ場合はアプリを使ってください。
+`koto` が PATH にない場合はインストール先のフルパスを使ってください。`--json` はコピー成功時にのみ `state: "copied"`、プレビュー時には `state: "preview"` を返します。失敗時はエラーと 0 以外の終了コードを返します。質問や回答を個別に選ぶ場合はアプリを使ってください。
 
 `koto trash <selector>` はセッションをゴミ箱または Agent のアーカイブへ移動します。`koto restore <trash-id>` は既存パスを上書きせず復元します。テストでは `--data`、Agent ルート、`--only` を使い、破棄できるディレクトリを指定してください。
 
 `koto mcp` は stdio JSON-RPC で読み取り専用の `list_sessions` と `get_session` を提供します。
+
+## アップデート
+
+App の「設定 → 一般」で更新を確認し、新しいバージョンがあれば「更新して再起動」を選びます。
+
+CLI の更新：
+
+```sh
+koto update --check
+koto update
+```
+
+App と CLI はそれぞれ GitHub Releases からダウンロードし、インストール前に SHA-256 を検証します。安定版は安定版のみを取得します。プレビュー版も使う場合は `--channel beta` を指定してください。
 
 ## 設定と保存データ
 
 言語は英語、簡体字中国語、繁体字中国語、日本語、ドイツ語、またはシステム設定に対応します。外観はシステム、ライト、ダークから選べます。
 
 索引、設定、比較の参照、ゴミ箱情報をローカルに保存します。対話のバックアップやコピー履歴は保存しません。コピーした添付ファイルは新しい Agent セッションに属します。コピーは手動操作のみです。
+
+索引の構造や読み取り規則が変わると自動で再構築し、セッションを順次表示します。元の Agent ファイルと保存済み設定は保持します。
+
+App と CLI は同じデータフォルダーを使います。macOS は `~/Library/Application Support/koto`、Windows は `%LOCALAPPDATA%\koto`、Linux は `$XDG_DATA_HOME/koto`（既定は `~/.local/share/koto`）です。`KOTO_HOME` または `--data` で変更できます。

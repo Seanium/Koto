@@ -144,8 +144,8 @@ func TestClaudeCodeIncrementalTail(t *testing.T) {
 		return out
 	}
 	jsonEq(t, ids(b), ids(a), "ids")
-	ob, _ := b.Hub.Offset("claude-code", CCSession)
-	oa, _ := a.Hub.Offset("claude-code", CCSession)
+	ob, _ := b.Hub.Offset(b.Registry.Get("claude-code").ID, CCSession)
+	oa, _ := a.Hub.Offset(a.Registry.Get("claude-code").ID, CCSession)
 	eq(t, ob.PrefixHash, oa.PrefixHash, "prefix")
 }
 

@@ -19,6 +19,7 @@ import (
 	"koto/internal/koto"
 	"koto/internal/legal"
 	"koto/internal/store"
+	"koto/internal/update"
 )
 
 // version is set by the release build (-ldflags -X main.version=…).
@@ -29,6 +30,7 @@ const help = `koto — copy coding-agent conversations between harnesses
 usage: koto <command> [options]
 
 commands
+  rebuild-index              rebuild disposable session summaries from native sources
   scan                       read the harness folders into the index (only changed files are read; nothing is written there)
   threads                    list conversations (from the index)
   show <sel>                 show a native session (sel: harness:session, or an event id)
@@ -41,11 +43,13 @@ commands
   restore <trash-id>         put a trash entry's sessions back where they were
   mcp                        stdio MCP server: list_sessions / get_session, so any MCP-capable harness can pull a session
   connectors                 list connectors and capabilities
+  profiles                   list storage profiles and evidenced identities
   version                    print the version
+  update [--check]            check for a new version or update this CLI
   licenses                   show complete license and third-party notices
 
 options
-  --data <dir>          data dir (default $KOTO_HOME or ~/.local/share/koto)
+  --data <dir>          data dir (default $KOTO_HOME or the platform data folder)
   --claude-root <dir>   Claude Code config dir (default $CLAUDE_CONFIG_DIR or ~/.claude)
   --pi-root <dir>       pi agent dir (default $PI_CODING_AGENT_DIR or ~/.pi/agent)
   --codex-home <dir>    Codex home (default $CODEX_HOME or ~/.codex)
@@ -53,7 +57,19 @@ options
   --dsh-home <dir>      dsh home (default $DSH_HOME or ~/.dsh)
   --agy-root <dir>      Antigravity CLI dir (default ~/.gemini/antigravity-cli)
   --opencode-root <dir> OpenCode data directory (default $XDG_DATA_HOME/opencode)
+  --zcode-root <dir>    ZCode storage directory (default $ZCODE_STORAGE_DIR or ~/.zcode)
+  --zcode-bin <path>    ZCode executable (default detected installation or PATH)
+  --cursor-app-root <dir>  Cursor App user data (separate from CLI)
+  --cursor-root <dir>   Cursor CLI data (default ~/.cursor)
+  --cursor-bin <path>   Explicit Cursor CLI executable
+  --workbuddy-root <dir> WorkBuddy App data (default ~/.workbuddy)
+  --workbuddy-ai-root <dir> WorkBuddy AI App data (default ~/.workbuddy-ai)
   --only <ids>          comma-separated connector ids to enable
+  --profile <id>        filter session list by storage profile
+  --account <id>        filter evidenced historical account (within profile)
+  --to-profile <id>     copy into this registered storage profile
+  --to-root <dir>       register and copy into this existing Agent data directory
+  --to-account <id>     select a native owner only where the target supports it
   --level L0|L1|L2|L3   projection level for carry
   --max-tokens <n>      token budget for carry (older turns summarized)
   --title <text>        a new session's title
@@ -63,6 +79,30 @@ options
 ` + "\n" + agentGuide
 
 func main() {
+	if len(os.Args) == 4 && os.Args[1] == "--koto-install" {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		exe, err := os.Executable()
+		if err == nil {
+			err = update.InstallCLI(ctx, exe, os.Args[2], version, os.Args[3])
+		}
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
+	if len(os.Args) == 3 && os.Args[1] == "--koto-update-recover" {
+		if err := update.RunRecovery(os.Args[2]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
+	update.CleanPrevious(update.CLI)
+	if len(os.Args) > 1 && os.Args[1] == "update" {
+		os.Exit(runUpdate(os.Args[2:], os.Stdout, os.Stderr))
+	}
 	// Flags may come after the positionals (koto carry <sel> --to pi).
 	var pos, flags []string
 	for i := 1; i < len(os.Args); i++ {
@@ -86,7 +126,13 @@ func main() {
 	b := func(n string) *bool { return fs.Bool(n, false, "") }
 	data, claude, piRoot, codexHome, codexShadow, codexBin, dshHome, agy := s("data"), s("claude-root"), s("pi-root"), s("codex-home"), s("codex-shadow"), s("codex-bin"), s("dsh-home"), s("agy-root")
 	opencodeRoot := s("opencode-root")
+	zcodeRoot := s("zcode-root")
+	zcodeBin := s("zcode-bin")
+	workBuddyRoot, workBuddyAIRoot := s("workbuddy-root"), s("workbuddy-ai-root")
+	cursorRoot, cursorBin := s("cursor-root"), s("cursor-bin")
+	cursorAppRoot := s("cursor-app-root")
 	only, to, level, maxTokens, harness, liveMs, limit, cwd, title := s("only"), s("to"), s("level"), s("max-tokens"), s("harness"), s("live-ms"), s("limit"), s("cwd"), s("title")
+	profile, account, toProfile, toAccount, toRoot := s("profile"), s("account"), s("to-profile"), s("to-account"), s("to-root")
 	dry, asJSON, h := b("dry-run"), b("json"), b("help")
 	if err := fs.Parse(flags); err != nil {
 		os.Exit(2)
@@ -116,7 +162,10 @@ func main() {
 	if len(pos) > 1 {
 		sel = pos[1]
 	}
-	cfg := koto.Config{DataDir: *data, ClaudeRoot: *claude, PiRoot: *piRoot, CodexHome: *codexHome, CodexShadow: *codexShadow, CodexBin: *codexBin, DshHome: *dshHome, AntigravityRoot: *agy, OpenCodeRoot: *opencodeRoot, Log: stderrLog{}}
+	cfg := koto.Config{DataDir: *data, ClaudeRoot: *claude, PiRoot: *piRoot, CodexHome: *codexHome, CodexShadow: *codexShadow, CodexBin: *codexBin, DshHome: *dshHome, AntigravityRoot: *agy, OpenCodeRoot: *opencodeRoot, ZCodeRoot: *zcodeRoot, Log: stderrLog{}}
+	cfg.ZCodeBin, cfg.WorkBuddyRoot, cfg.WorkBuddyAIRoot = *zcodeBin, *workBuddyRoot, *workBuddyAIRoot
+	cfg.CursorRoot, cfg.CursorBin = *cursorRoot, *cursorBin
+	cfg.CursorAppRoot = *cursorAppRoot
 	if *liveMs != "" {
 		n, _ := strconv.ParseInt(*liveMs, 10, 64)
 		cfg.LiveMs = &n
@@ -129,6 +178,16 @@ func main() {
 		fatal(err)
 	}
 	defer app.Close()
+	if *toRoot != "" {
+		if *toProfile != "" {
+			fatal(fmt.Errorf("choose --to-root or --to-profile, not both"))
+		}
+		p, err := app.EnsureRoot(*to, *toRoot)
+		if err != nil {
+			fatal(err)
+		}
+		*toProfile = p.ID
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 	out := func(human string, v any) {
@@ -156,7 +215,7 @@ func main() {
 			}
 			return view{app.Hub, app.Engine, t, hd}
 		}
-		app.Sessions.Scan(ctx, nil, nil)
+		app.ScanIndex(ctx, nil)
 		v, err := app.OpenThread(ctx, s)
 		if err != nil {
 			fatal(err)
@@ -178,9 +237,26 @@ func main() {
 		}
 	}
 	switch cmd {
-	case "scan":
+	case "profiles":
+		app.ScanIndex(ctx, nil)
+		profiles := app.Profiles(ctx)
+		var lines []string
+		for _, p := range profiles {
+			lines = append(lines, p.ID+"\t"+p.Root)
+		}
+		out(strings.Join(lines, "\n"), profiles)
+	case "scan", "rebuild-index":
 		t := time.Now()
-		r := app.Sessions.Scan(ctx, nil, nil)
+		var r engine.ScanReport
+		if cmd == "rebuild-index" {
+			var err error
+			r, err = (&koto.API{App: app}).RebuildIndex(ctx)
+			if err != nil {
+				fatal(err)
+			}
+		} else {
+			r = app.ScanIndex(ctx, nil)
+		}
 		var lines []string
 		for i, e := range r.Errors {
 			if i >= 20 {
@@ -190,12 +266,12 @@ func main() {
 		}
 		out(fmt.Sprintf("sessions %d, changed %d, errors %d in %d ms%s", r.Sessions, r.Changed, len(r.Errors), time.Since(t).Milliseconds(), strings.Join(lines, "")), r)
 	case "threads":
-		app.Sessions.Scan(ctx, nil, nil)
+		app.ScanIndex(ctx, nil)
 		n := 50
 		if *limit != "" {
 			n, _ = strconv.Atoi(*limit)
 		}
-		rows := app.ListThreads()
+		rows := app.SearchThreadsFiltered("", *harness, "", *profile, *account, 0)
 		if len(rows) > n {
 			rows = rows[:n]
 		}
@@ -235,7 +311,7 @@ func main() {
 		}
 		out(strings.Join(lines, "\n"), map[string]any{"thread": v.thread, "head": v.head, "events": path})
 	case "analyze":
-		app.Sessions.Scan(ctx, nil, nil)
+		app.ScanIndex(ctx, nil)
 		result, err := (&koto.API{App: app}).Analyze(ctx, pos[1:])
 		if err != nil {
 			fatal(err)
@@ -250,7 +326,7 @@ func main() {
 		if *maxTokens != "" {
 			mt, _ = strconv.Atoi(*maxTokens)
 		}
-		res, err := v.engine.Carry(ctx, engine.CarryOptions{Thread: v.thread, Head: v.head, To: *to, Level: *level, DryRun: *dry,
+		res, err := v.engine.Carry(ctx, engine.CarryOptions{Thread: v.thread, Head: v.head, To: *to, TargetProfile: *toProfile, TargetAccount: *toAccount, Level: *level, DryRun: *dry,
 			MaxTokens: mt, Cwd: *cwd, Title: *title})
 		if err != nil {
 			fatal(err)

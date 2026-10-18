@@ -4,6 +4,7 @@ import { shortcut } from '../ui/shortcut'
 
 import { createPortal } from 'react-dom'
 import { createContext, forwardRef, useCallback, useContext, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { captureScrollAnchor } from '../scrollAnchor'
 import { shell } from '../api/client'
 import { clockTime, oneLine, type ToolStep, type Turn, type TurnImage, type TurnFile } from '../api/model'
 import { Button, Icon, Skeleton } from '../ui'
@@ -36,11 +37,21 @@ export const Timeline = forwardRef<TimelineHandle, {
   const lastTurn = useRef(turns.at(-1)?.index ?? 0)
   const pendingJump = useRef<number | undefined>(undefined)
   const loadingEarlier = useRef(false)
+  const allowAutomaticPage = useRef(true)
   // Just opened: the page is still settling at its latest turn; do not page in earlier turns yet.
   const settling = useRef(0)
   const box = useRef<HTMLDivElement>(null)
   const flashTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
-  useEffect(() => () => clearTimeout(flashTimer.current), [])
+  const generation = useRef(0)
+  const frames = useRef(new Set<number>())
+  const nextFrame = useCallback((action: () => void) => {
+    const frame = requestAnimationFrame(() => { frames.current.delete(frame); action() })
+    frames.current.add(frame)
+  }, [])
+  useEffect(() => {
+    generation.current++; pendingJump.current = undefined; loadingEarlier.current = false; allowAutomaticPage.current = true; setEarlier(false)
+    return () => { generation.current++; clearTimeout(flashTimer.current); for (const frame of frames.current) cancelAnimationFrame(frame); frames.current.clear() }
+  }, [resetKey])
 
   // Another session: from its latest turn.
   useLayoutEffect(() => {
@@ -69,7 +80,7 @@ export const Timeline = forwardRef<TimelineHandle, {
     const added = end - lastTurn.current
     lastTurn.current = end
     if (added <= 0) return
-    if (atBottom) requestAnimationFrame(() => { const s = scroller.current; if (s) s.scrollTo({ top: s.scrollHeight, behavior: 'smooth' }) })
+    if (atBottom) nextFrame(() => { const s = scroller.current; if (s) s.scrollTo({ top: s.scrollHeight, behavior: 'smooth' }) })
     else setUnseen(n => n + added)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [turns.at(-1)?.index])
@@ -87,15 +98,20 @@ export const Timeline = forwardRef<TimelineHandle, {
   const jumpToTurn = useCallback((turn: number) => {
     if (turn < 1 || turn > totalTurns) return
     if (scrollToTurn(turn)) return
+    const currentGeneration = generation.current
     pendingJump.current = turn
+    allowAutomaticPage.current = false
     setEarlier(true)
-    void loadEarlier(turn).finally(() => setEarlier(false))
-  }, [totalTurns, scrollToTurn, loadEarlier])
+    void loadEarlier(turn).catch(() => {}).finally(() => {
+      if (generation.current !== currentGeneration) return
+      nextFrame(() => { if (pendingJump.current === turn) { pendingJump.current = undefined; scrollToTurn(turn) }; setEarlier(false) })
+    })
+  }, [totalTurns, scrollToTurn, loadEarlier, nextFrame])
   // A jump waiting for its page: scroll once the turn is rendered.
   useEffect(() => {
     const t = pendingJump.current
-    if (t !== undefined && document.getElementById(`turn-${t}`)) { pendingJump.current = undefined; requestAnimationFrame(() => scrollToTurn(t)) }
-  }, [turns, scrollToTurn])
+    if (t !== undefined && document.getElementById(`turn-${t}`)) { pendingJump.current = undefined; nextFrame(() => scrollToTurn(t)) }
+  }, [turns, scrollToTurn, nextFrame])
   useImperativeHandle(ref, () => ({ jumpToTurn }), [jumpToTurn])
 
   /** The turn at the top of the view, and whether its start is above the bar (partly scrolled past). */
@@ -129,17 +145,27 @@ export const Timeline = forwardRef<TimelineHandle, {
       const bottom = s.scrollHeight - s.scrollTop - s.clientHeight < 80
       setAtBottom(bottom)
       if (bottom) setUnseen(0)
-      if (hasEarlier && Date.now() > settling.current && !loadingEarlier.current && pendingJump.current === undefined && box.current && s.scrollTop < box.current.offsetTop + 300) {
+      if (hasEarlier && allowAutomaticPage.current && Date.now() > settling.current && !loadingEarlier.current && pendingJump.current === undefined && box.current && s.scrollTop < box.current.offsetTop + 300) {
+        allowAutomaticPage.current = false
         loadingEarlier.current = true
         setEarlier(true)
-        const before = s.scrollHeight
-        void loadEarlier().then(() => requestAnimationFrame(() => { s.scrollTop += s.scrollHeight - before })).finally(() => { loadingEarlier.current = false; setEarlier(false) })
+        const restoreAnchor = captureScrollAnchor(s, '[id^="turn-"]'), currentGeneration = generation.current
+        void loadEarlier().catch(() => {}).finally(() => {
+          if (generation.current !== currentGeneration) { restoreAnchor(); return }
+          nextFrame(() => {
+            restoreAnchor()
+            loadingEarlier.current = false; setEarlier(false)
+          })
+        })
       }
     }
     const onScroll = () => { if (!raf) raf = requestAnimationFrame(measure) }
+    const onIntent = () => { allowAutomaticPage.current = true }
+    const inputs = ['wheel', 'touchstart', 'pointerdown', 'keydown'] as const
+    inputs.forEach(event => s.addEventListener(event, onIntent, { passive: true }))
     s.addEventListener('scroll', onScroll, { passive: true })
     measure()
-    return () => { s.removeEventListener('scroll', onScroll); cancelAnimationFrame(raf) }
+    return () => { s.removeEventListener('scroll', onScroll); inputs.forEach(event => s.removeEventListener(event, onIntent)); cancelAnimationFrame(raf) }
   }, [scroller, hasEarlier, loadEarlier, turns])
 
   // ⌘F search · ⌘↑ / ⌘↓ your previous / next message.
@@ -147,7 +173,7 @@ export const Timeline = forwardRef<TimelineHandle, {
     const onKey = (e: KeyboardEvent) => {
       if (document.querySelector('.sheet')) return
       const mod = e.metaKey || e.ctrlKey
-      if (mod && e.key.toLowerCase() === 'f') { e.preventDefault(); setSearch(s => s ?? { q: '', i: 0 }); requestAnimationFrame(() => document.getElementById('tl-search')?.focus()) }
+      if (mod && e.key.toLowerCase() === 'f') { e.preventDefault(); setSearch(s => s ?? { q: '', i: 0 }); nextFrame(() => document.getElementById('tl-search')?.focus()) }
       else if (mod && e.key === 'ArrowUp' && totalTurns > 1) { e.preventDefault(); prev() }
       else if (mod && e.key === 'ArrowDown' && totalTurns > 1) { e.preventDefault(); next() }
     }
@@ -182,16 +208,25 @@ export const Timeline = forwardRef<TimelineHandle, {
               <span className="t-meta grow">{tr("第 ")}{atBottom ? visible.last : visible.first} / {totalTurns} {tr(" 轮")}</span>
               <Button variant="ghost" disabled={visible.first <= 1 && !hasEarlier} onClick={prev} title={shortcut(tr("上一条你的消息（⌘↑）"))}>{Icon.up}{tr("上一条")}</Button>
               <Button variant="ghost" disabled={atBottom} onClick={next} title={shortcut(tr("下一条你的消息（⌘↓）"))}>{Icon.down}{tr("下一条")}</Button>
-              <Button variant="ghost" onClick={() => { setSearch({ q: '', i: 0 }); requestAnimationFrame(() => document.getElementById('tl-search')?.focus()) }} title={shortcut(tr("在这个会话里搜索（⌘F）"))}>{Icon.search}{tr("搜索")}</Button>
+              <Button variant="ghost" onClick={() => { setSearch({ q: '', i: 0 }); nextFrame(() => document.getElementById('tl-search')?.focus()) }} title={shortcut(tr("在这个会话里搜索（⌘F）"))}>{Icon.search}{tr("搜索")}</Button>
             </>
           )}
         </div>
       )}
       <div ref={box} className="col g5 selectable" style={{ paddingTop: 4 }}>
         {hasEarlier && (
-          <div className="row g2" style={{ alignSelf: 'center' }}>
+          <div className="row g2" style={{ alignSelf: 'center', minHeight: 26 }}>
             {earlier ? <span className="t-meta">{tr("正在加载更早的轮次…")}</span>
-              : <Button variant="ghost" onClick={() => { setEarlier(true); void loadEarlier().finally(() => setEarlier(false)) }}>{turns[0].partial ? tr("显示第 {0} 轮的前半段", [turns[0].index]) : tr("显示更早的轮次（还有 {0} 轮）", [turns[0].index - 1])}</Button>}
+              : <Button variant="ghost" onClick={() => {
+                if (loadingEarlier.current) return
+                allowAutomaticPage.current = false
+                const g = generation.current; loadingEarlier.current = true; setEarlier(true)
+                const restoreAnchor = captureScrollAnchor(scroller.current, '[id^="turn-"]')
+                void loadEarlier().catch(() => {}).finally(() => {
+                  if (g !== generation.current) { restoreAnchor(); return }
+                  nextFrame(() => { restoreAnchor(); loadingEarlier.current = false; setEarlier(false) })
+                })
+              }}>{turns[0].partial ? tr("显示第 {0} 轮的前半段", [turns[0].index]) : tr("显示更早的轮次（还有 {0} 轮）", [turns[0].index - 1])}</Button>}
           </div>
         )}
         {turns.map(t => (
@@ -284,7 +319,7 @@ function StepView({ g, hit }: { g: Group; hit: string }) {
 // ---------------------------------------------------------------- pictures
 
 /** Where the timeline's pictures come from: their blob by sha256, as a data: URL (set by the pane). */
-export const ImageSource = createContext<((sha: string) => Promise<string>) | undefined>(undefined)
+export const ImageSource = createContext<((sha: string, signal?: AbortSignal) => Promise<string>) | undefined>(undefined)
 
 /** Thumbnails in a row; a click opens the picture full size (Esc or a click closes it). */
 function Images({ images }: { images: TurnImage[] }) {

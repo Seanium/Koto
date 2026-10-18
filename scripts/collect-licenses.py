@@ -99,6 +99,14 @@ def collect(target: Path):
             raise SystemExit(f"Unexpected license response for {name}")
         destination.write_bytes(contents)
 
+    # ZCode's official application mark is Apache-2.0, separately from lobe-icons.
+    zcode_url = "https://raw.githubusercontent.com/zai-org/ZCode/aac4755666d09fdcd70272fcf063c077a639015f/LICENSE"
+    with urllib.request.urlopen(zcode_url, timeout=30) as response:
+        zcode_license = response.read()
+    if not zcode_license.lstrip().startswith(b"Apache License"):
+        raise SystemExit("Unexpected ZCode license response")
+    (target / "assets/zcode-LICENSE").write_bytes(zcode_license)
+
     hashes = {path.relative_to(target).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest() for path in sorted(target.rglob("*")) if path.is_file() and path.name != "INDEX.json"}
     (target / "INDEX.json").write_text(json.dumps({"packages": packages, "files": hashes}, indent=2, ensure_ascii=False) + "\n")
     print(f"Preserved {len(hashes)} license files for {len(packages)} installed packages plus included marks.")

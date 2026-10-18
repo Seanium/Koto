@@ -25,6 +25,9 @@ func attachmentPart(b map[string]any, ctx *engine.DecodeContext) core.Part {
 	a := core.Obj(b["attachment"])
 	typ := core.S(b["type"])
 	p := core.Part{"type": typ, "name": core.S(a["name"]), "mediaType": core.S(a["mediaType"])}
+	if ctx.IndexOnly {
+		return p
+	}
 	m := attachmentID.FindStringSubmatch(core.S(a["attachmentId"]))
 	if m == nil {
 		return p

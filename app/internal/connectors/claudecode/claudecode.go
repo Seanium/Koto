@@ -17,6 +17,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"koto/internal/connectors/shared"
@@ -26,7 +27,7 @@ import (
 )
 
 const (
-	Version      = "claude-code-connector@0.1.0"
+	Version      = "claude-code-connector@0.2.0"
 	WriteVersion = "2.1.300"
 )
 
@@ -209,13 +210,16 @@ func ProjectDir(cwd string) string {
 
 // ------------------------------------------------------------------ decode
 
-var contextPrefixes = []string{"<command-name>", "<command-message>", "<command-args>", "<local-command-stdout>", "<local-command-stderr>", "<local-command-caveat>", "<system-reminder>", "<task-notification>"}
+var contextPrefixes = []string{"<command-name>", "<command-message>", "<command-args>", "<local-command-stdout>", "<local-command-stderr>", "<local-command-caveat>", "<system-reminder>"}
 
 var savedTo = regexp.MustCompile(`Full output saved to: (\S+/tool-results/\S+)`)
 
 var vocab = Vocabulary{}
 
 func blocks(content any, ctx *engine.DecodeContext, record map[string]any) []core.Part {
+	if ctx.IndexOnly {
+		return indexBlocks(content, filepath.Join(strings.TrimSuffix(ctx.Ref.Path, ".jsonl"), "attachments"))
+	}
 	if s, ok := content.(string); ok {
 		if s == "" {
 			return []core.Part{}
@@ -366,6 +370,29 @@ func (Decoder) Decode(r0 any, raw []byte, ctx *engine.DecodeContext) engine.Deco
 		}
 		out.Meta["frontend"] = "claude-desktop"
 	}
+	if model := core.S(core.Obj(r["message"])["model"]); model != "" && model != "<synthetic>" {
+		var identity core.SessionIdentity
+		if saved := core.Obj(ctx.State["identity"]); len(saved) > 0 {
+			identity = core.ReadIdentity(core.JsonObject{"identity": saved})
+		} else {
+			identity = core.ReadIdentity(ctx.Ref.Meta)
+		}
+		found := false
+		for _, p := range identity.Providers {
+			if p.Model == model && p.Scope == "message" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			identity.Providers = append(identity.Providers, core.ProviderIdentity{Model: model, Scope: "message", Evidence: "Claude transcript message.model"})
+		}
+		ctx.State["identity"] = core.IdentityMeta(identity)
+		if out.Meta == nil {
+			out.Meta = core.JsonObject{}
+		}
+		out.Meta["identity"] = ctx.State["identity"]
+	}
 	// /branch and --fork-session copy the chain with the same uuids and point each copy at its original.
 	ff := core.Obj(r["forkedFrom"])
 	if s := core.S(ff["sessionId"]); s != "" && s != core.S(r["sessionId"]) {
@@ -490,6 +517,12 @@ func decodeCC(r map[string]any, ctx *engine.DecodeContext) engine.DecodeOut {
 			}
 			return draft("compaction", "harness", parts, nil, rep)
 		}
+		// Async task results are delivered to the parent as native user records. They are
+		// conversation content, not environment context or a new human prompt. Keep only
+		// the delivered payload; output-file links do not authorize reading the child log.
+		if core.S(core.Obj(r["origin"])["kind"]) == "task-notification" || r["turnOrigin"] == "task_notification" {
+			return draft("notification", "user", parts, nil, nil)
+		}
 		if r["isMeta"] == true {
 			return draft("context", "user", parts, nil, nil)
 		}
@@ -554,8 +587,14 @@ func decodeCC(r map[string]any, ctx *engine.DecodeContext) engine.DecodeOut {
 		if u, ok := m["usage"]; ok && u != nil && u != false && u != "" {
 			extra["usage"] = u
 		}
+		if ctx.IndexOnly {
+			return draft("message", "assistant", nil, extra, nil)
+		}
 		return draft("message", "assistant", blocks(m["content"], ctx, r), extra, nil)
 	case "attachment":
+		if ctx.IndexOnly {
+			return draft("context", "harness", nil, nil, nil)
+		}
 		var rendered []string
 		hasRendered := false
 		if arr, ok := r["rendered"].([]any); ok {
@@ -687,6 +726,11 @@ func renderCC(it planner.Item, in engine.PlanInput, c ccCtx) []core.O {
 				content = strings.Join(ts, "\n")
 			}
 		}
+		if it.Event.Kind == "notification" && it.Synthetic == "" {
+			// Explicit range selection re-encodes even same-Agent records. Retain the native
+			// distinction between a delivered task result and a fresh human prompt.
+			return []core.O{{{K: "type", V: "user"}, {K: "message", V: core.O{{K: "role", V: "user"}, {K: "content", V: content}}}, {K: "promptSource", V: "system"}, {K: "turnOrigin", V: "task_notification"}, {K: "origin", V: core.O{{K: "kind", V: "task-notification"}, {K: "producer", V: "session-task"}}}}}
+		}
 		return []core.O{{{K: "type", V: "user"}, {K: "message", V: core.O{{K: "role", V: "user"}, {K: "content", V: content}}}, {K: "promptId", V: prompt}, {K: "promptSource", V: "typed"}, {K: "permissionMode", V: "default"}}}
 	case "assistant":
 		content := []any{}
@@ -801,14 +845,17 @@ func encodeItems(in engine.PlanInput, proj *planner.Projection, c ccCtx) []share
 
 // Options for the connector.
 type Options struct {
-	Root       string // $CLAUDE_CONFIG_DIR
-	ID         string
-	DesktopDir []string
+	Root string // $CLAUDE_CONFIG_DIR
+	ID   string
+	// DesktopScope is one account/org metadata directory; it filters the shared transcript root.
+	DesktopScope string
+	Identity     core.SessionIdentity
 }
 
 type cc struct {
 	id, root, projects string
-	desktop            []string
+	desktopScope       string
+	identity           core.SessionIdentity
 	files              *shared.PathIndex
 }
 
@@ -819,28 +866,40 @@ func New(o Options) *engine.Connector {
 	if o.ID == "" {
 		o.ID = "claude-code"
 	}
-	c := &cc{id: o.ID, root: o.Root, projects: filepath.Join(o.Root, "projects"), desktop: o.DesktopDir, files: shared.NewPathIndex()}
-	return &engine.Connector{ID: c.id, Root: c.root, Harness: "claude-code", Version: Version, Capabilities: Capabilities, Vocabulary: vocab,
+	c := &cc{id: o.ID, root: o.Root, projects: filepath.Join(o.Root, "projects"), desktopScope: o.DesktopScope, identity: o.Identity, files: shared.NewPathIndex()}
+	out := &engine.Connector{ID: c.id, Root: c.root, Harness: "claude-code", Version: Version, Capabilities: Capabilities, Vocabulary: vocab,
 		Source: c, Sink: c, Trash: c}
+	if c.desktopScope != "" {
+		out.Trash = nil
+	}
+	return out
 }
 
 func (c *cc) Discover(ctx context.Context) ([]core.NativeRef, error) {
+	if e := ctx.Err(); e != nil {
+		return nil, e
+	}
+	if c.desktopScope != "" {
+		return c.discoverDesktop(ctx)
+	}
 	dirs, err := os.ReadDir(c.projects)
 	if err != nil {
 		return nil, nil
 	}
-	var desktop map[string]core.JsonObject
-	if len(c.desktop) > 0 {
-		desktop = ReadDesktopIndex(c.desktop)
-	}
 	var out []core.NativeRef
 	for _, d := range dirs {
+		if e := ctx.Err(); e != nil {
+			return nil, e
+		}
 		if !d.IsDir() {
 			continue
 		}
 		dir := filepath.Join(c.projects, d.Name())
 		fs, _ := os.ReadDir(dir)
 		for _, f := range fs {
+			if e := ctx.Err(); e != nil {
+				return nil, e
+			}
 			if !sessionFile.MatchString(f.Name()) {
 				continue
 			}
@@ -851,32 +910,43 @@ func (c *cc) Discover(ctx context.Context) ([]core.NativeRef, error) {
 			}
 			session := strings.TrimSuffix(f.Name(), ".jsonl")
 			c.files.Set(session, p)
-			meta := core.JsonObject{"projectDir": d.Name()}
-			for k, v := range desktop[session] {
-				meta[k] = v
-			}
+			meta := core.JsonObject{"projectDir": d.Name(), "identity": core.IdentityMeta(c.identity)}
 			out = append(out, core.NativeRef{Harness: "claude-code", Connector: c.id, Session: session, Path: p, Size: st.Size(), MtimeMs: engine.MtimeMs(st), Meta: meta})
 		}
 	}
-	return out, nil
+	return out, ctx.Err()
 }
 
 func (c *cc) Tail(ctx context.Context, ref core.NativeRef, from *core.SourceOffset, yield func(core.SourceBatch) error) error {
 	return engine.TailJSONL(ctx, ref, from, Decoder{}, yield, 0, false)
 }
 
-func (c *cc) WatchRoots() []string { return []string{c.projects} }
+func (c *cc) WatchRoots() []string {
+	roots := []string{c.projects}
+	if c.desktopScope != "" {
+		roots = append(roots, c.desktopScope)
+	}
+	return roots
+}
 
 func (c *cc) ReadRecord(session string, index int, offset *int64) ([]byte, error) {
+	return c.ReadRecordContext(context.Background(), session, index, offset)
+}
+func (c *cc) ReadRecordContext(ctx context.Context, session string, index int, offset *int64) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	p, ok := c.files.Get(session)
 	if !ok {
-		_, _ = c.Discover(context.Background())
+		if _, err := c.Discover(ctx); err != nil {
+			return nil, err
+		}
 		p, ok = c.files.Get(session)
 	}
 	if !ok || offset == nil {
 		return nil, nil
 	}
-	return engine.ReadRecordAt(p, *offset)
+	return engine.ReadRecordAtContext(ctx, p, *offset)
 }
 
 // Files of a session for the trash: the transcript, its side directory, and the per-session state
@@ -918,18 +988,21 @@ func (c *cc) OpenBy(s engine.SessionRef) string {
 
 func (c *cc) Plan(in engine.PlanInput) (*engine.DeliveryPlan, error) {
 	t := in.Target
+	if err := c.checkTargetProfile(t); err != nil {
+		return nil, err
+	}
 	existing := ""
 	if t.Mode != "create" {
 		if p, ok := c.files.Get(t.Session); ok {
 			existing = p
-		} else if b := in.Hub.Binding("claude-code", t.Session); b != nil {
+		} else if b := in.Hub.Binding("claude-code", t.Session, c.id); b != nil {
 			existing = b.Path
 		}
 	}
 	home, _ := os.UserHomeDir()
 	cwd := firstNonEmpty(t.Cwd, in.Projection.Hints.Cwd, home)
 	if existing != "" {
-		if b := in.Hub.Binding("claude-code", t.Session); b != nil {
+		if b := in.Hub.Binding("claude-code", t.Session, c.id); b != nil {
 			if bc, ok := b.Meta["cwd"].(string); ok {
 				cwd = bc
 			}
@@ -966,9 +1039,17 @@ func (c *cc) Plan(in engine.PlanInput) (*engine.DeliveryPlan, error) {
 		records = []engine.PlanRecord{}
 	}
 	t.Path = file
-	return &engine.DeliveryPlan{ID: shared.PlanID(c.id, t.Session, in.Head, mode, strings.Join(shas, "")), Sink: c.id, Harness: "claude-code",
+	plan := &engine.DeliveryPlan{ID: shared.PlanID(c.id, t.Session, in.Head, mode, strings.Join(shas, "")), Sink: c.id, Harness: "claude-code",
 		Thread: in.Thread, Head: in.Head, Level: in.Level, Mode: mode, Target: t, Records: records, Content: content,
-		Losses: in.Projection.Losses, Notes: in.Projection.Notes, Extra: core.JsonObject{"attachments": attachments}}, nil
+		Losses: in.Projection.Losses, Notes: in.Projection.Notes, Extra: core.JsonObject{"attachments": attachments}}
+	if c.desktopScope != "" {
+		if t.Mode != "create" {
+			return nil, fmt.Errorf("Claude Desktop only supports new sessions")
+		}
+		now := time.Now().UnixMilli()
+		plan.Extra["desktopMetadata"] = core.JsonObject{"sessionId": "local_" + t.Session, "cliSessionId": t.Session, "title": t.Title, "titleSource": "user", "cwd": cwd, "originCwd": cwd, "createdAt": now, "lastActivityAt": now, "envScopeId": "builtin_local", "isArchived": false, "isStarred": false, "completedTurns": 0}
+	}
+	return plan, nil
 }
 
 func firstNonEmpty(xs ...string) string {
@@ -981,6 +1062,15 @@ func firstNonEmpty(xs ...string) string {
 }
 
 func (c *cc) Apply(ctx context.Context, plan *engine.DeliveryPlan) (core.JsonObject, error) {
+	if plan == nil {
+		return nil, fmt.Errorf("missing Claude delivery plan")
+	}
+	if err := c.checkTargetProfile(plan.Target); err != nil {
+		return nil, err
+	}
+	if c.desktopScope != "" {
+		return c.applyDesktop(ctx, plan)
+	}
 	if err := shared.ApplyAttachments(plan); err != nil {
 		return nil, err
 	}
@@ -989,6 +1079,13 @@ func (c *cc) Apply(ctx context.Context, plan *engine.DeliveryPlan) (core.JsonObj
 		c.files.Set(plan.Target.Session, plan.Target.Path)
 	}
 	return r, err
+}
+
+func (c *cc) checkTargetProfile(target engine.DeliveryTarget) error {
+	if target.Profile != "" && target.Profile != c.id || target.Root != "" && filepath.Clean(target.Root) != filepath.Clean(c.root) {
+		return fmt.Errorf("Claude target storage profile changed")
+	}
+	return nil
 }
 
 var pidFile = regexp.MustCompile(`^(\d+)\.json$`)

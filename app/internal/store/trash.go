@@ -199,7 +199,7 @@ func (t *Trash) Put(ctx context.Context, c Context, harness string) (*TrashEntry
 		thread := c.Thread
 		var bs []hub.Binding
 		for _, b := range c.Hub.Bindings(thread) {
-			if (harness == "" || b.Harness == harness) && (c.Selector == "" || strings.HasPrefix(c.Selector, "th:") || c.Selector == b.Harness+":"+b.Session) {
+			if (harness == "" || b.Harness == harness) && (c.Selector == "" || strings.HasPrefix(c.Selector, "th:") || core.MatchesSessionSelector(c.Selector, b.Connector, b.Harness, b.Session)) {
 				bs = append(bs, b)
 			}
 		}
@@ -326,7 +326,7 @@ func (t *Trash) Put(ctx context.Context, c Context, harness string) (*TrashEntry
 		}
 		e := TrashEntry{TrashID: trashID, Thread: thread, Harness: h, Title: TitleOf(bs), Items: items, TrashedAt: time.Now().UnixMilli()}
 		if len(bs) == 1 {
-			e.Thread = bs[0].Harness + ":" + bs[0].Session
+			e.Thread = core.SessionSelector(bs[0].Connector, bs[0].Harness, bs[0].Session)
 		}
 		if err := t.Store.AddTrash(e); err != nil {
 			return err
@@ -349,7 +349,10 @@ func (t *Trash) connector(id, harness string) *engine.Connector {
 	if c := t.Registry.Get(id); c != nil {
 		return c
 	}
-	if cs := t.Registry.ByHarness(harness); len(cs) > 0 {
+	if id != "" {
+		return nil
+	}
+	if cs := t.Registry.ByHarness(harness); len(cs) == 1 {
 		return cs[0]
 	}
 	return nil

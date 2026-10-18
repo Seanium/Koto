@@ -11,6 +11,9 @@ import piSvg from '../assets/harness/pi.svg?raw'
 import dsh from '../assets/harness/dsh.svg'
 import antigravity from '../assets/harness/antigravity.svg'
 import opencodeSvg from '../assets/harness/opencode.svg?raw'
+import zcodeSvg from '../assets/harness/zcode.svg?raw'
+import workbuddy from '../assets/harness/workbuddy.svg'
+import cursorSvg from '../assets/harness/cursor.svg?raw'
 import { shortcut } from './shortcut'
 
 // ---------------------------------------------------------------- keeping panels inside the window
@@ -90,6 +93,10 @@ const MARKS: Record<string, { src?: string; svg?: string }> = {
   dsh: { src: dsh },
   antigravity: { src: antigravity },
   opencode: { svg: opencodeSvg },
+  zcode: { svg: zcodeSvg },
+  workbuddy: { src: workbuddy },
+  'workbuddy-ai': { src: workbuddy },
+  cursor: { svg: cursorSvg },
 }
 
 export { agentName }
@@ -167,7 +174,7 @@ function lockBackgroundScroll(dialog: HTMLElement) {
   }
 }
 
-export function Sheet({ open, onClose, children, label }: { open: boolean; onClose: () => void; children: ReactNode; label: string }) {
+export function Sheet({ open, onClose, children, label, className }: { open: boolean; onClose: () => void; children: ReactNode; label: string; className?: string }) {
   const ref = useRef<HTMLDivElement>(null)
   const close = useRef(onClose); close.current = onClose
   useLayoutEffect(() => {
@@ -177,7 +184,7 @@ export function Sheet({ open, onClose, children, label }: { open: boolean; onClo
     if (!open) return
     const prev = document.activeElement as HTMLElement | null
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { e.preventDefault(); close.current() }
+      if (e.key === 'Escape' && !document.querySelector('.menu')) { e.preventDefault(); close.current() }
       if (e.key === 'Tab' && ref.current) { // keep focus inside
         const f = [...ref.current.querySelectorAll<HTMLElement>('button:not(:disabled), input, [tabindex="0"]')]
         if (!f.length) return
@@ -193,7 +200,7 @@ export function Sheet({ open, onClose, children, label }: { open: boolean; onClo
   if (!open) return null
   return (
     <div className="overlay no-drag" onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div ref={ref} className="sheet" role="dialog" aria-modal="true" aria-label={label}>{children}</div>
+      <div ref={ref} className={['sheet', className].filter(Boolean).join(' ')} role="dialog" aria-modal="true" aria-label={label}>{children}</div>
     </div>
   )
 }
@@ -213,12 +220,13 @@ const isSep = (i: MenuItem): i is { separator: true; key?: string } => 'separato
  * `align`: where the list opens — 'left' (default: the right edges line up), 'right' (wide, from the
  * left edge) or 'under' (280px, from the left edge). `header` goes above the items.
  */
-export function Menu({ label, items, children, trigger, pressed, searchable, align = 'left', header, title, width }: {
+export function Menu({ label, items, children, trigger, pressed, searchable, align = 'left', header, title, width, disabled }: {
   label: string; items: MenuItem[]; children: ReactNode; trigger?: 'ghost' | 'secondary' | 'tint'; pressed?: boolean
-  searchable?: string; align?: 'left' | 'right' | 'under'; header?: ReactNode; title?: string; width?: number
+  searchable?: string; align?: 'left' | 'right' | 'under'; header?: ReactNode; title?: string; width?: number; disabled?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
+  useEffect(() => { if (disabled) setOpen(false) }, [disabled])
   useEffect(() => { if (!open) setQ('') }, [open])
   const shown = q ? items.filter(i => !isSep(i) && `${i.label} ${i.sub ?? ''}`.toLowerCase().includes(q.toLowerCase())) : items
   const ref = useRef<HTMLDivElement>(null)
@@ -249,12 +257,12 @@ export function Menu({ label, items, children, trigger, pressed, searchable, ali
   useEffect(() => {
     if (!open) return
     const close = (e: Event) => { if (!(e.target instanceof Node && (ref.current?.contains(e.target) || panel.current?.contains(e.target)))) setOpen(false) }
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); setOpen(false); ref.current?.querySelector('button')?.focus() } }
     window.addEventListener('mousedown', close); window.addEventListener('keydown', esc)
     const frame = requestAnimationFrame(() => panel.current?.querySelector<HTMLElement>('.menu-search, .menu-item:not(:disabled)')?.focus({ preventScroll: true }))
     return () => { cancelAnimationFrame(frame); window.removeEventListener('mousedown', close); window.removeEventListener('keydown', esc) }
   }, [open])
-  const common = { 'aria-haspopup': 'menu' as const, 'aria-expanded': open, onClick: () => setOpen(o => !o) }
+  const common = { 'aria-haspopup': 'menu' as const, 'aria-expanded': open, disabled, onClick: () => setOpen(o => !o) }
   return (
     <div ref={ref} className="menu-anchor no-drag">
       {trigger
@@ -368,6 +376,7 @@ export function Skeleton({ w, h = 12 }: { w: number | string; h?: number }) {
 // ---------------------------------------------------------------- icons (stroke, currentColor)
 
 export const Icon = {
+  info: <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></svg>,
   file: <svg width="16" height="18" viewBox="0 0 24 24" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"><path d="M14 3H5v18h14V8zM14 3v5h5M8 12h8M8 16h6" /></svg>,
   refresh: <svg width="15" height="15" viewBox="0 0 20 20" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 8a6.25 6.25 0 1 0-.6 5.2M16 3.5V8h-4.5" /></svg>,
   back: <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden><path d="M6.3 2.2 3.5 5l2.8 2.8" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>,

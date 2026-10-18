@@ -48,7 +48,7 @@ func TestCodexCompressionIsAContainerChange(t *testing.T) {
 	r := scan(t, a)
 	eq(t, len(r.Errors), 0)
 	eq(t, a.Hub.EventCount(), n, "no new events")
-	off, _ := a.Hub.Offset("codex", CodexThread)
+	off, _ := a.Hub.Offset(a.Registry.Get("codex").ID, CodexThread)
 	eq(t, off.Records, len(codexRecords(t, "")))
 	// and it still tails: Codex re-materializes plain JSONL before appending
 	recs := codexRecords(t, "")

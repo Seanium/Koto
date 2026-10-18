@@ -15,7 +15,7 @@ import (
 // than the entire database file when a same-Agent copy inserts another session.
 func matrixSourceBytes(t *testing.T, ref core.NativeRef) []byte {
 	t.Helper()
-	if ref.Harness != "opencode" {
+	if ref.Harness != "opencode" && ref.Harness != "zcode" {
 		b, err := os.ReadFile(ref.Path)
 		if err != nil {
 			t.Fatal(err)

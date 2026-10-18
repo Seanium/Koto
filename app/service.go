@@ -15,15 +15,17 @@ import (
 	"koto/internal/engine"
 	"koto/internal/koto"
 	"koto/internal/store"
+	"koto/internal/update"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 type AppService struct {
-	core  *Core
-	ui    *UI
-	prefs *prefStore
-	mark  func(string)
+	core    *Core
+	ui      *UI
+	prefs   *prefStore
+	mark    func(string)
+	updates *appUpdater
 }
 
 // apiErr: a failure the frontend can read (JSON {status, code, error, detail}).
@@ -46,15 +48,27 @@ func (s *AppService) api() (*koto.API, error) {
 
 func call[T any](s *AppService, fn func(a *koto.API) (T, error)) (T, error) {
 	var zero T
-	a, err := s.api()
-	if err != nil {
-		return zero, err
+	a, release := s.core.acquire()
+	defer release()
+	if a == nil {
+		return zero, apiErr(errStarting)
 	}
 	v, err := fn(a)
 	if err != nil {
 		return zero, apiErr(err)
 	}
 	return v, nil
+}
+
+// Wails has already canceled its promise when this context is canceled. Return
+// no late rejection to that abandoned promise; the API still returns ctx errors.
+func callContext[T any](s *AppService, ctx context.Context, fn func(*koto.API) (T, error)) (T, error) {
+	value, err := call(s, fn)
+	if ctx.Err() != nil {
+		var zero T
+		return zero, nil
+	}
+	return value, err
 }
 
 var bg = context.Background()
@@ -72,8 +86,8 @@ func (s *AppService) SetConnectorEnabled(id string, enabled bool) (koto.Connecto
 	return call(s, func(a *koto.API) (koto.ConnectorInfo, error) { return a.SetConnectorEnabled(id, enabled) })
 }
 
-func (s *AppService) AddConnectorRoot(harness, root string) (koto.ConnectorInfo, error) {
-	return call(s, func(a *koto.API) (koto.ConnectorInfo, error) { return a.AddRoot(harness, root) })
+func (s *AppService) AddConnectorRoot(harness, root, variant string) (koto.ConnectorInfo, error) {
+	return call(s, func(a *koto.API) (koto.ConnectorInfo, error) { return a.AddRoot(harness, root, variant) })
 }
 
 func (s *AppService) RemoveConnector(id string) (bool, error) {
@@ -84,25 +98,33 @@ func (s *AppService) Threads(limit int) ([]koto.ThreadListing, error) {
 	return call(s, func(a *koto.API) ([]koto.ThreadListing, error) { return a.Threads(limit), nil })
 }
 
-func (s *AppService) SearchThreads(query, scope, project string) ([]koto.ThreadListing, error) {
+func (s *AppService) SearchThreads(query, scope, project, profile, account string) ([]koto.ThreadListing, error) {
 	return call(s, func(a *koto.API) ([]koto.ThreadListing, error) {
-		return a.App.SearchThreads(query, scope, project, 500), nil
+		return a.App.SearchThreadsFiltered(query, scope, project, profile, account, 500), nil
 	})
 }
 
+func (s *AppService) Profiles() ([]koto.Profile, error) {
+	return call(s, func(a *koto.API) ([]koto.Profile, error) { return a.Profiles(bg), nil })
+}
+
 // ThreadPage is a page of a native session's path from the end (before: the page before that node; turns 0: the whole path).
-func (s *AppService) ThreadPage(selector string, turns int, before string) (*koto.ThreadDetail, error) {
-	return call(s, func(a *koto.API) (*koto.ThreadDetail, error) { return a.Thread(bg, selector, turns, before) })
+func (s *AppService) ThreadPage(ctx context.Context, selector string, turns int, before string) (*koto.ThreadDetail, error) {
+	return callContext(s, ctx, func(a *koto.API) (*koto.ThreadDetail, error) { return a.Thread(ctx, selector, turns, before) })
+}
+
+func (s *AppService) ScanStatus() (koto.ScanStatus, error) {
+	return call(s, func(a *koto.API) (koto.ScanStatus, error) { return a.ScanStatus(), nil })
 }
 
 // Image is a picture from a conversation as a data: URL (sel: the conversation or a node in it).
-func (s *AppService) Image(selector, sha string) (string, error) {
-	return call(s, func(a *koto.API) (string, error) { return a.Image(bg, selector, sha) })
+func (s *AppService) Image(ctx context.Context, selector, sha string) (string, error) {
+	return callContext(s, ctx, func(a *koto.API) (string, error) { return a.Image(ctx, selector, sha) })
 }
 
-func (s *AppService) Carry(req koto.CarryRequest) (*engine.CarryResult, error) {
-	return call(s, func(a *koto.API) (*engine.CarryResult, error) {
-		r, err := a.Carry(bg, req)
+func (s *AppService) Carry(ctx context.Context, req koto.CarryRequest) (*engine.CarryResult, error) {
+	return callContext(s, ctx, func(a *koto.API) (*engine.CarryResult, error) {
+		r, err := a.Carry(ctx, req)
 		if err != nil || r == nil {
 			return r, err
 		}
@@ -121,6 +143,10 @@ func (s *AppService) ForgetCopy(requestID string) {
 	if a := s.core.API(); a != nil {
 		a.ForgetCopy(requestID)
 	}
+}
+
+func (s *AppService) RebuildIndex() (engine.ScanReport, error) {
+	return call(s, func(a *koto.API) (engine.ScanReport, error) { return a.RebuildIndex(bg) })
 }
 
 func (s *AppService) Scan() (engine.ScanReport, error) {
@@ -189,6 +215,9 @@ func (s *AppService) HomeDir() string { return homeDir() }
 
 func (s *AppService) GetPrefs() Prefs { return s.prefs.Get() }
 
+// SetAgentOrder only updates sidebar order, without restarting scans or changing other preferences.
+func (s *AppService) SetAgentOrder(ids []string) error { return s.prefs.SetAgentOrder(ids) }
+
 // The WebView resolves system language; the same resolved language labels native menus.
 func (s *AppService) SetUILocale(locale string) {
 	s.ui.localeMu.Lock()
@@ -229,7 +258,8 @@ func (s *AppService) McpConfig() string {
 	args := []string{"mcp"}
 	if sb := os.Getenv("KOTO_APP_SANDBOX"); sb != "" {
 		j := func(d string) string { return filepath.Join(sb, d) }
-		args = append(args, "--data", j("hub"), "--claude-root", j("claude"), "--pi-root", j("pi"), "--codex-home", j("codex"), "--dsh-home", j("dsh"), "--agy-root", j("antigravity"), "--opencode-root", j("opencode"))
+		args = append(args, "--data", j("hub"), "--claude-root", j("claude"), "--pi-root", j("pi"), "--codex-home", j("codex"), "--dsh-home", j("dsh"), "--agy-root", j("antigravity"), "--opencode-root", j("opencode"), "--zcode-root", j("zcode"))
+		args = append(args, "--workbuddy-root", j("workbuddy"), "--workbuddy-ai-root", j("workbuddy-ai"), "--cursor-root", j("cursor"))
 	}
 	b, _ := json.MarshalIndent(map[string]any{"mcpServers": map[string]any{"koto": map[string]any{"command": cmd, "args": args}}}, "", "  ")
 	return string(b)
@@ -239,17 +269,22 @@ func (s *AppService) McpConfig() string {
 func (s *AppService) PickDirectory(title string) (string, error) {
 	d := application.Get().Dialog.OpenFile().
 		CanChooseDirectories(true).CanChooseFiles(false).CanCreateDirectories(false).ShowHiddenFiles(true).
-		SetTitle(title).SetButtonText("添加")
+		SetTitle(title)
 	if s.ui.main != nil {
 		d = d.AttachToWindow(s.ui.main)
 	}
-	return d.PromptForSingleSelection()
+	selected, err := d.PromptForSingleSelection()
+	if err != nil {
+		return "", err
+	}
+	return selectedDirectory(selected)
 }
 
 // Mark receives frontend readiness and verification milestones.
 func (s *AppService) Mark(name string) {
 	if name == "ui-ready" && s.ui != nil {
 		s.ui.frontendReady()
+		update.MarkReady()
 	}
 	if strings.HasPrefix(name, "error: ") {
 		log.Printf("frontend %s", name)

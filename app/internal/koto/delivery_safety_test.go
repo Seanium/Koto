@@ -38,18 +38,22 @@ func TestAnalysisCollectionStoresOnlyReferences(t *testing.T) {
 	s := newSandbox(t)
 	a := s.app(enable("claude-code", "pi"))
 	api := newAPI(a)
-	c, err := api.SaveAnalysis(store.AnalysisCollection{Name: "实验", Sessions: []string{"claude-code:a", "claude-code:b"}})
+	for _, id := range []string{"11111111-2222-4333-8444-555555555555", "22222222-2222-4333-8444-555555555555", "33333333-2222-4333-8444-555555555555"} {
+		writeCcSession(t, s.Claude, id, false)
+	}
+	api.Reindex(ctx)
+	c, err := api.SaveAnalysis(store.AnalysisCollection{Name: "实验", Sessions: []string{"claude-code:11111111-2222-4333-8444-555555555555", "claude-code:22222222-2222-4333-8444-555555555555"}})
 	must(t, err)
 	c.Name = "比较结果"
-	c.Sessions = []string{"claude-code:a", "claude-code:c"}
-	_, err = api.SaveAnalysis(c)
+	c.Sessions = []string{"claude-code:11111111-2222-4333-8444-555555555555", "claude-code:33333333-2222-4333-8444-555555555555"}
+	c, err = api.SaveAnalysis(c)
 	must(t, err)
 	b := s.app(enable("claude-code", "pi"))
 	list, err := newAPI(b).Analyses()
 	must(t, err)
 	eq(t, len(list), 1)
 	jsonEq(t, list[0], c)
-	c.Sessions = []string{"claude-code:a", "pi:b"}
+	c.Sessions = []string{"claude-code:11111111-2222-4333-8444-555555555555", "pi:b"}
 	_, err = api.SaveAnalysis(c)
 	ok(t, err != nil)
 	must(t, api.DeleteAnalysis(c.ID))

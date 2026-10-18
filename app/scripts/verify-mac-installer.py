@@ -9,6 +9,7 @@ import tempfile
 from pathlib import Path
 
 from ds_store import DSStore
+from mac_alias import Alias
 
 
 def run(*args):
@@ -61,12 +62,19 @@ def verify(image):
             icons = metadata[(".", b"icvp")]
             assert icons["iconSize"] == 96 and icons["textSize"] == 14
             assert icons["backgroundType"] == 2 and icons["backgroundImageAlias"]
+            alias = Alias.from_bytes(icons["backgroundImageAlias"])
+            assert alias.target.posix_path.lstrip("/") == "koto.app/Contents/Resources/installer.tiff"
             assert icons["arrangeBy"] == "none"
             assert icons["scrollPositionX"] == icons["scrollPositionY"] == 0
             assert metadata[("koto.app", b"Iloc")] == (186, 226)
             assert metadata[("Applications", b"Iloc")] == (474, 226)
-            assert tiff_dimensions(mount / ".background.tiff") == {(660, 410), (1320, 820)}
+            assert not (mount / ".background.tiff").exists()
+            assert not (mount / ".VolumeIcon.icns").exists()
+            assert tiff_dimensions(mount / "koto.app/Contents/Resources/installer.tiff") == {(660, 410), (1320, 820)}
             bundle = mount / "koto.app"
+            info = plistlib.loads((bundle / "Contents/Info.plist").read_bytes())
+            assert info["CFBundleDevelopmentRegion"] == "en"
+            assert set(info["CFBundleLocalizations"]) == {"en", "zh-Hans", "zh-Hant", "ja", "de"}
             run("/usr/bin/codesign", "--verify", "--deep", "--strict", str(bundle))
             assert not (bundle / "Contents/Helpers/koto").exists(), "CLI is distributed separately"
             assert (bundle / "Contents/Resources/legal/LICENSE").is_file()

@@ -6,16 +6,22 @@
 
 | Agent | 读取 | 创建副本 |
 | --- | --- | --- |
-| Claude Code / Desktop Code | JSONL 与原生分叉 | 新 UUID 与原生 JSONL |
+| Claude Code / Claude Desktop | JSONL 与原生分叉 | 新 UUID 与原生 JSONL |
 | pi | v3 JSONL 树 | 新会话及新的 ID / 父节点链 |
 | Codex | rollout JSONL / zstd | 新原生 rollout，再用 app-server 验证读取 |
 | DeepSeek Harness | v4 JSONL / zstd | 新目录与原生压缩日志 |
 | Antigravity CLI | SQLite 与 protobuf 轨迹 | 新对话数据库和摘要条目 |
 | OpenCode | SQLite v1（`session`、`message`、`part`） | 在原生数据库中新建会话记录 |
+| Cursor CLI | 每会话 SQLite `store.db` | 新原生 CLI 会话 |
+| Cursor Desktop | `state.vscdb` 中的会话与消息 blob | 新 IDE 对话，在 App 中打开 |
+| WorkBuddy / WorkBuddy AI | 国内外独立目录、SQLite 索引与 JSONL | 在已有原生账号下新建会话 |
+| ZCode | App / CLI 共用 SQLite 历史与 App 任务索引 | 新原生会话及对应任务条目 |
 
 支持 OpenCode 1.19.3 的 v1 格式；遇到 v2 会话存储会明确拒绝。复制到 OpenCode 需要其 CLI 和已配置的默认模型，续聊使用目标模型。
 
 所有复制都会新建原生会话，不覆盖已有会话 ID 或独立文件。目标 Agent 加载自己的设置，来源的系统、开发者、环境、配置和权限上下文不会复制。目标不支持对应原生表达时，工具记录和推理内容可能转换为可读文本。
+
+Cursor Desktop 与 CLI 的存储和续聊入口独立。ZCode 支持正式版的原生 Agent，不含 Preview 或由 ZCode 启动的外部 Agent。WorkBuddy 国内版与国际版是独立目标。历史账号标识不会改变续聊使用的凭据。
 
 ## 附件
 
@@ -25,6 +31,12 @@
 | PDF、UTF-8 文本 | 原生文档 | 完整文件 | 完整文件 | 原生文件附件 | 原生 Media | 原生文件 |
 | 音频 | 完整文件 | 完整文件 | 原生音频 | 原生文件附件 | 原生 Media | 原生文件 |
 | DOCX、ZIP、JSON、其他二进制文件 | 完整文件 | 完整文件 | 完整文件 | 原生文件附件 | 原生 Media | 原生文件 |
+
+| 新增 Agent | 附件表达 |
+| --- | --- |
+| Cursor CLI / Cursor Desktop | 原生图片；完整文件或文件引用 |
+| WorkBuddy / WorkBuddy AI | 原生图片、用户文件引用；工具文件使用校验后的引用 |
+| ZCode | 原生媒体与目标会话中的完整文件 |
 
 如果某个角色或目标格式不能内嵌文件，koto 会在新会话的附件目录中保存完整字节，并添加文件引用。工具记录转成文本时，工具结果中的附件仍会保留。
 

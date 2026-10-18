@@ -6,8 +6,10 @@ files = [str(application)]
 symlinks = {"Applications": "/Applications"}
 format = "UDZO"
 filesystem = "HFS+"
-background = defines["background"]
-icon = str(application / "Contents" / "Resources" / "icons.icns")
+# The background lives inside the signed App bundle. The builder sets Finder's
+# alias after .DS_Store is written, leaving no artwork files in the volume root.
+background = None
+icon = None
 icon_locations = {application.name: (186, 226), "Applications": (474, 226)}
 window_rect = ((160, 180), (660, 410))
 default_view = "icon-view"

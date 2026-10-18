@@ -3,15 +3,16 @@ import { setAppearance } from '../appearance'
 // Settings (⌘,): a view inside the main window, beside the sidebar (Esc goes back) — 通用 · Agent.
 
 import { useEffect, useState } from 'react'
-import { api, refreshOpeners, shell, useOpeners, type AppInfo, type Opener, type Prefs } from '../api/client'
-import { AGENTS, openerName } from '../api/model'
+import { api, onUpdate, refreshOpeners, shell, useOpeners, type AppInfo, type Opener, type Prefs, type UpdateState } from '../api/client'
+import { AGENTS, openerName, productName } from '../api/model'
 import type { Connector } from '../api/types'
 import type { Hub } from '../store'
 import { AgentDisc, agentName, Button, Icon, ListRow, Menu, Segmented, Sheet, Skeleton, Switch } from '../ui'
 
 export type SettingsTab = 'general' | 'agents'
 export const isSettingsTab = (t: string): t is SettingsTab => t === 'general' || t === 'agents'
-const HARNESSES = AGENTS.map(a => a.id)
+const PRODUCTS = [...AGENTS.map(a => ({ harness: a.id, variant: a.id === 'workbuddy' || a.id === 'workbuddy-ai' ? 'desktop' : a.id === 'zcode' ? 'shared' : 'cli' })),
+  { harness: 'cursor', variant: 'ide' }]
 
 export function Settings({ hub, tab, setTab }: { hub: Hub; tab: SettingsTab; setTab: (t: SettingsTab) => void }) {
   return (
@@ -24,7 +25,7 @@ export function Settings({ hub, tab, setTab }: { hub: Hub; tab: SettingsTab; set
         </div>
       </div>
       <div className="col scroll grow" style={{ padding: '24px 32px 32px', width: '100%', maxWidth: 760, alignSelf: 'center' }}>
-        {tab === 'general' && <General hub={hub} />}
+        {tab === 'general' && <General />}
         {tab === 'agents' && <Agents hub={hub} />}
       </div>
     </div>
@@ -33,7 +34,7 @@ export function Settings({ hub, tab, setTab }: { hub: Hub; tab: SettingsTab; set
 
 // ---------------------------------------------------------------- 通用
 
-function General({ hub }: { hub: Hub }) {
+function General() {
   const [prefs, setPrefs] = useState<Prefs>()
   const [error, setError] = useState<string>()
   const [info, setInfo] = useState<AppInfo>()
@@ -67,7 +68,7 @@ function General({ hub }: { hub: Hub }) {
       {error && <div className="note" title={error}>{tr("没能保存")}</div>}
       <div className="group">
         <Line title={tr("开源许可")}><Button variant="ghost" onClick={() => setNoticesOpen(true)}>{tr("查看许可")}</Button></Line>
-        <Line title={tr("版本")}><span className="t-3 selectable">{info?.version ?? '—'}</span></Line>
+        <UpdateLine version={info?.version} />
         <Line title={tr("项目地址")}>
           <Button variant="ghost" disabled={!info} title={info?.projectURL} onClick={() => {
             if (info) void shell.openExternal(info.projectURL).then(() => setInfoError(undefined)).catch(e => setInfoError(String(e)))
@@ -78,6 +79,39 @@ function General({ hub }: { hub: Hub }) {
       {infoError && <div className="note" title={infoError}>{tr(info ? "无法打开链接" : "无法读取应用信息")}</div>}
     </div>
   )
+}
+
+function UpdateLine({ version }: { version?: string }) {
+  const [state, setState] = useState<UpdateState>()
+  const [error, setError] = useState('')
+  useEffect(() => {
+    let active = true
+    const accept = (next: UpdateState) => {
+      if (active) setState(previous => !previous || next.revision >= previous.revision ? next : previous)
+    }
+    const off = onUpdate(accept)
+    void shell.updateState().then(accept).catch(e => { if (active) setError(String(e)) })
+    return () => { active = false; off() }
+  }, [])
+  const check = () => {
+    setError('')
+    void shell.checkUpdates().then(next => setState(previous => !previous || next.revision >= previous.revision ? next : previous)).catch(e => setError(String(e)))
+  }
+  const install = () => { setError(''); void shell.installUpdate().catch(e => setError(String(e))) }
+  const phase = state?.phase
+  const busy = phase === 'checking' || phase === 'downloading' || phase === 'restarting'
+  const percent = state?.total ? Math.min(100, Math.floor(state.downloaded * 100 / state.total)) : 0
+  return <div className="col">
+    <Line title={tr("版本")}>
+      <span className="t-3 selectable">{version ?? '—'}</span>
+      {phase === 'available' ? <Button onClick={install}>{tr("更新并重启")}</Button> :
+        <Button variant="ghost" disabled={busy || !version} onClick={check}>{phase === 'checking' ? tr("正在检查…") : phase === 'downloading' ? tr("正在下载 {0}%", [percent]) : phase === 'restarting' ? tr("正在重启…") : tr("检查更新")}</Button>}
+    </Line>
+    {(phase === 'current' || phase === 'available') && <span className="t-meta" style={{ padding: '0 16px 12px' }} role="status">
+      {phase === 'current' ? tr("已是最新版本") : tr("新版本 {0}", [state?.latest ?? ''])}
+    </span>}
+    {(error || state?.error) && <div className="note selectable" style={{ padding: '0 16px 12px' }} role="alert">{tr("更新失败：{0}", [error || state?.error || ''])}</div>}
+  </div>
 }
 
 function LicenseSheet({ onClose }: { onClose: () => void }) {
@@ -168,9 +202,9 @@ function Agents({ hub }: { hub: Hub }) {
             return (
               <div key={c.id} className="col">
                 <div className="group-row">
-                  <AgentDisc harness={c.harness} size={28} state={enabled ? 'present' : 'absent'} />
+                  <AgentDisc harness={c.harness} size={28} title={productName(c.harness, c.variant)} state={enabled ? 'present' : 'absent'} />
                   <div className="col grow g1" style={{ opacity: enabled ? 1 : 0.55 }}>
-                    <span className="row g2"><span className="t-medium">{agentName(c.harness)}</span>{c.status === 'failed' && <span className="t-meta t-red" title={c.error}>{tr("读取失败")}</span>}{!c.sink && <span className="tag" title={tr("{0} 只能作为来源", [agentName(c.harness)])}>{tr("只读")}</span>}</span>
+                    <span className="row g2"><span className="t-medium">{productName(c.harness, c.variant)}</span>{c.status === 'failed' && <span className="t-meta t-red" title={c.error}>{tr("读取失败")}</span>}{!c.sink && <span className="tag" title={tr("{0} 只能作为来源", [productName(c.harness, c.variant)])}>{tr("只读")}</span>}</span>
                     <span className="row g2" style={{ minWidth: 0 }}>
                       {sourceTag(c.id) && <span className="tag" title={sourceTag(c.id) === tr("网关") ? tr("Claude Desktop 网关模式（Claude-3p）里的 Cowork 会话") : tr("Claude Desktop 账号模式里的 Cowork 会话")}>{sourceTag(c.id)}</span>}
                       <span className="mono t-3 ellipsis selectable" title={c.root}>{c.root ?? '—'}</span>
@@ -192,16 +226,16 @@ function Agents({ hub }: { hub: Hub }) {
 }
 
 function AddLocation({ open, onClose, hub }: { open: boolean; onClose: () => void; hub: Hub }) {
-  const [harness, setHarness] = useState('claude-code')
+  const [product, setProduct] = useState(PRODUCTS[0])
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
   useEffect(() => { if (open) setError(undefined) }, [open])
   const choose = async () => {
     setError(undefined)
-    const dir = await shell.pickDirectory(tr("选择 {0} 的数据目录", [agentName(harness)])).catch(() => '')
+    const dir = await shell.pickDirectory(tr("选择 {0} 的数据目录", [productName(product.harness, product.variant)])).catch(() => '')
     if (!dir) return
     setBusy(true)
-    try { await api.addConnectorRoot(harness, dir); await hub.reload(); onClose() }
+    try { await api.addConnectorRoot(product.harness, dir, product.variant); await hub.reload(); onClose() }
     catch (e) { setError((e as Error).message) }
     finally { setBusy(false) }
   }
@@ -211,11 +245,11 @@ function AddLocation({ open, onClose, hub }: { open: boolean; onClose: () => voi
         <div className="t-head">{tr("添加位置")}</div>
       </div>
       <div className="sheet-body col" role="listbox" aria-label={tr("这个目录属于哪个 Agent")}>
-        {HARNESSES.map(h => (
-          <ListRow key={h} selected={harness === h} onClick={() => setHarness(h)}>
-            <AgentDisc harness={h} size={24} />
-            <span className="grow t-medium">{agentName(h)}</span>
-            <span style={{ width: 16 }}>{harness === h && Icon.check}</span>
+        {PRODUCTS.map(p => (
+          <ListRow key={`${p.harness}/${p.variant}`} selected={product === p} onClick={() => setProduct(p)}>
+            <AgentDisc harness={p.harness} size={24} title="" />
+            <span className="grow t-medium">{productName(p.harness, p.variant)}</span>
+            <span style={{ width: 16 }}>{product === p && Icon.check}</span>
           </ListRow>
         ))}
         {error && <div className="note" style={{ padding: '8px 12px 0' }} title={error}>{connectorError(tr("没能添加这个目录"), error)}</div>}

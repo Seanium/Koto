@@ -1,0 +1,4 @@
+CREATE TABLE session_entry(id TEXT PRIMARY KEY,session_id TEXT NOT NULL,type TEXT NOT NULL,time_created INTEGER NOT NULL,time_updated INTEGER NOT NULL,data TEXT NOT NULL);
+CREATE TABLE session(id TEXT PRIMARY KEY,project_id TEXT NOT NULL,slug TEXT NOT NULL,directory TEXT NOT NULL,title TEXT NOT NULL,version TEXT NOT NULL,time_created INTEGER NOT NULL,time_updated INTEGER NOT NULL,time_archived INTEGER,task_type TEXT NOT NULL DEFAULT 'interactive',title_source TEXT,revert TEXT);
+CREATE TABLE message(id TEXT PRIMARY KEY,session_id TEXT NOT NULL REFERENCES session(id),time_created INTEGER NOT NULL,time_updated INTEGER NOT NULL,data TEXT NOT NULL,sequence INTEGER);
+CREATE TABLE part(id TEXT PRIMARY KEY,message_id TEXT NOT NULL REFERENCES message(id),session_id TEXT NOT NULL,time_created INTEGER NOT NULL,time_updated INTEGER NOT NULL,data TEXT NOT NULL,sequence INTEGER);

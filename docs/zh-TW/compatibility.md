@@ -6,16 +6,22 @@
 
 | Agent | 讀取 | 建立副本 |
 | --- | --- | --- |
-| Claude Code / Desktop Code | JSONL 與原生分支 | 新 UUID 與原生 JSONL |
+| Claude Code / Claude Desktop | JSONL 與原生分支 | 新 UUID 與原生 JSONL |
 | pi | v3 JSONL 樹 | 新工作階段與新的 ID / 父節點鏈 |
 | Codex | rollout JSONL / zstd | 新原生 rollout，再以 app-server 驗證讀取 |
 | DeepSeek Harness | v4 JSONL / zstd | 新目錄與原生壓縮日誌 |
 | Antigravity CLI | SQLite 與 protobuf 軌跡 | 新對話資料庫和摘要項目 |
 | OpenCode | SQLite v1（`session`、`message`、`part`） | 在原生資料庫中新建工作階段記錄 |
+| Cursor CLI | 每對話 SQLite `store.db` | 新原生 CLI 對話 |
+| Cursor Desktop | `state.vscdb` 中的對話與訊息 blob | 新 IDE 對話，在 App 中開啟 |
+| WorkBuddy / WorkBuddy AI | 中國版與國際版獨立目錄、SQLite 索引與 JSONL | 在既有原生帳號下建立對話 |
+| ZCode | App / CLI 共用 SQLite 歷史與 App 任務索引 | 新原生對話與對應任務項目 |
 
 支援 OpenCode 1.19.3 的 v1 格式；遇到 v2 工作階段儲存會明確拒絕。複製到 OpenCode 需要其 CLI 與已設定的預設模型，續聊使用目標模型。
 
 所有複製都會建立新的原生工作階段，不覆寫既有工作階段 ID 或獨立檔案。目標 Agent 載入自己的設定，來源的系統、開發者、環境、設定和權限上下文不會複製。目標不支援對應原生表達時，工具紀錄和推理內容可能轉換為可讀文字。
+
+Cursor Desktop 與 CLI 的儲存與續聊入口獨立。ZCode 支援正式版的原生 Agent，不含 Preview 或由 ZCode 啟動的外部 Agent。WorkBuddy 中國版與國際版是獨立目標。歷史帳號標示不會改變續聊使用的憑據。
 
 ## 附件
 
@@ -25,6 +31,12 @@
 | PDF、UTF-8 文字 | 原生文件 | 完整檔案 | 完整檔案 | 原生檔案附件 | 原生 Media | 原生檔案 |
 | 音訊 | 完整檔案 | 完整檔案 | 原生音訊 | 原生檔案附件 | 原生 Media | 原生檔案 |
 | DOCX、ZIP、JSON、其他二進位檔 | 完整檔案 | 完整檔案 | 完整檔案 | 原生檔案附件 | 原生 Media | 原生檔案 |
+
+| 新增 Agent | 附件表示方式 |
+| --- | --- |
+| Cursor CLI / Cursor Desktop | 原生圖片；完整檔案或檔案參照 |
+| WorkBuddy / WorkBuddy AI | 原生圖片、使用者檔案參照；工具檔案使用驗證後的參照 |
+| ZCode | 原生媒體與目標對話中的完整檔案 |
 
 若角色或目標格式無法內嵌檔案，koto 會在新工作階段的附件目錄中保存完整位元組，並加入檔案參照。工具紀錄轉為文字時，工具結果中的附件仍會保留。
 

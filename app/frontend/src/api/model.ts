@@ -87,15 +87,15 @@ export function turnsOf(events: HubEvent[], midTurn = false): Turn[] {
     }
     if (!cur) {
       // A page that starts mid-turn: keep its end as a turn whose start is not loaded yet.
-      if (e.kind === 'message' || e.kind === 'tool_result' || e.kind === 'compaction') {
+      if (e.kind === 'message' || e.kind === 'tool_result' || e.kind === 'compaction' || e.kind === 'notification') {
         cur = { index: 1, harness: e.provenance.source.harness, connector: e.provenance.source.connector, time: e.time, user: '', images: [], files: [], steps: [], eventIds: [], partial: midTurn }
         turns.push(cur)
       } else continue // context before the first user message
     }
     cur.eventIds.push(e.id)
     for (const p of e.parts) {
-      if (p.type === 'text' && e.actor === 'assistant' && p.text.trim()) cur.steps.push({ kind: 'text', text: p.text })
-      else if (p.type === 'image' && p.blob?.sha256 && e.actor !== 'user') cur.steps.push({ kind: 'image', image: { sha: p.blob.sha256, mediaType: p.mediaType, name: p.name } })
+      if (p.type === 'text' && (e.actor === 'assistant' || e.kind === 'notification') && p.text.trim()) cur.steps.push({ kind: 'text', text: p.text })
+      else if (p.type === 'image' && p.blob?.sha256 && (e.actor !== 'user' || e.kind === 'notification')) cur.steps.push({ kind: 'image', image: { sha: p.blob.sha256, mediaType: p.mediaType, name: p.name } })
       else if (p.type === 'file') cur.steps.push({ kind: 'file', file: { sha: p.blob?.sha256, mediaType: p.mediaType, name: p.name, uri: p.uri } })
       else if (p.type === 'reasoning' && p.text) cur.steps.push({ kind: 'reasoning', text: p.text })
       else if (p.type === 'tool_call') {
@@ -211,14 +211,20 @@ export const resumeLine = (b: Binding): string | undefined => b.resume?.shell
 export function lossSentences(losses: Loss[]): string[] {
   const counts = new Map<string, number>()
   for (const l of losses) {
+    if (l.field === 'reasoning' && l.kind === 'dropped' && l.note === 'empty reasoning') continue
     let text = l.note || tr("部分内容需要转换")
-    if (l.kind === 'referenced') text = tr("附件保留为原文件或链接")
+    if (l.kind === 'truncated') text = tr('部分内容被截断')
+    else if (l.kind === 'referenced') text = l.note?.includes('Remote attachment') ? tr('远程附件以链接保留') : l.note?.includes('内嵌格式') ? tr('目标无法内嵌此类附件，已保留原文件供读取') : tr("附件保留为原文件或链接")
     else if (l.field === 'image') text = tr("有图片内容不可用")
     else if (l.field === 'file') text = l.kind === 'dropped' ? tr("有附件内容不可用") : tr("附件格式有转换")
-    else if (l.field.startsWith('tool_call') || l.field === 'tool_result') text = tr("部分工具记录转为文字")
-    else if (l.field === 'reasoning') text = l.kind === 'dropped' ? tr("不含加密推理内容") : tr("推理过程转为文字")
+    else if (l.field.startsWith('tool_result') && l.kind === 'approximated') text = tr('部分工具调用缺少结果')
+    else if (l.field.startsWith('tool_call') || l.field.startsWith('tool_result')) text = l.kind === 'dropped' ? tr('部分工具记录未复制')
+      : l.note?.includes('orphan result') ? tr('未找到对应调用，工具结果以文字保留') : tr('为兼容目标格式，工具调用和结果以文字保留')
+    else if (l.field === 'reasoning') text = l.kind === 'dropped' ? (l.note?.startsWith("encrypted by ") ? tr("不含加密推理内容") : tr("部分推理内容未复制")) : tr("推理过程转为文字")
     else if (l.field === 'sidechain') text = tr("不含子任务记录")
     else if (l.field === 'history') text = tr("较早内容只含摘要")
+    else if (l.field === 'message' && l.kind === 'approximated') text = tr('部分对话已压缩为摘要')
+    else if (l.field === 'role' && l.kind === 'approximated') text = tr('为回复片段补充起始提问')
     else if (l.field.startsWith('opaque:')) text = tr("有无法识别的内容")
     else if (l.field === 'message' && l.kind === 'dropped') text = tr("不含未完成的回答")
     counts.set(text, (counts.get(text) ?? 0) + 1)
@@ -245,11 +251,21 @@ export const AGENTS: { id: string; name: string }[] = [
   { id: 'dsh', name: 'DeepSeek Harness' },
   { id: 'antigravity', name: 'Antigravity CLI' },
   { id: 'opencode', name: 'OpenCode' },
+  { id: 'zcode', name: 'ZCode' },
+  { id: 'workbuddy', name: 'WorkBuddy' },
+  { id: 'workbuddy-ai', name: 'WorkBuddy AI' },
+  { id: 'cursor', name: 'Cursor CLI' },
 ]
 const AGENT_NAMES = new Map(AGENTS.map(a => [a.id, a.name]))
 
 /** Display name for a harness id; unknown ids are shown as they are. */
 export const agentName = (harness: string) => AGENT_NAMES.get(harness) ?? harness
+export const productName = (harness: string, variant: string) => harness === 'cursor'
+  ? variant === 'ide' ? 'Cursor Desktop' : 'Cursor CLI'
+  : harness === 'claude-code' && variant === 'desktop' ? 'Claude Desktop'
+  : harness === 'claude-code' && variant === 'cowork' ? 'Claude Cowork'
+  : agentName(harness)
+export const productScopeName = (key: string) => productName(...key.split('/') as [string, string])
 
 /** A folder for display: under the home folder as ~/…. */
 export function tildePath(path: string, home?: string): string {

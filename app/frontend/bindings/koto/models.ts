@@ -67,9 +67,25 @@ export interface Prefs {
     "language": string;
 
     /**
+     * AgentOrder is independent of the derived session index. Unknown IDs survive upgrades.
+     */
+    "agentOrder"?: string[] | null;
+
+    /**
      * Main window frame, restored at launch (zero = default).
      */
     "window"?: WindowFrame | null;
+}
+
+export interface UpdateState {
+    "revision": number;
+    "phase": string;
+    "current": string;
+    "latest": string;
+    "url": string;
+    "error": string;
+    "downloaded": number;
+    "total": number;
 }
 
 export interface WindowFrame {

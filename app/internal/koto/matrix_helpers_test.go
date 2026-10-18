@@ -10,7 +10,7 @@ import (
 	"koto/internal/core"
 )
 
-var copyAgents = []string{"claude-code", "pi", "codex", "dsh", "antigravity", "opencode"}
+var copyAgents = []string{"claude-code", "pi", "codex", "dsh", "antigravity", "opencode", "zcode", "workbuddy", "workbuddy-ai", "cursor"}
 
 func requireCopyAgent(t *testing.T, from, to string) {
 	t.Helper()
@@ -27,11 +27,14 @@ func requireCopyAgent(t *testing.T, from, to string) {
 	}
 }
 
-// OpenCode stores all conversations in one database. Compare the selected
+// SQLite agents store all conversations in one database. Compare the selected
 // session's actual rows, so creating another session does not look like damage.
 func nativeSessionSnapshot(t *testing.T, file, harness, session string) string {
 	t.Helper()
-	if harness != "opencode" {
+	if harness == "workbuddy" || harness == "workbuddy-ai" {
+		return workBuddySessionSnapshot(t, file, session)
+	}
+	if harness != "opencode" && harness != "zcode" {
 		return text(t, file)
 	}
 	u := shared.FileURL(file)
@@ -76,6 +79,22 @@ func openCodeLinearSource(t *testing.T, s *sandbox, api *API) (string, string) {
 	writeLines(t, filepath.Join(ccDir(s.Claude), CCA+".jsonl"), ccLinear(CCA, 4, ""))
 	api.Reindex(ctx)
 	r, err := api.Carry(ctx, CarryRequest{Selector: "claude-code:" + CCA, To: "opencode", Cwd: s.Root})
+	must(t, err)
+	ok(t, r.Applied)
+	return r.Plan.Target.Path, r.Plan.Target.Session
+}
+
+// Seed each source through its native writer, then independently read it before
+// selecting anything. Native-app acceptance is separate from this API matrix.
+func linearMatrixSource(t *testing.T, s *sandbox, api *API, harness string) (string, string) {
+	t.Helper()
+	file := filepath.Join(ccDir(s.Claude), CCA+".jsonl")
+	writeLines(t, file, ccLinear(CCA, 4, ""))
+	api.Reindex(ctx)
+	if harness == "claude-code" {
+		return file, CCA
+	}
+	r, err := api.Carry(ctx, CarryRequest{Selector: "claude-code:" + CCA, To: harness, Cwd: s.Root})
 	must(t, err)
 	ok(t, r.Applied)
 	return r.Plan.Target.Path, r.Plan.Target.Session

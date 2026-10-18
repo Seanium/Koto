@@ -290,6 +290,14 @@ jobs:
           $result = Get-Content "app/.cache/platform-smoke-windows-$env:KOTO_CI_ARCH.json" -Raw | ConvertFrom-Json
           if ($result.passed -ne $true -or $result.os -ne 'windows' -or $result.arch -ne $env:KOTO_CI_ARCH) { throw 'Windows smoke JSON contract did not pass on this native architecture.' }
 
+      - name: Verify CLI installer in Windows PowerShell 5.1
+        if: matrix.os == 'windows'
+        shell: pwsh
+        run: |
+          $cli = Join-Path $env:GITHUB_WORKSPACE "app/bin/release/koto-cli-windows-$env:KOTO_CI_ARCH.exe"
+          & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ./app/scripts/test-cli-installer.ps1 -CLI $cli
+          if ($LASTEXITCODE -ne 0) { throw 'CLI installer tests failed.' }
+
       - name: Record each verification stage independently
         if: always()
         env:

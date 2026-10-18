@@ -20,7 +20,7 @@ import (
 	"koto/internal/planner"
 )
 
-const Version = "pi-connector@0.1.0"
+const Version = "pi-connector@0.2.0"
 
 // Vocabulary maps pi tools to the canonical vocabulary and back.
 type Vocabulary struct{}
@@ -170,11 +170,18 @@ func SessionIDFromPath(p string) string {
 // ------------------------------------------------------------------ decode
 
 func contentParts(content any, ctx *engine.DecodeContext) []core.Part {
+	decodeText := func(s string) []core.Part {
+		dir := strings.TrimSuffix(ctx.Ref.Path, ".jsonl") + ".assets"
+		if ctx.IndexOnly {
+			return shared.DecodeAttachmentTextIndex(s, dir)
+		}
+		return shared.DecodeAttachmentText(s, dir, ctx.Blob)
+	}
 	if s, ok := content.(string); ok {
 		if s == "" {
 			return []core.Part{}
 		}
-		return shared.DecodeAttachmentText(s, strings.TrimSuffix(ctx.Ref.Path, ".jsonl")+".assets", ctx.Blob)
+		return decodeText(s)
 	}
 	arr, ok := content.([]any)
 	if !ok {
@@ -185,7 +192,7 @@ func contentParts(content any, ctx *engine.DecodeContext) []core.Part {
 		c := core.Obj(x)
 		if c["type"] == "text" {
 			if t, ok := c["text"].(string); ok {
-				out = append(out, shared.DecodeAttachmentText(t, strings.TrimSuffix(ctx.Ref.Path, ".jsonl")+".assets", ctx.Blob)...)
+				out = append(out, decodeText(t)...)
 			}
 		} else if c["type"] == "image" {
 			if d, ok := c["data"].(string); ok {
@@ -193,7 +200,7 @@ func contentParts(content any, ctx *engine.DecodeContext) []core.Part {
 				if !ok {
 					mt = "image/png"
 				}
-				out = append(out, core.Part{"type": "image", "blob": ctx.Blob(core.Base64(d)), "mediaType": mt})
+				out = append(out, core.Part{"type": "image", "blob": ctx.BlobBase64(d), "mediaType": mt})
 			}
 		}
 	}
@@ -224,7 +231,7 @@ func (Decoder) Decode(r0 any, raw []byte, ctx *engine.DecodeContext) engine.Deco
 		ctx.State["version"] = v
 		out := engine.DecodeOut{NativeID: "#header", Meta: core.JsonObject{"cwd": strOrNil(r["cwd"]), "piVersion": v}}
 		if ps := core.S(r["parentSession"]); ps != "" {
-			out.Lineage = &core.Lineage{Kind: "fork", Harness: "pi", Session: SessionIDFromPath(ps)}
+			out.Lineage = &core.Lineage{Kind: "fork", Harness: "pi", Session: SessionIDFromPath(ps), Copied: true}
 		}
 		return out
 	}
@@ -245,6 +252,9 @@ func (Decoder) Decode(r0 any, raw []byte, ctx *engine.DecodeContext) engine.Deco
 		t = core.ParseTime(s)
 	}
 	mk := func(kind, actor string, parts []core.Part, attrs core.JsonObject) *core.DraftEvent {
+		if ctx.IndexOnly && !(kind == "message" && actor == "user") {
+			parts = nil
+		}
 		d := &core.DraftEvent{NativeID: id, Kind: kind, Actor: actor, Parts: parts, Time: t, Attrs: attrs}
 		if hasParent {
 			d.Parent = parent
@@ -261,11 +271,14 @@ func (Decoder) Decode(r0 any, raw []byte, ctx *engine.DecodeContext) engine.Deco
 		case "assistant":
 			parts := []core.Part{}
 			for _, x := range core.Arr(m["content"]) {
+				if ctx.IndexOnly {
+					break
+				}
 				c := core.Obj(x)
 				switch c["type"] {
 				case "text":
 					if s, ok := c["text"].(string); ok {
-						parts = append(parts, core.Part{"type": "text", "text": s})
+						parts = append(parts, contentParts(s, ctx)...)
 					}
 				case "thinking":
 					sig := core.S(c["thinkingSignature"])
@@ -300,6 +313,9 @@ func (Decoder) Decode(r0 any, raw []byte, ctx *engine.DecodeContext) engine.Deco
 			}
 			return engine.DecodeOut{NativeID: id, Draft: mk("message", "assistant", parts, attrs)}
 		case "toolResult":
+			if ctx.IndexOnly {
+				return engine.DecodeOut{NativeID: id, Draft: mk("tool_result", "tool", nil, nil)}
+			}
 			outcome := "success"
 			if m["isError"] == true {
 				outcome = "error"
@@ -509,15 +525,24 @@ func (c *piConn) Tail(ctx context.Context, ref core.NativeRef, from *core.Source
 func (c *piConn) WatchRoots() []string { return []string{c.sessions} }
 
 func (c *piConn) ReadRecord(session string, index int, offset *int64) ([]byte, error) {
+	return c.ReadRecordContext(context.Background(), session, index, offset)
+}
+
+func (c *piConn) ReadRecordContext(ctx context.Context, session string, index int, offset *int64) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	p, ok := c.files.Get(session)
 	if !ok {
-		_, _ = c.Discover(context.Background())
+		if _, err := c.Discover(ctx); err != nil {
+			return nil, err
+		}
 		p, ok = c.files.Get(session)
 	}
 	if !ok || offset == nil {
 		return nil, nil
 	}
-	return engine.ReadRecordAt(p, *offset)
+	return engine.ReadRecordAtContext(ctx, p, *offset)
 }
 
 func (c *piConn) Files(s engine.SessionRef) []string {

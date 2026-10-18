@@ -28,15 +28,15 @@ const (
 )
 
 type sandbox struct {
-	t                                                         *testing.T
-	Root, Data, Claude, Pi, Codex, Shadow, Dsh, Agy, OpenCode string
+	t                                                                *testing.T
+	Root, Data, Claude, Pi, Codex, Shadow, Dsh, Agy, OpenCode, ZCode string
 }
 
 func newSandbox(t *testing.T) *sandbox {
 	t.Helper()
 	root, _ := filepath.EvalSymlinks(t.TempDir())
 	s := &sandbox{t: t, Root: root, Data: filepath.Join(root, "hub"), Claude: filepath.Join(root, "claude"), Pi: filepath.Join(root, "pi"),
-		Codex: filepath.Join(root, "codex"), Shadow: filepath.Join(root, "shadow"), Dsh: filepath.Join(root, "dsh"), Agy: filepath.Join(root, "agy"), OpenCode: filepath.Join(root, "opencode")}
+		Codex: filepath.Join(root, "codex"), Shadow: filepath.Join(root, "shadow"), Dsh: filepath.Join(root, "dsh"), Agy: filepath.Join(root, "agy"), OpenCode: filepath.Join(root, "opencode"), ZCode: filepath.Join(root, "zcode")}
 	for _, d := range []string{s.Claude, s.Pi, s.Codex, s.Shadow, s.Dsh} {
 		must(t, os.MkdirAll(d, 0o755))
 	}
@@ -48,9 +48,19 @@ var zero int64
 // app opens an App on the sandbox; edit tweaks the config (Enable, LiveMs…).
 func (s *sandbox) app(edit ...func(*Config)) *App {
 	s.t.Helper()
-	cfg := Config{DataDir: s.Data, ClaudeRoot: s.Claude, PiRoot: s.Pi, CodexHome: s.Codex, CodexShadow: s.Shadow, DshHome: s.Dsh, AntigravityRoot: s.Agy, OpenCodeRoot: s.OpenCode, NoDesktop: true, LiveMs: &zero}
+	cfg := Config{DataDir: s.Data, ClaudeRoot: s.Claude, PiRoot: s.Pi, CodexHome: s.Codex, CodexShadow: s.Shadow, DshHome: s.Dsh, AntigravityRoot: s.Agy, OpenCodeRoot: s.OpenCode, ZCodeRoot: s.ZCode, NoDesktop: true, LiveMs: &zero}
+	cfg.WorkBuddyRoot, cfg.WorkBuddyAIRoot = filepath.Join(s.Root, "workbuddy"), filepath.Join(s.Root, "workbuddy-ai")
+	cfg.CursorRoot = filepath.Join(s.Root, "cursor")
 	for _, e := range edit {
 		e(&cfg)
+	}
+	if on(cfg.Enable, "zcode") {
+		initZCodeFixture(s.t, s.ZCode)
+	}
+	for _, variant := range []string{"workbuddy", "workbuddy-ai"} {
+		if on(cfg.Enable, variant) {
+			initWorkBuddyFixture(s.t, filepath.Join(s.Root, variant))
+		}
 	}
 	a, err := New(cfg)
 	must(s.t, err)

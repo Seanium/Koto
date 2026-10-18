@@ -6,8 +6,10 @@ import { create } from 'zustand'
 import { useShallow } from 'zustand/react/shallow'
 import { api, onServerEvent, onStatus, shell } from './api/client'
 import { fromDesktop, originBinding, projectName, threadCwd, threadTitle, turnsOf, type Turn } from './api/model'
-import type { Binding, Connector, CoreStatus, ScanProgress, ThreadDetail, ThreadSummary } from './api/types'
+import type { AgentProfile, Binding, Connector, CoreStatus, ScanProgress, ThreadDetail, ThreadSummary } from './api/types'
 import { coalescedRefresh } from './refresh'
+import { mergeConversationTail, prependConversationPage } from './conversationPages'
+import { tr } from './i18n/core'
 
 export interface SessionItem {
   id: string
@@ -19,6 +21,8 @@ export interface SessionItem {
   /** Has a Claude Code session written from Claude Desktop's Code tab. */
   desktop: boolean
   bindings: Binding[]
+  /** Changes only when this session's indexed source changes. */
+  revision?: string
 }
 
 export interface Hub {
@@ -26,6 +30,7 @@ export interface Hub {
   loaded: boolean
   error?: string
   connectors: Connector[]
+  profiles: AgentProfile[]
   sessions: SessionItem[]
   /** Re-read everything (after an action, or an index pass that changed something). */
   reload: () => Promise<void>
@@ -35,6 +40,8 @@ export interface Hub {
   loadedAt: number
   /** Set while a long index pass runs (the first one reads every session); the list fills meanwhile. */
   scanning?: ScanProgress
+  /** The automatic first scan has not completed yet. */
+  initializing?: boolean
 }
 
 interface HubData {
@@ -43,24 +50,33 @@ interface HubData {
   error?: string
   threads: ThreadSummary[]
   connectors: Connector[]
+  profiles: AgentProfile[]
   sessions: SessionItem[]
   version: number
   loadedAt: number
   scanning?: ScanProgress
+  initializing: boolean
 }
 
 /** The app's shared state (zustand): what the core knows, kept fresh by its events. */
-export const useHubStore = create<HubData & { reload: () => Promise<void> }>()((set) => {
-  const reload = coalescedRefresh(async () => {
-      try {
-        const [threads, connectors] = await Promise.all([api.threads(), api.connectors()])
-        set(s => ({ threads, connectors, sessions: buildSessions(threads), error: undefined, loaded: true, loadedAt: Date.now(), version: s.version + 1 }))
-        shell.mark('ready')
-      } catch (e) {
-        set({ error: (e as Error).message })
-      }
+export const useHubStore = create<HubData & { reload: () => Promise<void>; reloadSessions: () => Promise<void> }>()((set) => {
+  const reloadSessions = coalescedRefresh(async () => {
+    try {
+      const threads = await api.threads()
+      set(s => ({ threads, sessions: buildSessions(threads), error: undefined, loaded: true, loadedAt: Date.now(), version: s.version + 1 }))
+      shell.mark('ready')
+    } catch (e) { set({ error: (e as Error).message }) }
   })
-  return { status: { state: 'starting' }, loaded: false, threads: [], connectors: [], sessions: [], version: 0, loadedAt: 0, reload }
+  const reloadProfiles = coalescedRefresh(async () => {
+    try {
+      await Promise.all([
+        api.connectors().then(connectors => set({ connectors })),
+        api.profiles().then(profiles => set({ profiles })),
+      ])
+    } catch (e) { set({ error: (e as Error).message }) }
+  })
+  const reload = async () => { await Promise.all([reloadSessions(), reloadProfiles()]) }
+  return { status: { state: 'starting' }, loaded: false, initializing: true, threads: [], connectors: [], profiles: [], sessions: [], version: 0, loadedAt: 0, reload, reloadSessions }
 })
 
 let started = false
@@ -68,34 +84,47 @@ let started = false
 function startHub() {
   if (started) return
   started = true
-  const { reload } = useHubStore.getState()
+  const { reload, reloadSessions } = useHubStore.getState()
   const set = useHubStore.setState
-  const ready = (s: CoreStatus) => { set({ status: s }); if (s.state === 'ready') void reload() }
-  onStatus(ready)
+  let received = 0, checkedScan = false
+  const ready = (s: CoreStatus) => {
+    set({ status: s })
+    if (s.state === 'starting') { checkedScan = false; set({ initializing: true, scanning: undefined }) }
+    if (s.state !== 'ready') return
+    void reload()
+    if (checkedScan) return
+    checkedScan = true
+    const before = received
+    void api.scanStatus().then(scan => {
+      // A newer event wins over a late status response.
+      if (received !== before) return
+      set({ scanning: scan.progress, initializing: scan.scanning || !scan.report })
+      if (scan.report) void reloadSessions()
+    }).catch(e => set({ error: (e as Error).message }))
+  }
+  let statusEvents = 0
+  onStatus(s => { statusEvents++; ready(s) })
   let lastReload = 0
-  let quiet: ReturnType<typeof setTimeout> | undefined
   onServerEvent(e => {
+    received++
     if (e.type === 'progress') {
-      set({ scanning: e.done < e.total ? e : undefined })
-      // A pass that stops reporting must not leave the line up.
-      clearTimeout(quiet)
-      quiet = setTimeout(() => set({ scanning: undefined }), 5000)
-      if (e.added && Date.now() - lastReload > 1500) { lastReload = Date.now(); void reload() }
+      set({ scanning: e })
+      if (Date.now() - lastReload > 750) { lastReload = Date.now(); void reloadSessions() }
       return
     }
     if (e.type !== 'cycle') return
-    clearTimeout(quiet)
-    set({ scanning: undefined })
-    if (e.report.changed || e.report.added) { lastReload = Date.now(); void reload() }
+    const initial = useHubStore.getState().initializing
+    set({ scanning: undefined, initializing: false })
+    if (initial || e.report.changed || e.report.added) { lastReload = Date.now(); void reload() }
   })
-  void shell.status().then(ready)
+  void shell.status().then(s => { if (!statusEvents) ready(s) }).catch(e => set({ error: (e as Error).message }))
 }
 
 export function useHub(): Hub {
   useEffect(startHub, [])
   return useHubStore(useShallow(s => ({
-    status: s.status, loaded: s.loaded, error: s.error, connectors: s.connectors, sessions: s.sessions, reload: s.reload,
-    version: s.version, loadedAt: s.loadedAt, scanning: s.scanning,
+    status: s.status, loaded: s.loaded, error: s.error, connectors: s.connectors, profiles: s.profiles, sessions: s.sessions, reload: s.reload,
+    version: s.version, loadedAt: s.loadedAt, scanning: s.scanning, initializing: s.initializing,
   })))
 }
 
@@ -105,19 +134,20 @@ export function buildSessions(threads: ThreadSummary[]): SessionItem[] {
     .map(t => {
       const harness = originBinding(t.bindings)!.harness
       const cwd = threadCwd(t)
-      return { id: t.id, title: threadTitle(t), cwd, project: projectName(cwd), updated: t.updated, harness, desktop: t.bindings.some(b => fromDesktop(b)), bindings: t.bindings }
+      return { id: t.id, title: threadTitle(t), cwd, project: projectName(cwd), updated: t.updated, harness, desktop: t.bindings.some(b => fromDesktop(b)), bindings: t.bindings,
+        revision: t.revision }
     })
     .sort((a, b) => (b.updated ?? 0) - (a.updated ?? 0))
 }
 
 /** Search metadata across the index; ignore late results and release them when the query clears. */
-export function useSessionSearch(query: string, scope: string, project: string | undefined, version: number) {
-  const q = query.trim(), key = JSON.stringify([q, scope, project])
+export function useSessionSearch(query: string, scope: string, project: string | undefined, version: number, profile?: string, account?: string) {
+  const q = query.trim(), key = JSON.stringify([q, scope, project, profile, account])
   const [result, setResult] = useState<{ key: string; sessions?: SessionItem[]; error?: string }>()
   useEffect(() => {
-    if (!q) { setResult(undefined); return }
+    if (!q && !profile && !account) { setResult(undefined); return }
     let alive = true
-    const timer = setTimeout(() => { void api.searchThreads(q, scope, project).then(rows => {
+    const timer = setTimeout(() => { void api.searchThreads(q, scope, project, profile, account).then(rows => {
       if (alive) setResult({ key, sessions: buildSessions(rows) })
     }, error => { if (alive) setResult({ key, error: String(error) }) }) }, 180)
     return () => { alive = false; clearTimeout(timer) }
@@ -136,9 +166,16 @@ export interface Conversation {
   completeTurns: number
   hasEarlier: boolean
 }
-export function useConversation(id: string | undefined, reload: number) {
+export function useConversation(id: string | undefined, revision?: string) {
   const [state, setState] = useState<{ id?: string; conversation?: Conversation; error?: string }>({})
+  const [retry, setRetry] = useState(0)
+  const reload = useCallback(() => setRetry(n => n + 1), [])
+  const latest = useRef(state)
+  latest.current = state
   const generation = useRef(0)
+  const earlierRequest = useRef<AbortController | undefined>(undefined)
+  const refreshRequest = useRef<{ controller: AbortController; queued: boolean } | undefined>(undefined)
+  const publish = (next: typeof state) => { latest.current = next; setState(next) }
   const build = (selector: string, d: ThreadDetail): Conversation => {
     const turns = turnsOf(d.events, (d.offset ?? 0) > 0)
     const total = d.turns ?? turns.length
@@ -147,37 +184,79 @@ export function useConversation(id: string | undefined, reload: number) {
       completeTurns: d.completeTurns, hasEarlier: (d.offset ?? 0) > 0 }
   }
   useEffect(() => {
-    const current = ++generation.current
-    if (!id) { setState({}); return }
-    let alive = true
-    const keep = state.id === id ? Math.max(30, state.conversation?.turns.length ?? 30) : 30
-    ;(async () => {
-      let d = await api.threadPage(id, Math.min(500, keep))
-      let count = turnsOf(d.events).length
-      while (alive && (d.offset ?? 0) > 0 && count < keep) {
-        const page = await api.threadPage(d.head, Math.min(500, keep - count), d.events[0]?.id)
-        if (!page.events.length) break
-        d = { ...d, events: [...page.events, ...d.events], offset: page.offset }
-        count = turnsOf(d.events).length
-      }
-      return d
-    })().then(d => {
-      if (alive) setState({ id, conversation: build(id, d) })
-    }, e => { if (alive) setState(s => ({ ...(s.id === id ? s : {}), id, error: (e as Error).message })) })
-    return () => { alive = false; if (generation.current === current) generation.current++ }
+    generation.current++
+    publish(id ? { ...(latest.current.id === id ? latest.current : {}), id } : {})
+    return () => {
+      generation.current++
+      refreshRequest.current?.controller.abort(); refreshRequest.current = undefined
+      earlierRequest.current?.abort(); earlierRequest.current = undefined
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, reload])
+  }, [id])
+  useEffect(() => {
+    if (!id) return
+    // A revision queues one refresh; it must not cancel an in-progress history page
+    // or repeatedly restart a slow read while the Agent is streaming.
+    if (refreshRequest.current) { refreshRequest.current.queued = true; return }
+    const current = generation.current
+    const request = { controller: new AbortController(), queued: false }
+    refreshRequest.current = request
+    const active = () => generation.current === current && !request.controller.signal.aborted
+    void (async () => {
+      try {
+        do {
+          request.queued = false
+          let page = await api.threadPage(id, 30, undefined, request.controller.signal)
+          if (!active()) return
+          let previous = latest.current.conversation
+          let joined = previous && mergeConversationTail(previous.detail, page)
+          // More than one tail page may have arrived. Fill the gap by native event
+          // boundaries before joining; never fabricate a connection across forks.
+          while (previous && !joined && (page.offset ?? 0) > 0 && page.events.length) {
+            const before = page.events[0].id
+            const earlier = await api.threadPage(page.head, 30, before, request.controller.signal)
+            if (!active()) return
+            const extended = prependConversationPage(page, earlier, before)
+            if (!extended || extended.events.length === page.events.length) throw Error(tr('读取失败'))
+            page = extended
+            previous = latest.current.conversation
+            joined = previous && mergeConversationTail(previous.detail, page)
+          }
+          // Read latest again: a concurrently completed earlier page belongs in this join.
+          previous = latest.current.conversation
+          const detail = previous ? mergeConversationTail(previous.detail, page) ?? page : page
+          publish({ id, conversation: build(id, detail) })
+        } while (request.queued && active())
+      } catch (e) {
+        if (active()) publish({ ...latest.current, id, error: (e as Error).message })
+      } finally { if (refreshRequest.current === request) refreshRequest.current = undefined }
+    })()
+    // Only changing the selected session cancels its reads, in the lifetime effect above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, revision, retry])
   const loadEarlier = useCallback(async (untilTurn?: number) => {
     const current = generation.current
-    let c = state.conversation
+    earlierRequest.current?.abort()
+    const request = new AbortController()
+    earlierRequest.current = request
+    let c = latest.current.id === id ? latest.current.conversation : undefined
+    try {
     while (c?.hasEarlier && (untilTurn === undefined || (c.turns[0]?.index ?? 1) > untilTurn)) {
-      const page = await api.threadPage(c.detail.head, 30, c.detail.events[0]?.id)
-      if (generation.current !== current || !page.events.length || page.events[0]?.id === c.detail.events[0]?.id) break
-      c = build(c.selector, { ...c.detail, events: [...page.events, ...c.detail.events], offset: page.offset })
-      const loaded = c
-      setState(s => s.id === id && s.conversation?.detail.head === loaded.detail.head ? { ...s, conversation: loaded } : s)
+      const before = c.detail.events[0]?.id
+      if (!before) break
+      const page = await api.threadPage(c.detail.head, 30, before, request.signal)
+      if (request.signal.aborted || generation.current !== current) break
+      const now = latest.current.id === id ? latest.current.conversation : undefined
+      if (!now) break
+      const detail = prependConversationPage(now.detail, page, before)
+      if (!detail || detail.events.length === now.detail.events.length) break
+      c = build(now.selector, detail)
+      publish({ ...latest.current, conversation: c })
       if (untilTurn === undefined) break
     }
-  }, [id, state.conversation])
-  return { ...(state.id === id ? state : {}), loadEarlier }
+    } catch (e) {
+      if (!request.signal.aborted && generation.current === current) publish({ ...latest.current, error: (e as Error).message })
+    } finally { if (earlierRequest.current === request) earlierRequest.current = undefined }
+  }, [id])
+  return { ...(state.id === id ? state : {}), loadEarlier, reload }
 }

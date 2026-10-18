@@ -6,6 +6,7 @@ export type {
     Event,
     EventID,
     IDRule,
+    IdentityClaim,
     JsonObject,
     Loss,
     Native,

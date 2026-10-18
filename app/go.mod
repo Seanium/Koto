@@ -3,6 +3,7 @@ module koto
 go 1.26.0
 
 require (
+	github.com/go-json-experiment/json v0.0.0-20251027170946-4849db3c2f7e
 	github.com/klauspost/compress v1.20.3
 	github.com/wailsapp/wails/v3 v3.0.0-beta.24
 	golang.org/x/sys v0.48.0

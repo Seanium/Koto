@@ -48,7 +48,7 @@ select:focus-visible:not([data-pointer-focus]) { outline: 1px solid var(--muted)
 .wordmark { display: inline-flex; align-items: center; gap: 10px; font-size: 36px; font-weight: 680; letter-spacing: -1.9px; line-height: 1; }
 .wordmark-name { display: block; }
 .wordmark-dot { color: var(--accent); }
-.wordmark-icon { font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; font-size: 28px; font-weight: 400; letter-spacing: 0; line-height: 1; width: 28px; height: 28px; flex: none; text-align: center; }
+.wordmark-icon { display: block; width: 28px; height: 28px; flex: none; object-fit: contain; }
 nav, .preferences { display: flex; align-items: center; gap: 8px; }
 .github-link, .icon-control { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; flex: none; color: var(--muted); border-radius: 6px; }
 .github-link svg, .icon-control > svg { width: 20px; height: 20px; }
@@ -102,7 +102,6 @@ h2 { font-size: 25px; line-height: 1.3; font-weight: 600; letter-spacing: -.6px;
 .cli h2 > .cli-title-action { display: flex; flex-wrap: wrap; }
 html:lang(en) .cli-title-action, html:lang(de) .cli-title-action { column-gap: .25em; }
 .cli-title-action > span { display: inline-block; max-width: 100%; white-space: nowrap; }
-.cli-intro > p { color: var(--muted); font-size: 14px; line-height: 1.8; margin-top: 16px; }
 .cli-demo { display: flex; flex-direction: column; gap: 16px; margin: 0; min-width: 0; }
 .cli-message { width: fit-content; max-width: 94%; padding: 15px 18px; font-size: 14px; line-height: 1.8; }
 .cli-request { align-self: flex-end; margin: 0; background: var(--surface); border-radius: 16px 16px 4px 16px; }
@@ -131,9 +130,16 @@ html:lang(en) .cli-title-action, html:lang(de) .cli-title-action { column-gap: .
 .download-controls select { min-width: 0; max-width: 100%; border: 1px solid var(--line); background: var(--background); color: var(--ink); border-radius: 8px; padding: 12px 10px; font-size: 13px; cursor: pointer; }
 .download-button { display: inline-flex; align-items: center; justify-content: center; background: var(--accent); color: var(--on-accent); border-radius: 8px; font-size: 14px; font-weight: 600; padding: 13px 18px; white-space: nowrap; }
 .download-button[aria-disabled=true] { cursor: default; }
+.cli-install { margin-top: 18px; max-width: 520px; text-align: left; font-size: 12px; color: var(--muted); }
+.install-command { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 10px 12px; border-radius: 8px; background: var(--surface); color: var(--ink); }
+.install-command code { min-width: 0; flex: 1; overflow-x: auto; white-space: nowrap; font-size: 12px; }
+.install-command button { display: grid; place-items: center; flex: none; width: 30px; height: 30px; padding: 5px; border-radius: 6px; background: transparent; color: var(--muted); }
+.install-command button:hover { color: var(--ink); background: var(--background); }
+.install-command svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.install-feedback { display: block; min-height: 1.4em; margin-top: 4px; }
 footer { display: flex; align-items: center; justify-content: space-between; min-height: 110px; border-top: 1px solid var(--line); }
 footer .wordmark { font-size: 28px; letter-spacing: -1.5px; gap: 8px; }
-footer .wordmark-icon { font-size: 23px; width: 23px; height: 23px; }
+footer .wordmark-icon { width: 23px; height: 23px; }
 footer > span { font-size: 12px; color: var(--subtle); }
 
 @media (max-width: 900px) {
@@ -154,7 +160,7 @@ footer > span { font-size: 12px; color: var(--subtle); }
   .wrap { width: calc(100% - 36px); }
   .header { height: 76px; }
   .header .wordmark { font-size: 30px; letter-spacing: -1.6px; gap: 7px; }
-  .header .wordmark-icon { font-size: 22px; width: 22px; height: 22px; }
+  .header .wordmark-icon { width: 22px; height: 22px; }
   .hero { text-align: left; padding-top: 30px; padding-bottom: 30px; }
   h1 { font-size: 40px; letter-spacing: -1.7px; line-height: 1.14; }
   .hero > p { font-size: 16px; line-height: 1.65; margin-top: 21px; }

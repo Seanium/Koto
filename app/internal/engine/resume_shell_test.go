@@ -10,8 +10,10 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 	"unicode/utf16"
 )
 
@@ -32,8 +34,98 @@ func TestPowerShellResumeHelper(t *testing.T) {
 		b, _ := io.ReadAll(os.Stdin)
 		input = string(b)
 	}
+	if out := os.Getenv("KOTO_RESUME_TEST_FILE"); out != "" {
+		time.Sleep(150 * time.Millisecond)
+		b, _ := json.Marshal(map[string]any{"cwd": dir, "args": os.Args[start:], "input": input})
+		if err := os.WriteFile(out, b, 0600); err != nil {
+			os.Exit(24)
+		}
+		os.Exit(23)
+	}
 	_ = json.NewEncoder(os.Stdout).Encode(map[string]any{"cwd": dir, "env": os.Getenv("KOTO_RESUME_TEST_ROOT"), "args": os.Args[start:], "input": input})
 	os.Exit(0)
+}
+
+func TestWindowsGUIResumeWaitsAndKeepsArguments(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("requires a native Windows GUI-subsystem executable")
+	}
+	bin, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	image, err := os.ReadFile(bin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A private copy of this test helper models Electron's GUI subsystem. No
+	// signed installed application or original test executable is modified.
+	pe := int(binary.LittleEndian.Uint32(image[0x3c:]))
+	if string(image[pe:pe+4]) != "PE\x00\x00" {
+		t.Fatal("test executable has no PE header")
+	}
+	binary.LittleEndian.PutUint16(image[pe+24+68:], 2)
+	dir := filepath.Join(t.TempDir(), "项目 O'Brien [copy]")
+	if err := os.Mkdir(dir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	gui := filepath.Join(dir, "GUI CLI.exe")
+	if err := os.WriteFile(gui, image, 0700); err != nil {
+		t.Fatal(err)
+	}
+	args := []string{"", "中文🐙 O'Brien & $HOME; [literal]", `quote"inside`, `C:\space path\`, `two\\"quote`, "line\nbreak"}
+	appended := `appended "literal" \\`
+	for _, shell := range []string{"powershell.exe", "pwsh.exe"} {
+		t.Run(shell, func(t *testing.T) {
+			if _, err := exec.LookPath(shell); err != nil {
+				t.Skip("shell not installed")
+			}
+			out := filepath.Join(dir, shell+"-result.json")
+			argv := append([]string{gui, "-test.run=^TestPowerShellResumeHelper$", "--"}, args...)
+			line := shellCommand(argv, dir, map[string]string{"ELECTRON_RUN_AS_NODE": "1", "KOTO_RESUME_TEST_HELPER": "1", "KOTO_RESUME_TEST_FILE": out}, "windows")
+			script := line + " " + PowerShellQ(appended) + "; if ($LASTEXITCODE -ne 23 -or -not (Test-Path -LiteralPath " + PowerShellQ(out) + ")) { throw 'GUI command returned before child completion' }"
+			words := utf16.Encode([]rune(script))
+			encoded := make([]byte, len(words)*2)
+			for i, word := range words {
+				binary.LittleEndian.PutUint16(encoded[i*2:], word)
+			}
+			if output, err := exec.Command(shell, "-NoLogo", "-NoProfile", "-NonInteractive", "-EncodedCommand", base64.StdEncoding.EncodeToString(encoded)).CombinedOutput(); err != nil {
+				t.Fatalf("GUI resume: %v\n%s", err, output)
+			}
+			b, err := os.ReadFile(out)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got struct {
+				Args []string `json:"args"`
+				Cwd  string   `json:"cwd"`
+			}
+			decodeErr := json.Unmarshal(b, &got)
+			wantArgs := append(args, appended)
+			argsEqual := reflect.DeepEqual(got.Args, wantArgs)
+			cwdEqual := sameResumeDirectory(got.Cwd, dir)
+			if diagnosticDir := os.Getenv("KOTO_RESUME_TEST_DIAGNOSTICS"); diagnosticDir != "" {
+				diagnostic, _ := json.MarshalIndent(map[string]any{"architecture": runtime.GOARCH, "shell": shell, "argsEqual": argsEqual, "cwdEqual": cwdEqual, "wantedArgs": wantArgs, "gotArgs": got.Args, "wantedCwd": dir, "gotCwd": got.Cwd}, "", "  ")
+				if err := os.WriteFile(filepath.Join(diagnosticDir, "gui-resume-"+runtime.GOARCH+"-"+shell+".json"), diagnostic, 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if decodeErr != nil || !argsEqual || !cwdEqual {
+				t.Fatalf("GUI command changed arguments/directory: decode=%v argsEqual=%v cwdEqual=%v wantedArgs=%s gotArgs=%s wantedCwd=%s gotCwd=%s", decodeErr, argsEqual, cwdEqual, strconv.QuoteToASCII(resumeArgsJSON(wantArgs)), strconv.QuoteToASCII(resumeArgsJSON(got.Args)), strconv.QuoteToASCII(dir), strconv.QuoteToASCII(got.Cwd))
+			}
+		})
+	}
+}
+
+func sameResumeDirectory(a, b string) bool {
+	left, leftErr := os.Stat(a)
+	right, rightErr := os.Stat(b)
+	return leftErr == nil && rightErr == nil && os.SameFile(left, right)
+}
+
+func resumeArgsJSON(args []string) string {
+	b, _ := json.Marshal(args)
+	return string(b)
 }
 
 func TestWindowsResumeInputPromptPreservesUTF8(t *testing.T) {
@@ -74,7 +166,7 @@ func TestWindowsResumeInputPromptPreservesUTF8(t *testing.T) {
 		Args  []string `json:"args"`
 		Cwd   string   `json:"cwd"`
 	}
-	if err := json.Unmarshal(out, &got); err != nil || strings.TrimSuffix(strings.TrimSuffix(got.Input, "\n"), "\r") != input || !reflect.DeepEqual(got.Args, []string{"session O'Brien", "appended literal"}) || !strings.EqualFold(filepath.Clean(got.Cwd), filepath.Clean(dir)) {
+	if err := json.Unmarshal(out, &got); err != nil || strings.TrimSuffix(strings.TrimSuffix(got.Input, "\n"), "\r") != input || !reflect.DeepEqual(got.Args, []string{"session O'Brien", "appended literal"}) || !sameResumeDirectory(got.Cwd, dir) {
 		t.Fatalf("stdin or command changed: %v, %s", err, out)
 	}
 }
