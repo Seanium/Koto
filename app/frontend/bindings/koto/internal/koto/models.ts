@@ -58,7 +58,6 @@ export interface BindingView {
     "leaf": string;
     "path": string;
     "meta": core$0.JsonObject;
-    "trashed": string;
     "resume": Resume | null;
 }
 

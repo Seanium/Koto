@@ -1,5 +1,5 @@
 // Package engine holds the connector contract, the generic JSONL reader, and the operations over
-// a working copy: reading native sessions in, planning and applying copies, the trash.
+// a working copy: reading native sessions in, planning and applying copies.
 package engine
 
 import (
@@ -76,13 +76,6 @@ type PlanInput struct {
 	Residual func(e *core.Event) []byte
 }
 
-// SessionRef is a native session as sinks and the trash see it.
-type SessionRef struct {
-	Session string
-	Path    string
-	Meta    core.JsonObject
-}
-
 // Sink writes into a harness.
 type Sink interface {
 	Plan(in PlanInput) (*DeliveryPlan, error)
@@ -103,21 +96,7 @@ type TargetAccounts interface {
 	TargetAccounts(context.Context) ([]core.IdentityClaim, error)
 }
 
-// OpenChecker: is this native session open in a running harness process right now? Returns why, or "".
-type OpenChecker interface{ OpenBy(s SessionRef) string }
-
-// Trasher moves a native session to the trash (never deletes it): its files, or the harness's own archive.
-type Trasher interface {
-	Files(s SessionRef) []string
-}
-
-// Archiver archives with the harness's own API.
-type Archiver interface {
-	Archive(ctx context.Context, s SessionRef) (core.JsonObject, error)
-	Unarchive(ctx context.Context, s SessionRef, receipt core.JsonObject) error
-}
-
-// Connector is one harness storage root: a source, maybe a sink and a trash.
+// Connector is one harness storage root: a source and, when supported, a sink.
 type Connector struct {
 	ID           string
 	Harness      string
@@ -131,7 +110,6 @@ type Connector struct {
 	Vocabulary   core.ToolVocabulary
 	Source       Source
 	Sink         Sink
-	Trash        any // Trasher and/or Archiver
 	Dispose      func()
 }
 

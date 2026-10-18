@@ -19,7 +19,7 @@ setLanguage('de')
 const before = notifications
 setLanguage('de')
 assert.equal(notifications, before, 'unchanged locale does not render again')
-assert.equal(tr('{path} 是项目文件夹'), '{path} ist der Projektordner')
+assert.equal(tr('{path} 是项目目录'), '{path} ist der Projektordner')
 assert.equal(tr('unknown label'), 'unknown label')
 unsubscribe()
 setLanguage('zh-TW')

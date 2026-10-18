@@ -245,18 +245,12 @@ func TestVersionModelNothingLost(t *testing.T) {
 	xa2 := eventOf(t, a, "claude-code", CCA, "xa2")
 	eq(t, len(h.Children(xa2)), 2, "the rewrite grew a sibling branch")
 
-	// #4 deliveries: create, then an interior-node carry, then trash + restore
+	// #4 deliveries: create, then an interior-node carry
 	p1 := carry(t, a, engine.CarryOptions{Head: xa3, To: "pi"})
 	b1 := text(t, p1.Plan.Target.Path)
 	carry(t, a, engine.CarryOptions{Selector: thread, To: "pi"})
 	carry(t, a, engine.CarryOptions{Head: xa2, To: "dsh"})
 	eq(t, text(t, p1.Plan.Target.Path), b1)
-	api := newAPI(a)
-	api.Reindex(ctx)
-	tr, err := api.TrashThread(ctx, "pi:"+p1.Plan.Target.Session, "pi")
-	must(t, err)
-	_, err = api.Restore(ctx, tr.TrashID)
-	must(t, err)
 	scan(t, a)
 
 	// #1 every node from before is still there, byte for byte

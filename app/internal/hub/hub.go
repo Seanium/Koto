@@ -25,7 +25,6 @@ type Binding struct {
 	Leaf      string          `json:"leaf"` // "" = nothing yet
 	Path      string          `json:"path"`
 	Meta      core.JsonObject `json:"meta"`
-	Trashed   string          `json:"trashed"`
 	updated   int64
 }
 

@@ -868,10 +868,7 @@ func New(o Options) *engine.Connector {
 	}
 	c := &cc{id: o.ID, root: o.Root, projects: filepath.Join(o.Root, "projects"), desktopScope: o.DesktopScope, identity: o.Identity, files: shared.NewPathIndex()}
 	out := &engine.Connector{ID: c.id, Root: c.root, Harness: "claude-code", Version: Version, Capabilities: Capabilities, Vocabulary: vocab,
-		Source: c, Sink: c, Trash: c}
-	if c.desktopScope != "" {
-		out.Trash = nil
-	}
+		Source: c, Sink: c}
 	return out
 }
 
@@ -949,42 +946,10 @@ func (c *cc) ReadRecordContext(ctx context.Context, session string, index int, o
 	return engine.ReadRecordAtContext(ctx, p, *offset)
 }
 
-// Files of a session for the trash: the transcript, its side directory, and the per-session state
-// Claude Code keeps elsewhere (file-history for rewind, session-env, todos).
-func (c *cc) Files(s engine.SessionRef) []string {
-	file, ok := c.files.Get(s.Session)
-	if !ok {
-		file = s.Path
-	}
-	if file == "" || !exists(file) {
-		return nil
-	}
-	out := []string{file}
-	cands := []string{strings.TrimSuffix(file, ".jsonl"), filepath.Join(c.root, "file-history", s.Session), filepath.Join(c.root, "session-env", s.Session)}
-	if ents, err := os.ReadDir(filepath.Join(c.root, "todos")); err == nil {
-		for _, e := range ents {
-			if strings.HasPrefix(e.Name(), s.Session+"-") {
-				cands = append(cands, filepath.Join(c.root, "todos", e.Name()))
-			}
-		}
-	}
-	for _, p := range cands {
-		if exists(p) {
-			out = append(out, p)
-		}
-	}
-	return out
-}
-
 func exists(p string) bool { _, err := os.Stat(p); return err == nil }
 
 func (c *cc) NewSessionID(key string) string { return core.UUID5("claude-code\x00" + key) }
 func (c *cc) ResumeCommand() string          { return "claude --resume {id}" }
-
-func (c *cc) OpenBy(s engine.SessionRef) string {
-	cwd, _ := s.Meta["cwd"].(string)
-	return OpenBy(c.root, s.Session, cwd)
-}
 
 func (c *cc) Plan(in engine.PlanInput) (*engine.DeliveryPlan, error) {
 	t := in.Target
@@ -1086,52 +1051,4 @@ func (c *cc) checkTargetProfile(target engine.DeliveryTarget) error {
 		return fmt.Errorf("Claude target storage profile changed")
 	}
 	return nil
-}
-
-var pidFile = regexp.MustCompile(`^(\d+)\.json$`)
-var claudeProc = regexp.MustCompile(`(^|/)claude(\s|$)|/claude/versions/`)
-
-// OpenBy: Claude Code registers each running instance in <config>/sessions/<pid>.json ({pid,
-// sessionId, cwd, status}). A live pid whose entry names this session has it open; a claude
-// process with no entry (an older CLI) running in the session's cwd may have it open too.
-func OpenBy(root, session, cwd string) string {
-	dir := filepath.Join(root, "sessions")
-	registered := map[int]bool{}
-	names, _ := os.ReadDir(dir)
-	for _, f := range names {
-		m := pidFile.FindStringSubmatch(f.Name())
-		if m == nil {
-			continue
-		}
-		pid, _ := strconv.Atoi(m[1])
-		if !shared.PidAlive(pid) {
-			continue
-		}
-		registered[pid] = true
-		b, err := os.ReadFile(filepath.Join(dir, f.Name()))
-		if err != nil {
-			continue
-		}
-		var e map[string]any
-		if json.Unmarshal(b, &e) != nil {
-			continue
-		}
-		if e["sessionId"] == session {
-			st := ""
-			if s, ok := e["status"].(string); ok {
-				st = " (" + s + ")"
-			}
-			return fmt.Sprintf("Claude Code pid %d has it open%s", pid, st)
-		}
-	}
-	if cwd == "" {
-		return ""
-	}
-	procs, _ := shared.ProcessesWithCwd(claudeProc)
-	for _, p := range procs {
-		if !registered[p.Pid] && p.Cwd != "" && shared.SamePath(p.Cwd, cwd) {
-			return fmt.Sprintf("a Claude Code process (pid %d) without a session registry entry runs in %s", p.Pid, cwd)
-		}
-	}
-	return ""
 }

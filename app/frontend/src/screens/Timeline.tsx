@@ -254,7 +254,7 @@ function TurnView({ t, flash, done, hit }: {
   return (
     <div id={`turn-${t.index}`} data-turn={t.index} className={`col g4 turn ${flash ? 'turn-flash' : ''}`}
       data-selection-unit={selection && eligible ? 'turn' : undefined} data-selection-events={selection?.events(t.eventIds).join(' ')} data-selecting={!!selection || undefined} title={done ? undefined : tr("这一轮还没结束")}>
-      {selection ? <SelectionCheck scope="turn" events={t.eventIds} label={tr("第 {0} 轮 · 整轮", [t.index])} disabled={!eligible} /> : !t.partial && <div className="turn-label mono">{tr("第 ")}{t.index} {tr(" 轮")}{!done && <span className="turn-label-hint"> {tr(" · 这一轮还没结束")}</span>}</div>}
+      {!t.partial && <div className="turn-label mono"><SelectionCheck scope="turn" events={t.eventIds} label={tr("第 {0} 轮 · 整轮", [t.index])} disabled={!eligible} />{tr("第 ")}{t.index} {tr(" 轮")}{!done && <span className="turn-label-hint"> {tr(" · 这一轮还没结束")}</span>}</div>}
       {t.partial ? <div className="switch-line">{tr("第 ")}{t.index} {tr(" 轮很长，这里是它的后半段")}</div> : t.promptId ? <div className="msg-you" data-content-selected={eligible && selection?.has(t.promptId) || undefined} title={t.time ? clockTime(t.time) : undefined}>
         <SelectionCheck events={[t.promptId]} label={tr("提问")} disabled={!eligible} />
         {t.imagesFirst && t.images.length > 0 && <Images images={t.images} />}
@@ -375,6 +375,7 @@ function Thumb({ image }: { image: TurnImage }) {
     if (host.current) observer.observe(host.current)
     return () => observer.disconnect()
   }, [])
+  const close = () => { setBig(false); host.current?.querySelector<HTMLElement>('[role="button"]')?.focus({ preventScroll: true }) }
   const needed = near || big
   useEffect(() => {
     if (!source || !needed) { setSrc(undefined); return }
@@ -385,14 +386,14 @@ function Thumb({ image }: { image: TurnImage }) {
   }, [image.sha, source, needed])
   useEffect(() => {
     if (!big) return
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); setBig(false) } }
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); close() } }
     window.addEventListener('keydown', esc, true)
     return () => window.removeEventListener('keydown', esc, true)
   }, [big])
   return (
     <span ref={host} className="msg-image-slot">
-      {failed ? <span className="msg-img msg-img-missing" title={image.name}>{tr("图片读不到了")}</span> : src ? <img className="msg-img no-drag" src={src} alt={image.name ?? tr("图片")} title={image.name} onLoad={e => { const r = e.currentTarget.getBoundingClientRect(); setSize({ width: r.width, height: r.height }) }} onClick={() => setBig(true)} /> : <span className="msg-img msg-img-loading" style={size} aria-label={tr("图片")} />}
-      {big && createPortal(<div className="img-overlay no-drag" role="dialog" aria-label={tr("图片")} onClick={() => setBig(false)}><img src={src} alt={image.name ?? tr("图片")} /></div>, document.body)}
+      {failed ? <span className="msg-img msg-img-missing" title={image.name}>{tr("图片读不到了")}</span> : src ? <img className="msg-img no-drag" role="button" tabIndex={0} src={src} alt={image.name ?? tr("图片")} title={image.name} onLoad={e => { const r = e.currentTarget.getBoundingClientRect(); setSize({ width: r.width, height: r.height }) }} onClick={() => setBig(true)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setBig(true) } }} /> : <span className="msg-img msg-img-loading" style={size} aria-label={tr("图片")} />}
+      {big && createPortal(<div className="img-overlay no-drag" role="dialog" aria-label={tr("图片")} onClick={close}><img src={src} alt={image.name ?? tr("图片")} /></div>, document.body)}
     </span>
   )
 }
@@ -400,7 +401,7 @@ function Thumb({ image }: { image: TurnImage }) {
 function ToolLine({ tool }: { tool: ToolStep }) {
   const [open, setOpen] = useState(false)
   return (
-    <div className={`code no-drag${open ? ' code-open' : ''}`} role="button" tabIndex={0} title={open ? undefined : tool.result} onClick={() => setOpen(o => !o)} onKeyDown={e => { if (e.key === 'Enter') setOpen(o => !o) }} style={{ cursor: 'pointer' }}>
+    <div className={`code no-drag${open ? ' code-open' : ''}`} role="button" tabIndex={0} title={open ? undefined : tool.result} onClick={() => setOpen(o => !o)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(o => !o) } }} style={{ cursor: 'pointer' }}>
       <span className={open ? '' : 'ellipsis'} style={{ maxWidth: open ? '100%' : '60%', minWidth: 0, color: 'var(--ink)', overflowWrap: 'anywhere' }}>{tool.call}</span>
       {tool.result && <span className={open ? '' : 'ellipsis grow'} style={{ minWidth: 0, flexBasis: open ? '100%' : undefined, overflowWrap: 'anywhere' }}>→ {tool.result}</span>}
       {tool.outcome === 'error' && <span className="t-red">{tr("失败")}</span>}

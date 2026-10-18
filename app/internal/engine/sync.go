@@ -13,6 +13,7 @@ import (
 	"koto/internal/core"
 	"koto/internal/hub"
 	"koto/internal/planner"
+	"koto/internal/platform"
 )
 
 // Logger takes warnings and notes.
@@ -109,7 +110,7 @@ type Engine struct {
 	LockWait time.Duration
 	Locks    Locker
 	Jobs     *CopyJobs
-	// Filter: sessions a scan skips unless told otherwise (those in the trash).
+	// Filter limits scans to the sessions in this working copy.
 	Filter func(core.NativeRef) bool
 	mu     sync.Mutex
 }
@@ -175,7 +176,7 @@ func (e *Engine) exclusive(ctx context.Context, fn func() error) error {
 	return fn()
 }
 
-// Locked runs fn as one engine operation (e.g. moving sessions to the trash).
+// Locked runs fn as one engine operation shared across processes.
 func (e *Engine) Locked(ctx context.Context, fn func() error) error { return e.exclusive(ctx, fn) }
 
 // ------------------------------------------------------------------ ingest
@@ -570,6 +571,11 @@ func (e *Engine) planLocked(ctx context.Context, o CarryOptions) (*Planned, erro
 			}
 		}
 	}
+	// Native Codex on Windows can persist \\?\C:\... as cwd. Target Agents
+	// encode a normal project path into a directory name; retaining the namespace
+	// marker would put an illegal '?' in that name. Source metadata stays intact.
+	target.Cwd = platform.ProjectPath(target.Cwd)
+	proj.Hints.Cwd = platform.ProjectPath(proj.Hints.Cwd)
 	readCtx, closeReads := withRecordReads(ctx)
 	defer closeReads()
 	plan, err := sink.Sink.Plan(PlanInput{Thread: thread, Head: effective, Level: level, Projection: proj, Target: target, Hub: e.Hub, Residual: func(ev *core.Event) []byte { return e.residual(readCtx, ev) }})

@@ -115,7 +115,7 @@ func (ss *Sessions) Scan(ctx context.Context, connectors []string, onProgress fu
 }
 
 // ScanIncremental reads native histories without the copy lease. Only bounded
-// index publication is serialized with copy/trash, after rechecking the source.
+// index publication is serialized with copying, after rechecking the source.
 func (ss *Sessions) ScanIncremental(ctx context.Context, onProgress func(engine.ScanProgress), reset map[string]bool, publish func(func() error) error) engine.ScanReport {
 	return ss.scan(ctx, nil, onProgress, publish, reset)
 }
@@ -469,13 +469,6 @@ func (ss *Sessions) indexOne(ctx context.Context, c *engine.Connector, ref core.
 		if expected := core.S(ref.Meta["_nativeRevision"]); expected != "" && nativeRevision(c, ref) != expected {
 			return errSourceChanged
 		}
-		for _, entry := range ss.Store.Trash(false) {
-			for _, item := range entry.Items {
-				if item.Connector == c.ID && item.Session == ref.Session {
-					return errSourceChanged
-				}
-			}
-		}
 		return ss.Store.PutSession(*out)
 	})
 }
@@ -761,12 +754,6 @@ func (ss *Sessions) OpenThread(ctx context.Context, selector string) (*OpenThrea
 		return nil, ctx.Err()
 	}
 	h := hub.New()
-	trashed := map[string]bool{}
-	for _, e := range ss.Store.Trash(false) {
-		for _, i := range e.Items {
-			trashed[keyOf(i.Harness, i.Session, i.Connector)] = true
-		}
-	}
 	readSet, reading := map[string]bool{}, map[string]bool{}
 	var readMembers []SessionRow
 	var read func(SessionRow) error
@@ -779,7 +766,7 @@ func (ss *Sessions) OpenThread(ctx context.Context, selector string) (*OpenThrea
 			return fmt.Errorf("cyclic native ancestry")
 		}
 		c := ss.Registry.Get(m.Connector)
-		if c == nil || c.Source == nil || m.Path == "" || trashed[k] {
+		if c == nil || c.Source == nil || m.Path == "" {
 			if nativeScope {
 				return fmt.Errorf("required source unavailable: %s", k)
 			}
@@ -868,9 +855,7 @@ func (ss *Sessions) OpenThread(ctx context.Context, selector string) (*OpenThrea
 	// session on disk into it would mix conversations and cost the memory the index saves.
 	own := map[string]bool{}
 	for _, m := range g.Members {
-		if !trashed[keyOf(m.Harness, m.Session, m.Connector)] {
-			own[keyOf(m.Harness, m.Session, m.Connector)] = true
-		}
+		own[keyOf(m.Harness, m.Session, m.Connector)] = true
 	}
 	e.Filter = func(r core.NativeRef) bool { return own[keyOf(r.Harness, r.Session, r.Connector)] }
 	view := &OpenThread{Hub: h, Engine: e, Thread: thread, Group: g}

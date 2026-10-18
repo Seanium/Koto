@@ -32,3 +32,7 @@
 [使用指南](usage.md) · [兼容性](compatibility.md) · [开发指南](development.md) · [参与贡献](contributing.md)
 
 [MIT 许可证](../../LICENSE) · [第三方声明](../../THIRD_PARTY_NOTICES.md)
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/chart?repos=seanium/koto&type=date&legend=top-left)](https://www.star-history.com/?repos=seanium%2Fkoto&type=date&legend=top-left)

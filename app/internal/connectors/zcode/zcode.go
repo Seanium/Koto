@@ -65,7 +65,7 @@ func New(o Options) *engine.Connector {
 		o.DBPath, _ = filepath.Abs(o.DBPath)
 	}
 	c := &connector{id: o.ID, root: o.Root, db: o.DBPath, index: filepath.Join(o.Root, "v2", "tasks-index.sqlite"), command: append([]string{}, o.Command...)}
-	return &engine.Connector{ID: c.id, Root: c.root, Harness: "zcode", Version: Version, Capabilities: Capabilities, Vocabulary: Vocabulary{}, Source: c, Sink: c, Trash: c}
+	return &engine.Connector{ID: c.id, Root: c.root, Harness: "zcode", Version: Version, Capabilities: Capabilities, Vocabulary: Vocabulary{}, Source: c, Sink: c}
 }
 func (c *connector) DatabasePath() string { return c.db }
 func (c *connector) WatchRoots() []string {
@@ -194,98 +194,4 @@ func (c *connector) indexSession(ctx context.Context, tx *sql.Tx, p *engine.Deli
 	meta, _ := json.Marshal(core.JsonObject{"taskId": p.Target.Session, "workspacePath": p.Target.Cwd, "title": title, "provider": "glm", "mode": "build", "status": "completed", "createdAt": d.Created, "updatedAt": d.Created})
 	_, err := tx.ExecContext(ctx, `INSERT INTO desktop.tasks(workspace_key,workspace_path,task_id,title,task_status,provider,mode,created_at,updated_at,meta_json) VALUES(?,?,?,?,?,'glm','build',?,?,?) ON CONFLICT(workspace_key,task_id) DO NOTHING`, p.Target.Cwd, p.Target.Cwd, p.Target.Session, title, "completed", d.Created, d.Created, string(meta))
 	return err
-}
-func (c *connector) Archive(ctx context.Context, s engine.SessionRef) (core.JsonObject, error) {
-	db, err := c.open(ctx, true)
-	if err != nil {
-		return nil, err
-	}
-	defer db.Close()
-	has, err := c.attachIndex(ctx, db)
-	if err != nil {
-		return nil, err
-	}
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback()
-	stamp := time.Now().UnixMilli()
-	r, err := tx.ExecContext(ctx, `UPDATE session SET time_archived=? WHERE id=? AND time_archived IS NULL`, stamp, s.Session)
-	if err != nil {
-		return nil, err
-	}
-	n, _ := r.RowsAffected()
-	if n != 1 {
-		return nil, fmt.Errorf("ZCode session is absent or already archived")
-	}
-	states := []any{}
-	if has {
-		rows, e := tx.QueryContext(ctx, `SELECT workspace_key,archived FROM desktop.tasks WHERE task_id=?`, s.Session)
-		if e != nil {
-			return nil, e
-		}
-		for rows.Next() {
-			var key string
-			var archived int
-			if e = rows.Scan(&key, &archived); e != nil {
-				rows.Close()
-				return nil, e
-			}
-			states = append(states, core.JsonObject{"workspace": key, "archived": archived})
-		}
-		e = rows.Err()
-		rows.Close()
-		if e != nil {
-			return nil, e
-		}
-		if _, err = tx.ExecContext(ctx, `UPDATE desktop.tasks SET archived=1 WHERE task_id=?`, s.Session); err != nil {
-			return nil, err
-		}
-	}
-	if err = tx.Commit(); err != nil {
-		return nil, err
-	}
-	return core.JsonObject{"archivedAt": stamp, "desktopStates": states}, nil
-}
-func (c *connector) Unarchive(ctx context.Context, s engine.SessionRef, receipt core.JsonObject) error {
-	stamp, ok := core.Num(receipt["archivedAt"])
-	if !ok {
-		return fmt.Errorf("invalid ZCode archive receipt")
-	}
-	db, err := c.open(ctx, true)
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-	has, err := c.attachIndex(ctx, db)
-	if err != nil {
-		return err
-	}
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	r, err := tx.ExecContext(ctx, `UPDATE session SET time_archived=NULL WHERE id=? AND time_archived=?`, s.Session, int64(stamp))
-	if err != nil {
-		return err
-	}
-	n, _ := r.RowsAffected()
-	if n != 1 {
-		return fmt.Errorf("ZCode archive changed; refusing to overwrite")
-	}
-	if has {
-		for _, v := range core.Arr(receipt["desktopStates"]) {
-			state := core.Obj(v)
-			old, ok := core.Num(state["archived"])
-			if !ok {
-				return fmt.Errorf("invalid ZCode desktop archive receipt")
-			}
-			if _, err = tx.ExecContext(ctx, `UPDATE desktop.tasks SET archived=? WHERE task_id=? AND workspace_key=? AND archived=1`, int(old), s.Session, core.S(state["workspace"])); err != nil {
-				return err
-			}
-		}
-	}
-	return tx.Commit()
 }

@@ -335,3 +335,13 @@ func readLine(t *testing.T, l string) map[string]any {
 	must(t, json.Unmarshal([]byte(l), &m))
 	return m
 }
+
+func newAPI(a *App) *API { return &API{App: a} }
+
+func apiCode(err error) (int, string) {
+	if err == nil {
+		return 0, ""
+	}
+	e := AsAPIError(err)
+	return e.Status, e.Code
+}

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"image/png"
+	"runtime"
 	"testing"
 )
 
@@ -42,7 +43,11 @@ func TestPackagedIcons(t *testing.T) {
 			}
 		})
 	}
-	if !bytes.Equal(platformApplicationIcon(), appIconPNG) {
+	if runtime.GOOS == "darwin" {
+		if platformApplicationIcon() != nil {
+			t.Fatal("macOS must retain its standard bundle icon for Finder and the running Dock")
+		}
+	} else if !bytes.Equal(platformApplicationIcon(), appIconPNG) {
 		t.Fatal("runtime icon must use the same fixed artwork as packaged icons")
 	}
 }

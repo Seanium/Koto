@@ -223,8 +223,6 @@ func TestThinIndexRebuildPreservesContentAndUserData(t *testing.T) {
 	collection, err := api.SaveAnalysis(store.AnalysisCollection{Name: "keep comparison", Sessions: []string{list[0].ID, list[1].ID}})
 	must(t, err)
 	a.Store.SetSetting("prefs", map[string]any{"language": "ja", "theme": "dark"})
-	trash := store.TrashEntry{TrashID: "retained-restore-record", Thread: "@missing:gone", Items: []store.TrashItem{}, TrashedAt: 1}
-	must(t, a.Store.AddTrash(trash))
 	beforeRows := a.Store.Sessions()
 	beforeList := core.ToJSON(list)
 	before, err := api.Thread(ctx, list[0].ID, 0, "")
@@ -249,7 +247,6 @@ func TestThinIndexRebuildPreservesContentAndUserData(t *testing.T) {
 	collections, err := api.Analyses()
 	must(t, err)
 	eq(t, collections[0].ID, collection.ID)
-	eq(t, len(a.Store.Trash(false)), 1)
 	// The returned view is still valid while cache ownership moves to fresh views.
 	ok(t, len(before.Events) > 0)
 	for file, hash := range files {

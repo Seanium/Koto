@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 
@@ -13,24 +12,9 @@ import (
 	"koto/internal/connectors/codex"
 	"koto/internal/connectors/dsh"
 	"koto/internal/connectors/pi"
-	"koto/internal/connectors/shared"
 	"koto/internal/core"
 	"koto/internal/engine"
 )
-
-func TestLivenessProgramOnly(t *testing.T) {
-	cc := regexp.MustCompile(`(^|/)claude(\s|$)|/claude/versions/`)
-	p := regexp.MustCompile(`pi-coding-agent|(^|/)pi(\s|$)`)
-	watcher := "/opt/koto/bin/koto scan /tmp/acc/claude /tmp/acc/pi /tmp/acc/codex"
-	ok(t, !cc.MatchString(shared.ProgramOf(watcher)))
-	ok(t, !p.MatchString(shared.ProgramOf(watcher)))
-	ok(t, !cc.MatchString(shared.ProgramOf("grep -r claude .")))
-	ok(t, cc.MatchString(shared.ProgramOf("/Users/u/.local/share/claude/versions/2.1.3 --resume abc")))
-	ok(t, cc.MatchString(shared.ProgramOf("claude -p hi")))
-	ok(t, p.MatchString(shared.ProgramOf("node /usr/local/lib/node_modules/@earendil/pi-coding-agent/dist/cli.js --session x")))
-	ok(t, p.MatchString(shared.ProgramOf("node --no-warnings /usr/local/bin/pi -p hi")))
-	ok(t, p.MatchString(shared.ProgramOf("/usr/local/bin/pi")))
-}
 
 func TestOwnSideFile(t *testing.T) {
 	root, _ := filepath.EvalSymlinks(t.TempDir())

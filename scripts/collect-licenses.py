@@ -107,6 +107,14 @@ def collect(target: Path):
         raise SystemExit("Unexpected ZCode license response")
     (target / "assets/zcode-LICENSE").write_bytes(zcode_license)
 
+    # The App's static UI icon subset is pinned to this Lucide revision.
+    lucide_url = "https://raw.githubusercontent.com/lucide-icons/lucide/1ef60af944de207e0d5176905a0759ba12e6ee8d/LICENSE"
+    with urllib.request.urlopen(lucide_url, timeout=30) as response:
+        lucide_license = response.read()
+    if not lucide_license.startswith(b"ISC License"):
+        raise SystemExit("Unexpected Lucide license response")
+    (target / "assets/lucide-LICENSE").write_bytes(lucide_license)
+
     hashes = {path.relative_to(target).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest() for path in sorted(target.rglob("*")) if path.is_file() and path.name != "INDEX.json"}
     (target / "INDEX.json").write_text(json.dumps({"packages": packages, "files": hashes}, indent=2, ensure_ascii=False) + "\n")
     print(f"Preserved {len(hashes)} license files for {len(packages)} installed packages plus included marks.")

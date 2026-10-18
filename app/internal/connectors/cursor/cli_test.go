@@ -290,30 +290,6 @@ func TestCLIPublishPreservesConcurrentNativeTarget(t *testing.T) {
 	}
 }
 
-func TestCLITrashKeepsDatabaseAndAssetsTogether(t *testing.T) {
-	c := NewCLI(CLIOptions{Root: t.TempDir()}).Source.(*cliConnector)
-	h := hub.New()
-	u := projected("user", "attachment")
-	u.Parts = append(u.Parts, core.Part{"type": "file", "name": "material.txt", "mediaType": "text/plain", "blob": h.PutBlob([]byte("trash together"))})
-	p, err := c.Plan(engine.PlanInput{Hub: h, Projection: &planner.Projection{Items: []planner.Item{u}}, Target: engine.DeliveryTarget{Mode: "create", Session: c.NewSessionID("trash"), Cwd: c.root}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = c.Apply(context.Background(), p); err != nil {
-		t.Fatal(err)
-	}
-	files := c.Files(engine.SessionRef{Session: p.Target.Session, Path: p.Target.Path})
-	if !reflect.DeepEqual(files, []string{filepath.Dir(p.Target.Path)}) {
-		t.Fatal("trash detached DB from assets", files)
-	}
-	if got := c.Files(engine.SessionRef{Session: c.NewSessionID("other"), Path: p.Target.Path}); len(got) != 0 {
-		t.Fatal("accepted other session", got)
-	}
-	if got := c.Files(engine.SessionRef{Session: p.Target.Session, Path: filepath.Join(t.TempDir(), "store.db")}); len(got) != 0 {
-		t.Fatal("accepted outside path", got)
-	}
-}
-
 func TestCLIFileAttachmentsRemainCompleteInEveryRole(t *testing.T) {
 	for _, role := range []string{"user", "assistant", "tool"} {
 		for _, media := range []string{"text/plain", "application/json", "application/octet-stream", "image/png"} {

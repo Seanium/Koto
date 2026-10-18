@@ -15,9 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"koto/internal/connectors/claudecode"
-	"koto/internal/connectors/codex"
-	"koto/internal/connectors/pi"
 	"koto/internal/connectors/shared"
 	"koto/internal/core"
 	"koto/internal/engine"
@@ -118,44 +115,6 @@ func TestSessionLossOpenIdleSession(t *testing.T) {
 	r := carry(t, strict, engine.CarryOptions{Selector: piSel, To: "claude-code"})
 	jsonEq(t, []string{r.Plan.Mode, r.Plan.Target.Session}, []string{"create", r.Plan.Target.Session})
 	ok(t, !strings.Contains(text(t, ccFile), "from pi"))
-}
-
-func TestSessionLossOpenProbes(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("file-holder and cwd probes are not implemented on Windows")
-	}
-	root := t.TempDir()
-	root, _ = filepath.EvalSymlinks(root)
-	cwd := filepath.Join(root, "proj")
-	must(t, os.Mkdir(cwd, 0o755))
-	lockDir := filepath.Join(root, "codex", "thread-writer-locks")
-	must(t, os.MkdirAll(lockDir, 0o755))
-	lock := filepath.Join(lockDir, "T1.lock")
-	must(t, os.WriteFile(lock, nil, 0o644))
-	script := filepath.Join(root, "lib", "pi-coding-agent", "dist", "cli.js")
-	must(t, os.MkdirAll(filepath.Dir(script), 0o755))
-	must(t, os.WriteFile(script, []byte("setInterval(() => {}, 1000)\n"), 0o644))
-	node, err := exec.LookPath("node")
-	if err != nil {
-		t.Skip("node not installed")
-	}
-	cc := startHolder(t, "")
-	cx := startFileHolder(t, lock)
-	piH := startHolder(t, cwd, node, script)
-	must(t, os.Mkdir(filepath.Join(root, "sessions"), 0o755))
-	must(t, os.WriteFile(filepath.Join(root, "sessions", fmt.Sprintf("%d.json", cc.pid)), []byte(`{"sessionId":"S1","status":"busy"}`), 0o644))
-	must(t, os.WriteFile(filepath.Join(root, "sessions", "999999.json"), []byte(`{"sessionId":"S2"}`), 0o644))
-	ok(t, regexp.MustCompile(`pid \d+ has it open \(busy\)`).MatchString(claudecode.OpenBy(root, "S1", "")))
-	eq(t, claudecode.OpenBy(root, "S2", ""), "", "a dead instance does not hold anything")
-	got := codex.OpenBy(filepath.Join(root, "codex"), "T1", "")
-	ok(t, strings.Contains(got, fmt.Sprintf("writer lock (pid %d)", cx.pid)), got)
-	eq(t, codex.OpenBy(filepath.Join(root, "codex"), "T2", ""), "")
-	got = pi.OpenBy("P1", "", cwd)
-	ok(t, strings.Contains(got, fmt.Sprintf("pi pid %d runs in", piH.pid)), got)
-	eq(t, pi.OpenBy("P1", "", root), "")
-	cx.kill()
-	cx.exited()
-	eq(t, codex.OpenBy(filepath.Join(root, "codex"), "T1", ""), "", "stale lock file nobody holds")
 }
 
 func TestSessionLossCodexRegistrationFails(t *testing.T) {

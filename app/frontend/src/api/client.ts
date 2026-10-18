@@ -1,4 +1,5 @@
 import { tr } from '../i18n/core.ts'
+import { projectFolderError } from './copyErrors'
 // Typed wrappers over the core, which runs inside the app: every call goes straight to Go
 // (AppService); the core's events arrive as Wails events.
 
@@ -6,7 +7,7 @@ import { useEffect, useState } from 'react'
 import { Browser, Events, type CancellablePromise } from '@wailsio/runtime'
 import { AppService } from '../../bindings/koto'
 import type {
-  AgentProfile, AnalysisCollection, AnalysisResult, CarryRequest, CarryResult, Connector, CoreStatus, ScanReport, ScanStatus, ServerEvent, ThreadDetail, ThreadSummary, TrashEntry } from './types'
+  AgentProfile, AnalysisCollection, AnalysisResult, CarryRequest, CarryResult, Connector, CoreStatus, ScanReport, ScanStatus, ServerEvent, ThreadDetail, ThreadSummary } from './types'
 
 /** A failed call: the core's message, with its `code` and the rest of what it said in `body`. */
 export class ApiError extends Error {
@@ -15,6 +16,8 @@ export class ApiError extends Error {
 
 /** Actionable summaries; the original error remains visible in the error details. */
 export function copyFailure(reason: string): string {
+  const folder = projectFolderError(reason)
+  if (folder) return folder
   if (/already exists with different content/.test(reason)) return tr("目标已有同名会话，未覆盖原文件。请重新复制。")
   if (/new Codex session could not be registered|Codex did not accept/.test(reason)) return tr("新会话已写入，但 Codex 尚未确认。请重试完成验证。")
   if (/cannot start|executable file not found/.test(reason)) return tr("无法启动目标 Agent，请检查是否已安装、命令是否可用。")
@@ -69,10 +72,7 @@ export const api = {
   saveAnalysis: (c: AnalysisCollection) => call<AnalysisCollection>(AppService.SaveAnalysis(c as never)),
   deleteAnalysis: (id: string) => call<boolean>(AppService.DeleteAnalysis(id)),
 
-  // 回收站: sessions are only ever moved there and restored, never deleted.
-  trash: (selector: string, harness?: string) => call<TrashEntry>(AppService.TrashThread(selector, harness ?? '')),
-  trashList: () => call<TrashEntry[]>(AppService.TrashList()),
-  restore: (id: string) => call<TrashEntry>(AppService.Restore(id)),
+
 }
 
 // ---------------------------------------------------------------- shell

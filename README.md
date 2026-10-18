@@ -32,3 +32,7 @@ Copy a session. Just ask.
 [Usage](docs/usage.md) · [Compatibility](docs/compatibility.md) · [Development](docs/development.md) · [Contributing](CONTRIBUTING.md)
 
 [MIT License](LICENSE) · [Third-party notices](THIRD_PARTY_NOTICES.md)
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/chart?repos=seanium/koto&type=date&legend=top-left)](https://www.star-history.com/?repos=seanium%2Fkoto&type=date&legend=top-left)

@@ -174,12 +174,8 @@ export function Restart(): $CancellablePromise<void> {
     return $Call.ByID(408403709);
 }
 
-export function Restore(id: string): $CancellablePromise<store$0.TrashEntry | null> {
-    return $Call.ByID(976466128, id);
-}
-
 /**
- * RevealPath shows the folder in Finder / the file manager.
+ * RevealPath shows a project folder or session file in Finder / the file manager.
  */
 export function RevealPath(path: string): $CancellablePromise<boolean> {
     return $Call.ByID(880898056, path);
@@ -239,14 +235,6 @@ export function ThreadPage(selector: string, turns: number, before: string): $Ca
 
 export function Threads(limit: number): $CancellablePromise<koto$0.ThreadListing[] | null> {
     return $Call.ByID(3464577351, limit);
-}
-
-export function TrashList(): $CancellablePromise<store$0.TrashEntry[] | null> {
-    return $Call.ByID(3844050072);
-}
-
-export function TrashThread(selector: string, harness: string): $CancellablePromise<store$0.TrashEntry | null> {
-    return $Call.ByID(568078464, selector, harness);
 }
 
 export function UpdateState(): $CancellablePromise<$models.UpdateState> {

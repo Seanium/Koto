@@ -3,9 +3,9 @@ import { shortcut } from '../ui/shortcut'
 // One native session: a linear turn list or the full conversation, with explicit copy selection.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { api, shell, useOpeners } from '../api/client'
-import { openerName, projectName, revealLabel } from '../api/model'
+import { openerName, originBinding, projectName, revealLabel } from '../api/model'
 import type { Conversation, SessionItem } from '../store'
-import { Banner, Button, Icon, Menu, OverflowLabel, Popover, Segmented, Toast } from '../ui'
+import { Banner, Button, Icon, Menu, OverflowLabel, Segmented, Toast } from '../ui'
 import { ImageSource, Timeline, TimelineSkeleton, TurnPreview, type TimelineHandle } from './Timeline'
 import { SelectionCheck, SelectionContext, useContentSelection } from './ContentSelection'
 import type { CopySource } from './Continue'
@@ -14,17 +14,18 @@ import { SplitPane } from '../ui/SplitPane'
 import { SelectionSurface } from './SelectionSurface'
 import { captureScrollAnchor } from '../scrollAnchor'
 
-export function Detail({ item, detailError, conversation: c, loadEarlier, onRetry, onCopy, onTrash, askTrash }: {
+export function Detail({ item, detailError, conversation: c, loadEarlier, onRetry, onCopy }: {
   item: SessionItem; detailError?: string; conversation?: Conversation; loadEarlier: (untilTurn?: number) => Promise<void>; onRetry: () => void
   onCopy: (source: CopySource) => void
-  onTrash: () => Promise<string | undefined>; askTrash: number
 }) {
   const scroller = useRef<HTMLDivElement>(null)
   const turnList = useRef<HTMLDivElement>(null)
   const previewScroller = useRef<HTMLDivElement>(null)
   const timeline = useRef<TimelineHandle>(null)
+  const copyButton = useRef<HTMLButtonElement>(null)
   const [view, setView] = useState<'list' | 'chat'>('list')
   const selection = useContentSelection(c)
+  const exitSelection = () => { selection.exit(); copyButton.current?.focus({ preventScroll: true }) }
   const custom = selection.source
   const rangeLabel = selection.invalid ? tr("会话已变更，请重新选择") : custom?.label ?? tr("未选择内容")
   const [preview, setPreview] = useState<number>()
@@ -36,6 +37,7 @@ export function Detail({ item, detailError, conversation: c, loadEarlier, onRetr
   useEffect(() => { alive.current = true; return () => { alive.current = false; cancelAnimationFrame(earlierFrame.current) } }, [])
   const turn = c?.turns.find(t => t.index === preview) ?? c?.turns.at(-1)
   const binding = item.bindings[0]
+  const sessionPath = originBinding(item.bindings)?.path
   const imageSource = useCallback((sha: string, signal?: AbortSignal) => api.image(item.id, sha, signal), [item.id])
   const copy = () => { if (custom) onCopy(custom) }
   const loaded = !!c
@@ -76,7 +78,7 @@ export function Detail({ item, detailError, conversation: c, loadEarlier, onRetr
   }, [view, loaded])
   useEffect(() => {
     if (!selection.active) return
-    const escape = (e: KeyboardEvent) => { if (e.key === 'Escape' && !document.querySelector('.sheet,.menu,.attachment-overlay,.img-overlay')) { e.preventDefault(); selection.exit() } }
+    const escape = (e: KeyboardEvent) => { if (e.key === 'Escape' && !document.querySelector('.sheet,.menu,.attachment-overlay,.img-overlay')) { e.preventDefault(); exitSelection() } }
     window.addEventListener('keydown', escape)
     return () => window.removeEventListener('keydown', escape)
   }, [selection.active])
@@ -85,20 +87,22 @@ export function Detail({ item, detailError, conversation: c, loadEarlier, onRetr
       <div className="session-heading">
         <h1 className="t-title no-drag"><OverflowLabel text={item.title} /></h1>
         <div className="session-project no-drag">{item.cwd && <ProjectButton cwd={item.cwd} />}</div>
-        <TrashConfirm onTrash={onTrash} ask={askTrash} />
+        <div className="row g2 no-drag">
+          {sessionPath && <SessionFileButton path={sessionPath} />}
+        </div>
       </div>
       <div className="detail-toolbar no-drag">
         <Segmented label={tr("会话视图")} value={view} onChange={setView} options={[{ value: 'list', label: tr("列表视图") }, { value: 'chat', label: tr("对话视图") }]} />
         <span className="copy-control">
           {selection.active ? <>
-            <Menu trigger="ghost" label={tr("选择操作")} title={rangeLabel} width={180} items={[{ label: tr("全选"), onClick: selection.all }, { label: tr("清空"), onClick: selection.clear }]}>
+            <Menu key="selection-range" trigger="ghost" label={tr("选择操作")} title={rangeLabel} width={180} items={[{ label: tr("全选"), onClick: selection.all }, { label: tr("清空"), onClick: selection.clear }]}>
               <span className="copy-range t-meta">{rangeLabel}</span>{Icon.chevron}
             </Menu>
-            <Button variant="ghost" icon aria-label={tr("取消选择")} title={tr("取消选择")} onClick={selection.exit}>{Icon.close}</Button>
-            <Button id="copy-main" variant="primary" disabled={!custom} onClick={copy}>{tr("复制到…")}</Button>
+            <Button key="selection-cancel" variant="ghost" onClick={exitSelection}>{tr("取消")}</Button>
+            <Button key="copy-action" ref={copyButton} id="copy-main" variant="primary" disabled={!custom} onClick={copy}>{tr("复制到…")}</Button>
           </> : <>
-            {binding.resume && <ResumeActions command={binding.resume.shell} instructions={binding.resume.instructions && binding.harness === 'dsh' ? tr(/win/i.test(navigator.platform) ? "输入下一条消息，按 Enter 提交。" : "输入下一条消息后，在新行按 Ctrl+D 提交。") : binding.resume.instructions} />}
-            <Button id="copy-main" variant="primary" disabled={!selection.canStart} onClick={selection.start}>{tr("选择复制范围")}</Button>
+            {binding.resume && <ResumeActions key="resume" command={binding.resume.shell} instructions={binding.resume.instructions && binding.harness === 'dsh' ? tr(/win/i.test(navigator.platform) ? "输入下一条消息，按 Enter 提交。" : "输入下一条消息后，在新行按 Ctrl+D 提交。") : binding.resume.instructions} />}
+            <Button key="copy-action" ref={copyButton} id="copy-main" variant="primary" disabled={!selection.canStart} onClick={selection.start}>{tr("选择复制范围")}</Button>
           </>}
         </span>
       </div>
@@ -115,7 +119,7 @@ export function Detail({ item, detailError, conversation: c, loadEarlier, onRetr
           onScroll={e => { if (listInteracted.current && e.currentTarget.scrollTop < 80) void loadMore() }}>
           {c.hasEarlier && <Button variant="ghost" disabled={loadingEarlier} onClick={() => void loadMore()}>{loadingEarlier ? tr("加载中…") : tr("加载更早的轮次")}</Button>}
           {c.turns.map(t => <div key={t.index} role="option" tabIndex={0} data-turn={t.index} data-selection-unit={selection.active && !t.partial && t.index <= selection.selection!.state.through ? 'turn' : undefined} data-selection-events={selection.selection?.events(t.eventIds).join(' ')} aria-selected={selection.active ? t.index <= selection.selection!.state.through && t.eventIds.some(id => selection.selection?.has(id)) : turn?.index === t.index} className="turn-list-row no-drag" onClick={() => setPreview(t.index)} onKeyDown={e => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setPreview(t.index); if (selection.active && !t.partial && t.index <= selection.selection!.state.through) selection.selection?.toggle(t.eventIds) } }}>
-            {selection.active ? <SelectionCheck scope="turn" events={t.eventIds} label={tr("第 {0} 轮", [t.index])} disabled={t.partial || t.index > selection.selection!.state.through} /> : <><span className="turn-list-point" /><span className="t-meta">{tr("第 ")}{t.index} {tr(" 轮")}</span></>}
+            <span className="turn-list-choice">{selection.active ? <SelectionCheck scope="turn" events={t.eventIds} label={tr("第 {0} 轮", [t.index])} disabled={t.partial || t.index > selection.selection!.state.through} /> : <span className="turn-list-point" />}</span><span className="t-meta">{tr("第 ")}{t.index} {tr(" 轮")}</span>
             <span className="ellipsis">{t.user || (t.promptId ? tr("图片或附件") : tr("仅回复片段"))}</span>
             {t.index > c.completeTurns && <span className="t-meta">{tr("进行中")}</span>}
           </div>)}
@@ -132,37 +136,29 @@ export function Detail({ item, detailError, conversation: c, loadEarlier, onRetr
   </div>
 }
 
-function TrashConfirm({ onTrash, ask }: { onTrash: () => Promise<string | undefined>; ask: number }) {
-  const [open, setOpen] = useState(false)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string>()
-  const first = useRef(ask)
-  useEffect(() => { if (ask !== first.current) setOpen(true) }, [ask])
-  useEffect(() => { if (open) { setError(undefined); requestAnimationFrame(() => document.getElementById('trash-go')?.focus()) } }, [open])
-  const go = async () => {
-    setBusy(true); setError(undefined)
-    const err = await onTrash()
-    setBusy(false)
-    if (err) setError(err)
-    else setOpen(false)
+/** Native file paths can point at a log or a database shared by several sessions. */
+function SessionFileButton({ path }: { path: string }) {
+  const [note, setNote] = useState<string>()
+  const reveal = async () => {
+    try { if (!await shell.revealPath(path)) setNote(tr('无法打开会话文件所在目录，文件可能已移动或删除。')) }
+    catch { setNote(tr('无法打开会话文件所在目录，文件可能已移动或删除。')) }
   }
-  return (
-    <Popover open={open} setOpen={setOpen} width={300} align="right" label={tr("移到回收站")}
-      trigger={p => <Button className="btn-square" aria-label={tr("移到回收站")} title={shortcut(tr("移到回收站（⌘⌫）"))} aria-pressed={open} {...p}>{Icon.trash}</Button>}>
-      <div className="col g2" style={{ padding: '8px 10px 10px' }} onKeyDown={e => { if (e.key === 'Enter' && !busy) { e.preventDefault(); void go() } }}>
-        <span className="t-medium">{tr("把这个会话移到回收站？")}</span>
-        <span className="t-meta">{tr("只移动当前会话。之后可以在回收站里恢复。")}</span>
-        {error && <span className="note">{error}</span>}
-        <div className="row g2" style={{ justifyContent: 'flex-end', paddingTop: 4 }}>
-          <Button small onClick={() => setOpen(false)}>{tr("取消")}</Button>
-          <Button small id="trash-go" className="btn-danger" disabled={busy} onClick={() => void go()}>{busy ? tr("正在移走…") : error ? tr("再试一次") : tr("移到回收站")}</Button>
-        </div>
-      </div>
-    </Popover>
-  )
+  const copy = async () => {
+    try { if (!await shell.copy(path)) setNote(tr('未能复制会话文件路径，请重试。')) }
+    catch { setNote(tr('未能复制会话文件路径，请重试。')) }
+  }
+  return <>
+    <Menu trigger="secondary" square label={tr('会话文件')} width={320}
+      header={<><span className="t-medium">{tr('会话文件')}</span><span className="mono t-3 selectable" style={{ overflowWrap: 'anywhere' }}>{path}</span></>}
+      items={[
+        { label: tr('打开会话文件所在目录'), icon: Icon.folder, onClick: () => void reveal() },
+        { label: tr('复制会话文件路径'), icon: Icon.copy, onClick: () => void copy() },
+      ]}>{Icon.file}</Menu>
+    {note && <Toast text={note} onDone={() => setNote(undefined)} />}
+  </>
 }
 
-/** Project actions and the full path stay in the menu so long paths cannot move the toolbar. */
+/** Project actions use cwd; the separate session-file menu uses the native log or database. */
 function ProjectButton({ cwd }: { cwd: string }) {
   const openers = useOpeners()
   const [exists, setExists] = useState(true)
@@ -173,9 +169,9 @@ function ProjectButton({ cwd }: { cwd: string }) {
   const nameOf = (list: { id: string; name: string }[] | undefined, id?: string) => { const opener = list?.find(o => o.id === id); return opener && openerName(opener) }
   const terminal = info?.terminal ? (info.terminal === 'custom' ? tr("自定义") : nameOf(info.terminals, info.terminal)) : undefined
   const editor = info?.editor ? (info.editor === 'custom' ? tr("自定义") : nameOf(info.editors, info.editor)) : undefined
-  const gone = exists ? undefined : tr("文件夹已不存在")
+  const gone = exists ? undefined : tr("目录已不存在")
   const fail = (what: string) => (ok: unknown) => { if (!ok) setNote(tr("没能{0}", [what])) }
-  const reveal = () => { void shell.revealPath(cwd).then(fail(tr("打开文件夹"))) }
+  const reveal = () => { void shell.revealPath(cwd).then(fail(tr("打开目录"))) }
   // ⌥⌘R reveals the current session's folder.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (exists && e.metaKey && e.altKey && e.code === 'KeyR') { e.preventDefault(); reveal() } }

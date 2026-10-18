@@ -41,8 +41,6 @@ type Config struct {
 	Enable []string
 	Extra  []*engine.Connector
 	Log    engine.Logger
-	// TrashRename stands in for os.Rename in the trash (tests).
-	TrashRename func(from, to string) error
 }
 
 // ConnectorInfo is a registered connector as the UI and CLI show it.
@@ -109,7 +107,6 @@ type App struct {
 	Store    *store.Store
 	Registry *engine.Registry
 	Sessions *store.Sessions
-	Trash    *store.Trash
 	// Hub and Engine: a working copy of everything scanned (CLI and tests); the app opens one conversation at a time.
 	Hub    *hub.Hub
 	Engine *engine.Engine
@@ -273,7 +270,6 @@ func New(cfg Config) (*App, error) {
 	}
 	a.Sessions = store.NewSessions(st, r)
 	a.Sessions.Log, a.Sessions.LiveMs = cfg.Log, cfg.LiveMs
-	a.Trash = &store.Trash{Store: st, Registry: r, Dir: filepath.Join(dataDir, "trash"), Rename: cfg.TrashRename}
 	a.Hub = hub.New()
 	a.Engine = engine.New(a.Hub, r)
 	a.Engine.Log, a.Engine.Locks = cfg.Log, store.NewEngineLocks(st)
@@ -281,19 +277,7 @@ func New(cfg Config) (*App, error) {
 	if cfg.LiveMs != nil {
 		a.Engine.LiveMs = *cfg.LiveMs
 	}
-	a.Engine.Filter = a.notTrashed
 	return a, nil
-}
-
-func (a *App) notTrashed(ref core.NativeRef) bool {
-	for _, e := range a.Store.Trash(false) {
-		for _, i := range e.Items {
-			if i.Harness == ref.Harness && i.Session == ref.Session && (i.Connector == ref.Connector || i.Connector == "" && ref.Connector == ref.Harness) {
-				return false
-			}
-		}
-	}
-	return true
 }
 
 var unsafeID = regexp.MustCompile(`[^\w.-]`)
@@ -422,8 +406,10 @@ func (a *App) withResume(b hub.Binding, refreshProject bool) BindingView {
 				meta["cwd"] = historical
 			}
 			for _, k := range []string{"currentCwd", "currentProject"} {
-				if v, exists := row.Meta[k]; exists {
+				if v, exists := row.Meta[k]; exists && v != nil {
 					meta[k] = v
+				} else {
+					delete(meta, k)
 				}
 			}
 		}
@@ -519,17 +505,10 @@ func (a *App) SearchThreadsFiltered(query, scope, project, profile, account stri
 		}
 	}
 	names := map[string]string{"claude-code": "Claude Code", "pi": "Pi", "codex": "Codex", "dsh": "DeepSeek Harness", "antigravity": "Antigravity CLI", "opencode": "OpenCode", "zcode": "ZCode", "workbuddy": "WorkBuddy", "workbuddy-ai": "WorkBuddy AI", "cursor": "Cursor CLI"}
-	trashed := map[string]bool{}
-	for _, e := range a.Store.Trash(false) {
-		for _, i := range e.Items {
-			trashed[core.SessionSelector(i.Connector, i.Harness, i.Session)] = true
-		}
-	}
-
 	out := []ThreadListing{}
 	for _, m := range a.Sessions.Rows() {
 		id := core.SessionSelector(m.Connector, m.Harness, m.Session)
-		if trashed[id] || m.Turns == 0 && m.Offset != nil || core.S(m.Meta["supersededBy"]) != "" {
+		if m.Turns == 0 && m.Offset != nil || core.S(m.Meta["supersededBy"]) != "" {
 			continue
 		}
 		if variant != "" && core.S(core.Obj(m.Meta["sourceProfile"])["variant"]) != variant {

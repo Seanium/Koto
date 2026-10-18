@@ -2,11 +2,10 @@ import { tr } from '../i18n/core.ts'
 import { shortcut } from '../ui/shortcut'
 // Sidebar selects a product workspace; Agent and project filters narrow session copying.
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { api, ApiError, onContextAction, onNavigate, onSettingsTab, shell, useOpeners } from '../api/client'
-import { clockTime, fromDesktop, originBinding, productName, productScopeName, projectName, relativeTime, tildePath } from '../api/model'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { api, onContextAction, onNavigate, onSettingsTab, shell, useOpeners } from '../api/client'
+import { clockTime, originBinding, productName, productScopeName, projectName, relativeTime, tildePath } from '../api/model'
 import { accountLabel, accountName, storageAccount, matchesIdentity, matchesProduct, productKey, UNKNOWN_ACCOUNT } from '../api/identity'
-import type { TrashEntry } from '../api/types'
 import { buildSessions, useConversation, useSessionSearch, type Hub, type SessionItem } from '../store'
 import { AgentDisc, agentName, Button, Icon, ListRow, Menu, OperationError, SearchField, Skeleton, Toast } from '../ui'
 import { ContinueSheet, type CopySource } from './Continue'
@@ -17,7 +16,7 @@ import { SplitPane } from '../ui/SplitPane'
 import { useAgentOrder } from '../ui/useAgentOrder'
 import { destinationFilters, visibleSelection } from '../sessionNavigation'
 
-type Mode = { kind: 'analysis' } | { kind: 'sessions' } | { kind: 'trash' } | { kind: 'settings'; tab: SettingsTab }
+type Mode = { kind: 'analysis' } | { kind: 'sessions' } | { kind: 'settings'; tab: SettingsTab }
 
 /** scope: 'all' or a product key. Switching product clears its narrower filters. */
 interface Filters { scope: string; project?: string; profile?: string; account?: string }
@@ -41,23 +40,7 @@ function useFilters(): [Filters, (f: Filters) => void] {
   return [f, set]
 }
 
-const desktopHint = () => tr("Claude Desktop 里可能仍显示，但打不开")
-
-/** One short sentence for the core's trash / restore refusals. */
-function trashError(e: unknown, fallback: string): string {
-  if (!(e instanceof ApiError)) return fallback
-  if (e.code === 'SESSION_OPEN') {
-    const open = (e.body.open as { harness?: string }[] | undefined)?.map(o => o.harness).filter((h): h is string => !!h) ?? []
-    return tr("{0} 里正开着这个会话，关掉后再试", [[...new Set(open)].map(agentName).join('、') || 'Agent'])
-  }
-  if (e.code === 'RESTORE_CONFLICT') return (e.body.missing as unknown[] | undefined)?.length ? tr("回收站里的文件不见了，无法恢复") : tr("原位置已有同名文件，无法恢复")
-  if (e.code === 'TRASH_BLOCKED') return tr("有写到一半的内容，修复后才能移走")
-  if (e.code === 'HUB_BUSY') return tr("正忙，稍后重试")
-  if (e.code === 'NOT_FOUND') return tr("找不到这个会话")
-  return fallback
-}
-
-interface ToastState { text: string; sub?: string; undo?: () => void }
+interface ToastState { text: string; sub?: string }
 
 export function MainWindow({ hub }: { hub: Hub }) {
   const [mode, setMode] = useState<Mode>({ kind: 'sessions' })
@@ -67,15 +50,10 @@ export function MainWindow({ hub }: { hub: Hub }) {
   const [destination, setDestination] = useState<SessionItem>()
   const navigation = useRef<AbortController | undefined>(undefined)
   useEffect(() => () => { navigation.current?.abort() }, [mode, filters, query, selected])
-  // Only masks pending list/search refreshes after a successful move. Never persisted.
-  const [removed, setRemoved] = useState<Map<string, boolean>>(() => new Map())
-  const unmask = (id: string) => setRemoved(old => { const next = new Map(old); next.delete(id); return next })
   const [sheet, setSheet] = useState<{ title: string; source: CopySource }>()
   const [toast, setToast] = useState<ToastState>()
   const [refreshing, setRefreshing] = useState(false)
   const search = useRef<HTMLInputElement>(null)
-  const trash = useTrash(hub)
-  const inTrash = mode.kind === 'trash'
   const matches = useSessionSearch(mode.kind === 'sessions' ? query : '', filters.scope, filters.project, hub.version, mode.kind === 'sessions' ? filters.profile : undefined, mode.kind === 'sessions' ? filters.account : undefined)
 
   // Sessions in the picked scope, and the projects among them (for 项目 ▾).
@@ -105,20 +83,10 @@ export function MainWindow({ hub }: { hub: Hub }) {
     const serverMatches = matches?.sessions && new Set(matches.sessions.map(s => s.id))
     const candidates = destination && selected === destination.id && !rows.some(s => s.id === destination.id) ? [destination, ...rows] : rows
     return candidates.filter(s =>
- !removed.has(s.id) && matchesProduct(s.bindings, filters.scope) && (!filters.project || projectOf(s) === filters.project) && matchesIdentity(s.bindings, filters.profile, filters.account)
+      matchesProduct(s.bindings, filters.scope) && (!filters.project || projectOf(s) === filters.project) && matchesIdentity(s.bindings, filters.profile, filters.account)
       && (serverMatches?.has(s.id) || !q || s.id.toLowerCase().includes(q) || s.title.toLowerCase().includes(q) || s.project.toLowerCase().includes(q) || agentName(s.harness).toLowerCase().includes(q) || (s.desktop && 'claude desktop'.includes(q))
         || (!!s.cwd && (s.cwd.toLowerCase().includes(q) || tildePath(s.cwd, openers?.home).toLowerCase().includes(q)))))
-  }, [inScope, filters, query, openers?.home, matches, removed, destination, selected])
-  useEffect(() => {
-    const done = [...removed].filter(([id, refreshed]) => refreshed && !hub.sessions.some(s => s.id === id) && !matches?.sessions?.some(s => s.id === id)).map(([id]) => id)
-    if (done.length) setRemoved(old => { const next = new Map(old); for (const id of done) next.delete(id); return next })
-  }, [removed, hub.sessions, matches])
-
-  const trashVisible = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    return trash.entries.filter(e => !q || (e.title ?? '').toLowerCase().includes(q) || e.items.some(i => agentName(i.harness).toLowerCase().includes(q)))
-  }, [trash.entries, query])
-
+  }, [inScope, filters, query, openers?.home, matches, destination, selected])
   // Keep a selection while the list changes.
   useEffect(() => {
     const next = visibleSelection(visible, selected)?.id
@@ -128,41 +96,16 @@ export function MainWindow({ hub }: { hub: Hub }) {
   const current = mode.kind === 'sessions' ? visibleSelection(visible, selected) : undefined
   const { conversation, error: detailError, loadEarlier, reload: reloadDetail } = useConversation(current?.id, current?.revision)
 
-  const reloadAll = useCallback(() => { void hub.reload(); void trash.reload() }, [hub, trash])
   const refresh = async () => {
     if (refreshing) return
     setRefreshing(true)
     try {
       const report = await api.scan()
-      await Promise.all([hub.reload(), trash.reload()])
+      await hub.reload()
       setToast(report.errors.length ? { text: tr("部分会话未能刷新"), sub: report.errors.map(e => e.error).join('；') } : { text: tr("会话数据已刷新") })
     } catch (e) { setToast({ text: tr("刷新失败，请重试"), sub: (e as Error).message }) }
     finally { setRefreshing(false) }
   }
-
-  /** Move a session (or, with harness, only that Agent's copy) to 回收站; the toast undoes it. */
-  /** Resolves to an error sentence when it could not (shown where it was asked), undefined when done. */
-  const moveToTrash = useCallback(async (id: string, harness?: string): Promise<string | undefined> => {
-    const item = hub.sessions.find(s => s.id === id)
-    try {
-      const entry = await api.trash(id, harness)
-      setRemoved(old => new Map(old).set(id, false))
-      setDestination(old => old?.id === id ? undefined : old)
-      setSelected(old => old === id ? undefined : old)
-      void hub.reload().then(() => setRemoved(old => old.has(id) ? new Map(old).set(id, true) : old))
-      void trash.reload()
-      const cc = entry.items.some(i => i.harness === 'claude-code')
-      setToast({
-        text: harness ? tr("已从 {0} 移到回收站", [agentName(harness)]) : tr("已移到回收站"),
-        sub: cc ? desktopHint() : undefined,
-        undo: () => { void api.restore(entry.trashId).then(() => { unmask(id); reloadAll() }, e => setToast({ text: trashError(e, tr("没能撤销")) })) },
-      })
-    } catch (e) {
-      return trashError(e, tr("没能把「{0}」移到回收站", [item?.title ?? tr("这个会话")]))
-    }
-  }, [hub.sessions, reloadAll])
-  // ⌘⌫ and the right-click menu ask through the same confirmation under the trash button.
-  const [askTrash, setAskTrash] = useState(0)
 
   const openSession = async (id: string) => {
     navigation.current?.abort()
@@ -182,18 +125,6 @@ export function MainWindow({ hub }: { hub: Hub }) {
     setDestination(item); setMode({ kind: 'sessions' }); setFilters(destinationFilters(originBinding(item.bindings), item.harness)); setQuery(''); setSelected(item.id)
   }
 
-  const restore = async (e: TrashEntry) => {
-    // No message: the session is back in the list, selected.
-    try {
-      await api.restore(e.trashId)
-      unmask(e.thread)
-      void trash.reload()
-      await hub.reload() // the session must be in the list before it can stay selected
-      await openSession(e.thread) // restored old sessions may be outside the recent-list page
-    }
-    catch (x) { setToast({ text: trashError(x, tr("没能恢复")) }) }
-  }
-
   const openSettings = (tab?: string) => setMode({ kind: 'settings', tab: tab && isSettingsTab(tab) ? tab : 'general' })
 
   // Shell → window: tray 「复制到…」, right-click menu, ⌘, and 设置 from the menu bar.
@@ -209,23 +140,20 @@ export function MainWindow({ hub }: { hub: Hub }) {
   }, [])
   useEffect(() => onContextAction(a => {
     if (a.action === 'copy-id') void shell.copy(a.thread)
-    if (a.action === 'trash') { setSelected(a.thread); setAskTrash(n => n + 1) }
-  }), [moveToTrash])
+  }), [])
 
-  // ⌘K search · ↑↓ sessions · ⌘↵ 复制到… · ⌘⌫ move to 回收站 · ⌘, settings · Esc back
+  // ⌘K search · ↑↓ sessions · ⌘↵ 复制到… · ⌘, settings · Esc back
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (sheet || document.querySelector('.sheet, .menu')) return
       const mod = e.metaKey || e.ctrlKey
-      const typing = e.target instanceof HTMLElement && e.target.closest('input, textarea, [contenteditable="true"]')
       if (mod && e.key === ',') { e.preventDefault(); openSettings() }
       else if (e.key === 'Escape' && mode.kind !== 'sessions') { e.preventDefault(); setMode({ kind: 'sessions' }) }
       else if (mode.kind === 'settings' || mode.kind === 'analysis') return
       else if (mod && e.key.toLowerCase() === 'r') { e.preventDefault(); document.getElementById('refresh-sessions')?.click() }
       else if (mod && e.key.toLowerCase() === 'k') { e.preventDefault(); search.current?.focus(); search.current?.select() }
       else if (mod && e.key === 'Enter' && current) { e.preventDefault(); document.getElementById('copy-main')?.click() }
-      else if (mod && (e.key === 'Backspace' || e.key === 'Delete') && !typing && current) { e.preventDefault(); setAskTrash(n => n + 1) }
-      else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && !inTrash && !(e.target instanceof HTMLElement && e.target.closest('[role="listbox"]:not(#sessions), [role="switch"], [role="menu"]'))) {
+      else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && !(e.target instanceof HTMLElement && e.target.closest('[role="listbox"]:not(#sessions), [role="switch"], [role="menu"]'))) {
         e.preventDefault()
         const i = visible.findIndex(s => s.id === selected)
         const next = visible[Math.max(0, Math.min(visible.length - 1, i + (e.key === 'ArrowDown' ? 1 : -1)))]
@@ -235,11 +163,11 @@ export function MainWindow({ hub }: { hub: Hub }) {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, selected, current, sheet, inTrash, mode, moveToTrash])
+  }, [visible, selected, current, sheet, mode])
 
   const issue = issueOf(hub, { session: id => { setMode({ kind: 'sessions' }); setFilters(NO_FILTERS); setSelected(id) }, settings: openSettings })
 
-  const scopeTitle = inTrash ? tr("回收站") : filters.scope === 'all' ? tr("全部会话") : tr("{0} 会话", [productScopeName(filters.scope)])
+  const scopeTitle = filters.scope === 'all' ? tr("全部会话") : tr("{0} 会话", [productScopeName(filters.scope)])
   const pickScope = (scope: string) => { setMode({ kind: 'sessions' }); setFilters(scope === filters.scope ? filters : { scope }) }
 
   const down = hub.status.state === 'error' || !!hub.error
@@ -253,7 +181,7 @@ export function MainWindow({ hub }: { hub: Hub }) {
     )}
     <SplitPane name="sidebar" label={tr("侧边栏宽度")} initial={190} min={180} max={300} minRest={841}
       first={<Sidebar hub={hub} mode={mode} scope={filters.scope} pickScope={pickScope} openAnalysis={() => setMode({ kind: 'analysis' })} openCopy={() => setMode({ kind: 'sessions' })}
-        openTrash={() => setMode({ kind: 'trash' })} openSettings={() => openSettings()} issue={issue} />}
+        openSettings={() => openSettings()} issue={issue} />}
       second={mode.kind === 'analysis' ? <Analysis hub={hub} /> : mode.kind === 'settings' ? (
         <Settings hub={hub} tab={mode.tab} setTab={tab => setMode({ kind: 'settings', tab })} />
       ) : <SplitPane name="sessions" label={tr("会话列表宽度")} initial={300} min={240} max={460} minRest={600} first={
@@ -264,12 +192,12 @@ export function MainWindow({ hub }: { hub: Hub }) {
             <Button id="refresh-sessions" variant="ghost" icon disabled={refreshing || hub.status.state !== 'ready'} onClick={() => void refresh()} aria-label={tr("刷新会话数据")} aria-busy={refreshing}
               title={shortcut(tr("刷新会话数据（⌘R）。后台每 3 秒自动检查变化，不会自动复制。"))}>{Icon.refresh}</Button>
           </div>
-          <SearchField ref={search} value={query} onChange={setQuery} placeholder={inTrash ? tr("搜索回收站") : tr("搜索会话")} />
-          {!inTrash && <div className="row g1 list-filters">
+          <SearchField ref={search} value={query} onChange={setQuery} placeholder={tr("搜索会话")} />
+          <div className="row g1 list-filters">
             {profiles.length > 1 && <Menu trigger="ghost" align="under" pressed={!!filters.profile} label={tr('筛选会话目录')} searchable={tr('搜索目录')}
-              items={[{ label: tr('全部目录'), checked: !filters.profile, onClick: () => setFilters({ ...filters, profile: undefined, account: undefined }) },
+              items={[{ label: tr('全部会话目录'), checked: !filters.profile, onClick: () => setFilters({ ...filters, profile: undefined, account: undefined }) },
                 ...profiles.map(p => ({ key: p.id, label: p.label || agentName(p.harness), sub: tildePath(p.root, openers?.home), checked: filters.profile === p.id, onClick: () => setFilters({ ...filters, profile: p.id, account: undefined }) }))]}>
-              <span className="ellipsis">{currentProfile?.label || tr('目录')}</span> {Icon.chevron}
+              <span className="ellipsis">{currentProfile?.label || tr('会话目录')}</span> {Icon.chevron}
             </Menu>}
             {(accounts.length > 0 || filters.account) && <Menu trigger="ghost" align="under" pressed={!!filters.account} label={tr('筛选账号')} searchable={tr('搜索账号')}
               items={[{ label: tr('全部账号'), checked: !filters.account, onClick: () => setFilters({ ...filters, account: undefined }) },
@@ -277,26 +205,24 @@ export function MainWindow({ hub }: { hub: Hub }) {
                 { label: tr('账号未知'), checked: filters.account === UNKNOWN_ACCOUNT, onClick: () => setFilters({ ...filters, account: UNKNOWN_ACCOUNT }) }]}>
               <span className="ellipsis">{filters.account === UNKNOWN_ACCOUNT ? tr('账号未知') : accountName(accounts.find(a => a.id === filters.account) ?? { id: tr('账号'), kind: 'account', scope: 'storage', evidence: '' })}</span> {Icon.chevron}
             </Menu>}
-            {!inTrash && projects.length > 1 && (
+            {projects.length > 1 && (
               <Menu trigger="ghost" align="under" pressed={!!filters.project} label={tr("只看一个项目里的会话")} searchable={tr("搜索项目")}
                 items={[{ label: tr("全部"), checked: !filters.project, onClick: () => setFilters({ ...filters, project: undefined }) },
-                  ...projects.map(([p]) => ({ key: p, label: projectLabel(p), sub: p === NO_PROJECT ? tr("没有记录项目文件夹") : tildePath(p, openers?.home), checked: filters.project === p, onClick: () => setFilters({ ...filters, project: p }) }))]}>
-                {tr(" 项目：")}{filters.project ? projectLabel(filters.project) : tr("全部")} {Icon.chevron}
+                  ...projects.map(([p]) => ({ key: p, label: projectLabel(p), sub: p === NO_PROJECT ? tr("没有记录项目目录") : tildePath(p, openers?.home), checked: filters.project === p, onClick: () => setFilters({ ...filters, project: p }) }))]}>
+                <span className="ellipsis">{tr('项目目录：{0}', [filters.project ? projectLabel(filters.project) : tr('全部')])}</span> {Icon.chevron}
               </Menu>
             )}
-          </div>}
+          </div>
         </div>
-        {!inTrash && hub.status.state !== 'error' && (hub.initializing || (refreshing && hub.scanning)) && (
+        {hub.status.state !== 'error' && (hub.initializing || (refreshing && hub.scanning)) && (
           <div className="scanline" title={tr("第一次打开要把各 Agent 的会话读一遍；读到的会话已经可以点开")}>
             <span role="status">{hub.scanning ? <>{tr(" 正在读取 ")}{agentName(hub.scanning.harness)} {tr(" 的会话 · ")}{hub.scanning.done.toLocaleString()} / {hub.scanning.total.toLocaleString()}</> : tr("正在读取会话")}</span>
             <span className={`scanline-bar${hub.scanning?.total ? '' : ' indeterminate'}`} role="progressbar" aria-label={tr("正在读取会话")} aria-valuemin={0} aria-valuemax={hub.scanning?.total || undefined} aria-valuenow={hub.scanning?.total ? hub.scanning.done : undefined}><span style={hub.scanning?.total ? { width: `${Math.round(100 * hub.scanning.done / hub.scanning.total)}%` } : undefined} /></span>
           </div>
         )}
         {matches?.error && <OperationError message={tr("读取失败")} detail={matches.error} />}
-        {inTrash
-          ? <TrashList trash={trash} entries={trashVisible} query={query} restore={restore} />
-          : <SessionList hub={hub} items={visible} selected={current?.id} onSelect={setSelected} query={query} filters={filters}
-              clear={() => { setFilters({ scope: filters.scope }); setQuery('') }} openSettings={() => openSettings('agents')} />}
+        <SessionList hub={hub} items={visible} selected={current?.id} onSelect={setSelected} query={query} filters={filters}
+              clear={() => { setFilters({ scope: filters.scope }); setQuery('') }} openSettings={() => openSettings('agents')} />
       </section>} second={
       <main className="col grow" style={{ background: 'var(--bg-window)', minWidth: 0, minHeight: 0 }}>
         {current ? (
@@ -304,11 +230,9 @@ export function MainWindow({ hub }: { hub: Hub }) {
             onCopy={source => {
               const binding = originBinding(current.bindings)
               setSheet({ title: current.title, source: { ...source, cwd: current.cwd, profile: binding?.connector, harness: binding?.harness, variant: binding?.meta.sourceProfile?.variant, account: storageAccount(binding) } })
-            }}
-            onTrash={() => moveToTrash(current.id)} askTrash={askTrash} />
+            }} />
         ) : (
           <div className="drag col grow" style={{ alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-            <span className="t-meta">{inTrash ? tr("回收站里的会话不会被删除，点「恢复」放回原处") : ''}</span>
           </div>
         )}
       </main>} /> } />
@@ -318,16 +242,16 @@ export function MainWindow({ hub }: { hub: Hub }) {
             await openSession(id); setSheet(undefined)
           }} />
       )}
-      {toast && <Toast text={toast.text} sub={toast.sub} action={toast.undo ? tr("撤销") : undefined} onAction={toast.undo} onDone={() => setToast(undefined)} />}
+      {toast && <Toast text={toast.text} sub={toast.sub} onDone={() => setToast(undefined)} />}
     </div>
   )
 }
 
 // ---------------------------------------------------------------- sidebar: where to look
 
-function Sidebar({ hub, mode, scope, pickScope, openTrash, openSettings, openAnalysis, openCopy, issue }: {
+function Sidebar({ hub, mode, scope, pickScope, openSettings, openAnalysis, openCopy, issue }: {
   hub: Hub; mode: Mode; scope: string; pickScope: (s: string) => void
-  openTrash: () => void; openSettings: () => void; openAnalysis: () => void; openCopy: () => void; issue?: Issue
+  openSettings: () => void; openAnalysis: () => void; openCopy: () => void; issue?: Issue
 }) {
   const scroll = useRef<HTMLDivElement>(null)
   const products = new Map(hub.connectors.map(c => [productKey(c), c]))
@@ -370,7 +294,6 @@ function Sidebar({ hub, mode, scope, pickScope, openTrash, openSettings, openAna
         </button>
       )}
       <div className="col no-drag" style={{ padding: '6px 8px 8px', gap: 1, borderTop: issue ? undefined : '1px solid var(--divider)' }}>
-        <SideItem icon={Icon.trash} label={tr("回收站")} selected={mode.kind === 'trash'} onClick={openTrash} />
         <SideItem icon={Icon.gear} label={tr("设置")} selected={mode.kind === 'settings'} onClick={openSettings} title={shortcut('⌘,')} />
       </div>
     </nav>
@@ -392,48 +315,6 @@ function SideItem({ icon, label, selected, onClick, title, indent, reorder }: {
       <span className="row" style={{ width: 16, justifyContent: 'center', color: 'var(--ghost-ink)' }}>{icon}</span>
       <span className="grow ellipsis">{label}</span>
     </ListRow>
-  )
-}
-
-// ---------------------------------------------------------------- 回收站
-
-interface Trash { loaded: boolean; error: boolean; entries: TrashEntry[]; reload: () => Promise<void> }
-
-function useTrash(hub: Hub): Trash {
-  const [entries, setEntries] = useState<TrashEntry[]>([])
-  const [loaded, setLoaded] = useState(false)
-  const [error, setError] = useState(false)
-  const reload = useCallback(async () => {
-    try { setEntries(await api.trashList()); setError(false) } catch { setError(true) } finally { setLoaded(true) }
-  }, [])
-  const ready = hub.status.state === 'ready'
-  useEffect(() => { if (ready) void reload() }, [reload, ready, hub.version])
-  return useMemo(() => ({ loaded, error, entries, reload }), [loaded, error, entries, reload])
-}
-
-function TrashList({ trash, entries, query, restore }: { trash: Trash; entries: TrashEntry[]; query: string; restore: (e: TrashEntry) => Promise<void> }) {
-  const [busy, setBusy] = useState<string>()
-  if (!trash.loaded) return <ListSkeleton />
-  if (trash.error) return <div className="t-meta grow" style={{ padding: 24 }}>{tr("读不到回收站 ")}<Button variant="link" onClick={() => void trash.reload()}>{tr("重试")}</Button></div>
-  if (!entries.length) return query.trim() ? <Empty title={tr("没有找到“{0}”", [query.trim()])} why={tr("试试别的关键词")} /> : <Empty title={tr("回收站是空的")} why={tr("移到这里的会话随时可以恢复")} />
-  return (
-    <div className="col scroll grow" role="list" aria-label={tr("回收站")} style={{ padding: '0 8px 8px', gap: 2 }}>
-      {entries.map(e => {
-        const agents = [...new Set(e.items.map(i => i.harness))]
-        return (
-          <div key={e.trashId} role="listitem" className="lrow" style={{ alignItems: 'flex-start', cursor: 'default' }}>
-            <span className="col grow g1" style={{ padding: '2px 0', minWidth: 0 }}>
-              <span className="ellipsis t-medium">{e.title || tr("未命名会话")}</span>
-              <span className="t-meta ellipsis">
-                {e.harness ? tr("只移走了 {0} 里的那份", [agentName(e.harness)]) : agents.map(agentName).join('、')} · {relativeTime(e.trashedAt)}{tr("移入 ")}</span>
-            </span>
-            <Button small disabled={busy === e.trashId} onClick={async () => { setBusy(e.trashId); await restore(e); setBusy(undefined) }}>
-              {busy === e.trashId ? tr("正在恢复…") : tr("恢复")}
-            </Button>
-          </div>
-        )
-      })}
-    </div>
   )
 }
 
@@ -493,7 +374,7 @@ function SessionList({ hub, items, selected, onSelect, query, filters, clear, op
     if (hub.initializing && !hub.error) return <Empty title={tr("正在读取会话")} why={tr("读到的会话会陆续出现在这里")} />
     if (query.trim()) return <Empty title={tr("没有找到“{0}”", [query.trim()])} why={tr("试试别的关键词")} />
     if (filters.project || filters.profile || filters.account) {
-      const what = [filters.project && tr("项目：{0}", [projectLabel(filters.project)]), filters.profile && tr('会话目录'), filters.account && tr('账号')].filter(Boolean).join(' · ')
+      const what = [filters.project && tr('项目目录：{0}', [projectLabel(filters.project)]), filters.profile && tr('会话目录'), filters.account && tr('账号')].filter(Boolean).join(' · ')
       return <Empty title={tr("没有符合条件的会话")} why={what} action={<Button small onClick={clear}>{tr("清除筛选")}</Button>} />
     }
     if (filters.scope !== 'all') return <Empty title={tr("暂无会话")} />

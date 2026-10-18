@@ -58,10 +58,10 @@ function General() {
         </Line>
         {prefs && openers && <>
           <OpenerLine title={tr("在终端中打开")} hint={tr("「在终端中打开」用哪个终端运行接着聊的命令")} list={openers.info.terminals} current={openers.info.terminal}
-            custom={prefs.terminalCustom} placeholder={tr("例如 kitty --directory {cwd} sh -c {cmd}")} help={tr("{cmd} 是要运行的命令（已含 cd），{cwd} 是项目文件夹")}
+            custom={prefs.terminalCustom} placeholder={tr("例如 kitty --directory {cwd} sh -c {cmd}")} help={tr("{cmd} 是要运行的命令（已含 cd），{cwd} 是项目目录")}
             onPick={id => void save({ ...prefs, terminal: id })} onCustom={t => void save({ ...prefs, terminal: 'custom', terminalCustom: t })} />
           <OpenerLine title={tr("在编辑器中打开")} hint={tr("项目菜单里「在编辑器中打开」用哪个编辑器")} list={openers.info.editors} current={openers.info.editor}
-            custom={prefs.editorCustom} placeholder={tr("例如 subl -n {path}")} help={tr("{path} 是项目文件夹")}
+            custom={prefs.editorCustom} placeholder={tr("例如 subl -n {path}")} help={tr("{path} 是项目目录")}
             onPick={id => void save({ ...prefs, editor: id })} onCustom={t => void save({ ...prefs, editor: 'custom', editorCustom: t })} />
         </>}
       </div>
@@ -282,7 +282,7 @@ function connectorError(fallback: string, e: unknown): string {
   const m = e instanceof Error ? e.message : String(e)
   if (/is already registered as/.test(m)) return tr("这个目录已经添加过了")
   if (/overlaps the root of/.test(m)) return tr("这个目录和已添加的位置重叠")
-  if (/is not a directory/.test(m)) return tr("这不是一个文件夹")
+  if (/is not a directory/.test(m)) return tr("这不是一个目录")
   if (/waiting for repair|needs repair/.test(m)) return tr("有写到一半的内容，修复后才能移除")
   if (/is built in/.test(m)) return tr("内置位置不能移除，可以停用")
   return fallback

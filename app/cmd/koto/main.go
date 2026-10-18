@@ -18,7 +18,6 @@ import (
 	"koto/internal/hub"
 	"koto/internal/koto"
 	"koto/internal/legal"
-	"koto/internal/store"
 	"koto/internal/update"
 )
 
@@ -39,8 +38,6 @@ commands
   copy --current --to <agent>  copy this session using its native ID or KOTO_SESSION
   analyze <session> <session>…  read-only comparison of sessions from the same Agent
   carry <sel> --to <conn>    copy into a new session, from any node (dry-run first with --dry-run)
-  trash [<sel>] [--harness h]  move a conversation's native sessions (or one harness's) to the trash; no <sel>: list the trash
-  restore <trash-id>         put a trash entry's sessions back where they were
   mcp                        stdio MCP server: list_sessions / get_session, so any MCP-capable harness can pull a session
   connectors                 list connectors and capabilities
   profiles                   list storage profiles and evidenced identities
@@ -388,63 +385,6 @@ func main() {
 		if err := app.ServeMCP(ctx, os.Stdin, os.Stdout); err != nil {
 			fatal(err)
 		}
-	case "trash":
-		if sel == "" {
-			es := app.Store.Trash(false)
-			var lines []string
-			for _, e := range es {
-				var is []string
-				for _, i := range e.Items {
-					ss := i.Session
-					if len(ss) > 13 {
-						ss = ss[:13]
-					}
-					is = append(is, i.Harness+":"+ss)
-				}
-				t := ""
-				if e.Title != nil {
-					t = *e.Title
-				}
-				lines = append(lines, fmt.Sprintf("%s  %s  %s  %s", e.TrashID, time.UnixMilli(e.TrashedAt).UTC().Format(time.RFC3339), strings.Join(is, " "), t))
-			}
-			if len(lines) == 0 {
-				lines = []string{"(trash is empty)"}
-			}
-			out(strings.Join(lines, "\n"), es)
-			break
-		}
-		v := open(sel)
-		e, err := app.Trash.Put(ctx, store.Context{Hub: v.hub, Engine: v.engine, Thread: v.thread, Selector: sel}, *harness)
-		if err != nil {
-			fatal(err)
-		}
-		lines := []string{fmt.Sprintf("moved to the trash as %s (koto restore %s):", e.TrashID, e.TrashID)}
-		for _, i := range e.Items {
-			what := "hidden in koto only"
-			switch i.Via {
-			case "move":
-				what = fmt.Sprintf("%d path(s) moved", len(i.Files))
-			case "archive":
-				what = "archived in its harness"
-			}
-			note := ""
-			if i.Note != nil {
-				note = " (" + *i.Note + ")"
-			}
-			lines = append(lines, fmt.Sprintf("  %s:%s  %s%s", i.Harness, i.Session, what, note))
-		}
-		out(strings.Join(lines, "\n"), e)
-	case "restore":
-		need(sel, "restore <trash-id>")
-		e, err := app.Trash.Restore(ctx, sel)
-		if err != nil {
-			fatal(err)
-		}
-		var is []string
-		for _, i := range e.Items {
-			is = append(is, i.Harness+":"+i.Session)
-		}
-		out("restored "+strings.Join(is, ", "), e)
 	case "connectors":
 		cs := app.Connectors()
 		sort.SliceStable(cs, func(i, j int) bool { return false })

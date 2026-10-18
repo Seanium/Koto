@@ -125,7 +125,7 @@ func TestRoundTripRegionsMaterialsAndSelection(t *testing.T) {
 		})
 	}
 }
-func TestArchiveOwnershipAndRecovery(t *testing.T) {
+func TestTargetOwnershipChangesRejected(t *testing.T) {
 	c := fixture(t, "cn")
 	p, e := c.Plan(*input(c, "one"))
 	if e != nil {
@@ -134,30 +134,14 @@ func TestArchiveOwnershipAndRecovery(t *testing.T) {
 	if _, e = c.Apply(context.Background(), p); e != nil {
 		t.Fatal(e)
 	}
-	s := engine.SessionRef{Session: p.Target.Session}
-	receipt, e := c.Archive(context.Background(), s)
-	if e != nil {
-		t.Fatal(e)
-	}
-	refs, _ := c.Discover(context.Background())
-	if len(refs) != 0 {
-		t.Fatal(refs)
-	}
-	if e = c.Unarchive(context.Background(), s, receipt); e != nil {
-		t.Fatal(e)
-	}
 	db, _ := c.open(true)
-	db.Exec(`UPDATE sessions SET status='active' WHERE id=?`, s.Session)
-	if _, e = c.Archive(context.Background(), s); e == nil {
-		t.Fatal("archived running task")
-	}
 	db.Exec(`INSERT INTO sessions(id,cwd,user_id,status,created_at,updated_at,transport) VALUES('other-account','','different','completed',0,0,'cloud')`)
 	db.Close()
 	if _, e = c.Plan(*input(c, "two")); e == nil {
 		t.Fatal("guessed ambiguous target account")
 	}
 	db, _ = c.open(true)
-	db.Exec(`UPDATE sessions SET user_id='different' WHERE id=?`, s.Session)
+	db.Exec(`UPDATE sessions SET user_id='different' WHERE id=?`, p.Target.Session)
 	db.Close()
 	if _, e = c.Apply(context.Background(), p); e == nil {
 		t.Fatal("account change not detected")
@@ -190,7 +174,7 @@ func TestExplicitAccountsRemainBoundToProfileAndEdition(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	// Legacy configured target preference must not hide another owner's history.
+	// A configured target preference must not hide another owner's history.
 	c.userID = "test-account"
 	refs, err := c.Discover(context.Background())
 	if err != nil || len(refs) != 2 {
@@ -201,15 +185,6 @@ func TestExplicitAccountsRemainBoundToProfileAndEdition(t *testing.T) {
 		if identity.Status != "known" || len(identity.Claims) != 1 || identity.Claims[0].ID != core.S(ref.Meta["userId"]) || identity.Claims[0].Scope != "storage" {
 			t.Fatal("incorrect historical account claim", identity)
 		}
-	}
-	// An explicitly selected source stays addressable when other owners coexist.
-	selected := engine.SessionRef{Session: refs[1].Session}
-	receipt, err := c.Archive(context.Background(), selected)
-	if err != nil {
-		t.Fatal("multi-owner source archive", err)
-	}
-	if err := c.Unarchive(context.Background(), selected, receipt); err != nil {
-		t.Fatal("multi-owner source restore", err)
 	}
 	for _, owner := range []string{"not-in-this-root", "second-account"} {
 		other := fixture(t, "international")

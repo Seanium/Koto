@@ -74,32 +74,6 @@ func TestProfilesIsolateSameNativeIDAndCopyDefaults(t *testing.T) {
 	eq(t, string(got), string(secondBytes))
 }
 
-func TestProfileTrashDoesNotHideSameIDInAnotherRoot(t *testing.T) {
-	s := newSandbox(t)
-	writeCcSession(t, s.Claude, "", true)
-	other := filepath.Join(s.Root, "other")
-	writeCcSession(t, other, "", true)
-	a := s.app(enable("claude-code"))
-	p, err := a.AddRoot("claude-code", other)
-	must(t, err)
-	api := newAPI(a)
-	api.Reindex(ctx)
-	sel := core.SessionSelector(p.ID, "claude-code", CCSession)
-	entry, err := api.TrashThread(ctx, sel, "")
-	must(t, err)
-	eq(t, len(entry.Items), 1)
-	eq(t, entry.Items[0].Connector, p.ID)
-	rows := a.ListThreads()
-	eq(t, len(rows), 1)
-	eq(t, rows[0].Bindings[0].Connector, a.Registry.Get("claude-code").ID)
-	_, err = api.Thread(ctx, core.SessionSelector(a.Registry.Get("claude-code").ID, "claude-code", CCSession), 0, "")
-	must(t, err)
-	_, err = a.Trash.Restore(ctx, entry.TrashID)
-	must(t, err)
-	api.Reindex(ctx)
-	eq(t, len(a.ListThreads()), 2)
-}
-
 func TestProfileCopyRequestCannotChangeDestination(t *testing.T) {
 	s := newSandbox(t)
 	writeCcSession(t, s.Claude, "", true)

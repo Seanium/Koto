@@ -10,7 +10,7 @@ const refresh = coalescedRefresh(async () => {
   visible = snapshot
 })
 const before = refresh()
-source = ['source'] // copy moved to trash while an earlier read is still in flight
+source = ['source'] // source no longer appears while an earlier read is still in flight
 const after = refresh(), also = refresh()
 assert.equal(before, after)
 assert.equal(after, also)
@@ -20,13 +20,13 @@ assert.equal(reads, 2, 'concurrent refresh requests share one follow-up read')
 release!()
 await after
 assert.deepEqual(visible, ['source'], 'the mutation waits for a snapshot taken after it')
-source.push('restored')
-const restored = refresh(); release!(); await restored
-assert.deepEqual(visible, ['source', 'restored'])
+source.push('new-session')
+const added = refresh(); release!(); await added
+assert.deepEqual(visible, ['source', 'new-session'])
 
 let fail = true
 const retry = coalescedRefresh(async () => { if (fail) throw Error('offline') })
 await assert.rejects(retry(), /offline/)
 fail = false
 await retry()
-console.log('Refresh: delete during read, coalesced updates, restore and retry passed')
+console.log('Refresh: source changes during read, coalesced updates, new sessions and retry passed')

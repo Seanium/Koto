@@ -118,7 +118,7 @@ html:lang(en) .cli-title-action, html:lang(de) .cli-title-action { column-gap: .
 .agent-list > span { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 500; }
 .agent-list img { width: 24px; height: 24px; }
 .agent-list > .agent-roadmap { font-size: 13px; font-weight: 400; color: var(--muted); }
-:root[data-theme=dark] .agent-list img[src$="pi.svg"], :root[data-theme=dark] .hero-agent img[src$="pi.svg"] { filter: invert(1); }
+:root[data-theme=dark] :is(.agent-list, .hero-agent) img:is([src$="pi.svg"], [src$="cursor.svg"], [src$="zcode.svg"]) { filter: invert(1); }
 
 .download { display: flex; align-items: center; justify-content: space-between; gap: 40px; border-top: 1px solid var(--line); padding-top: 46px; padding-bottom: 46px; scroll-margin-top: 30px; }
 .download h2 { font-size: 27px; }

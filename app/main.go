@@ -97,8 +97,6 @@ func sessionMenu(ui *UI) {
 		}), label, "")
 	}
 	item("复制会话 ID", "copy-id")
-	m.AddSeparator()
-	item("移到回收站", "trash")
 }
 
 func main() {
@@ -174,8 +172,9 @@ func main() {
 	core.OnEvent = func(raw string) { app.Event.Emit("koto:event", raw) }
 	core.OnStatus = func(s CoreStatus) { app.Event.Emit("koto:status", s) }
 
-	setAppearance(prefs.Get().Appearance)
+	setAppearance(ui, prefs.Get().Appearance)
 	ui.main = app.Window.NewWithOptions(withFrame(mainWindowOptions(), prefs.Get().Window))
+	bindWindowAppearance(ui)
 	// Native fullscreen/restore and programmatic resize can clear Wails' constraints. Reapply
 	// the product minimum after those transitions, and repair an undersized frame immediately.
 	minimum := mainWindowOptions()

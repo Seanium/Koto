@@ -153,18 +153,6 @@ func (s *AppService) Scan() (engine.ScanReport, error) {
 	return call(s, func(a *koto.API) (engine.ScanReport, error) { return a.Reindex(bg), nil })
 }
 
-func (s *AppService) TrashThread(selector, harness string) (*store.TrashEntry, error) {
-	return call(s, func(a *koto.API) (*store.TrashEntry, error) { return a.TrashThread(bg, selector, harness) })
-}
-
-func (s *AppService) TrashList() ([]store.TrashEntry, error) {
-	return call(s, func(a *koto.API) ([]store.TrashEntry, error) { return a.TrashList(), nil })
-}
-
-func (s *AppService) Restore(id string) (*store.TrashEntry, error) {
-	return call(s, func(a *koto.API) (*store.TrashEntry, error) { return a.Restore(bg, id) })
-}
-
 // ---------------------------------------------------------------- shell
 
 func (s *AppService) Copy(text string) bool {
@@ -204,8 +192,18 @@ func (s *AppService) OpenInEditor(path string) bool {
 	return isDir(path) && run(editorArgv(info.Editors, info.Editor, p.EditorCustom, path))
 }
 
-// RevealPath shows the folder in Finder / the file manager.
-func (s *AppService) RevealPath(path string) bool { return isDir(path) && revealPath(path) }
+// RevealPath shows a project folder or session file in Finder / the file manager.
+func (s *AppService) RevealPath(path string) bool {
+	return canRevealPath(path) && revealPath(path)
+}
+
+func canRevealPath(path string) bool {
+	if !filepath.IsAbs(path) {
+		return false
+	}
+	info, err := os.Stat(path)
+	return err == nil && (info.IsDir() || info.Mode().IsRegular())
+}
 
 // PathExists: is this folder still there.
 func (s *AppService) PathExists(path string) bool { return isDir(path) }
@@ -247,7 +245,7 @@ func (s *AppService) SetPrefs(p Prefs) error {
 		go s.core.Restart()
 	}
 	if old.Appearance != s.prefs.Get().Appearance {
-		setAppearance(s.prefs.Get().Appearance)
+		setAppearance(s.ui, s.prefs.Get().Appearance)
 	}
 	return nil
 }

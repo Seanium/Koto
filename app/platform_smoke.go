@@ -12,6 +12,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	model "koto/internal/core"
 )
 
 func validatePlatformSmoke() error {
@@ -98,7 +100,12 @@ waitReady:
 	js(`window.platformWait(()=>[...document.querySelectorAll('[role=tab]')].some(e=>e.textContent.trim()==='通用'&&e.getAttribute('aria-selected')==='true'))`)
 	result["coldStartSettings"] = true
 	js(`(async()=>{window.platformNav=(text)=>[...document.querySelectorAll('nav [role=option]')].find(e=>e.textContent.trim()===text);await window.platformWait(()=>window.platformNav('会话复制'));if(window.platformNav('会话复制').getAttribute('aria-expanded')!=='true')window.platformNav('会话复制').click();await window.platformWait(()=>window.platformNav('全部会话'));window.platformNav('全部会话').click();await window.platformWait(()=>window.platformNav('全部会话')?.getAttribute('aria-selected')==='true');})()`)
-	js(`(async()=>{window.platformSource=()=>[...document.querySelectorAll('#sessions [role=option]')].find(e=>e.id.slice(2)==='claude-code:6b1f2a40-1c2d-4e3f-8a4b-5c6d7e8f9a01');await window.platformWait(window.platformSource);window.platformSource().click();})()`)
+	source, err := core.API().App.ResolveSession("claude-code:6b1f2a40-1c2d-4e3f-8a4b-5c6d7e8f9a01")
+	if err != nil {
+		panic(fmt.Sprintf("synthetic source resolution: %v", err))
+	}
+	sourceJSON, _ := json.Marshal(model.SessionSelector(source.Connector, source.Harness, source.Session))
+	js(`(async()=>{window.platformSource=()=>[...document.querySelectorAll('#sessions [role=option]')].find(e=>e.id.slice(2)===` + string(sourceJSON) + `);await window.platformWait(window.platformSource);window.platformSource().click();})()`)
 	js(`window.platformWait(()=>window.platformSource()?.getAttribute('aria-selected')==='true'&&document.querySelector('.session-heading h1')?.textContent==='把 CAS 打包改成按天分片'&&document.getElementById('copy-main')&&!document.getElementById('copy-main').disabled)`)
 	sourceID := js(`document.querySelector('#sessions [aria-selected="true"]').id.slice(2)`)
 	modifier := "Ctrl+"
@@ -127,7 +134,8 @@ document.querySelector('.sheet-foot button').click()`)
 	js(`document.querySelector('.sheet-foot .btn-primary').click()`)
 	js(`(async()=>{await window.platformWait(()=>[...document.querySelectorAll('.sheet button')].some(e=>e.textContent.includes('查看新会话')));[...document.querySelectorAll('.sheet button')].find(e=>e.textContent.includes('查看新会话')).click();await window.platformWait(()=>!document.querySelector('.sheet')&&document.querySelector('#sessions [aria-selected="true"]'));})()`)
 	destinationID := js(`document.querySelector('#sessions [aria-selected="true"]').id.slice(2)`)
-	if sourceID == destinationID || !strings.HasPrefix(destinationID, "pi:") {
+	_, _, explicit, valid := model.ParseSessionSelector(destinationID)
+	if sourceID == destinationID || !valid || !explicit {
 		panic("UI did not select a new pi session: " + destinationID)
 	}
 	js(`{const row=document.querySelector('#sessions [aria-selected="true"]');if(JSON.parse(getComputedStyle(row).getPropertyValue('--custom-contextmenu-data'))!==row.id.slice(2))throw Error('native context menu changed session ID')}`)
@@ -135,6 +143,9 @@ document.querySelector('.sheet-foot button').click()`)
 	thread, err := core.API().Thread(context.Background(), destinationID, 0, "")
 	if err != nil {
 		panic(fmt.Sprintf("native session readback: %v", err))
+	}
+	if len(thread.Bindings) == 0 || thread.Bindings[0].Harness != "pi" {
+		panic("copied session does not belong to pi: " + destinationID)
 	}
 	users, answers := 0, 0
 	for _, event := range thread.Events {
@@ -153,14 +164,6 @@ document.querySelector('.sheet-foot button').click()`)
 	result["userMessages"] = users
 	result["assistantMessages"] = answers
 	result["nativeCopyReadback"] = true
-	destinationJSON, _ := json.Marshal(destinationID)
-	js(`window.platformDestination=` + string(destinationJSON) + `;window.platformDestinationTitle=document.querySelector('.session-heading h1')?.textContent;document.querySelector('button[aria-label="移到回收站"]').click()`)
-	js(`(async()=>{await window.platformWait(()=>document.getElementById('trash-go'));document.getElementById('trash-go').click();await window.platformWait(()=>![...document.querySelectorAll('#sessions [role=option]')].some(e=>e.id.slice(2)===window.platformDestination));await new Promise(r=>setTimeout(r,800));if([...document.querySelectorAll('#sessions [role=option]')].some(e=>e.id.slice(2)===window.platformDestination))throw Error('deleted copy reappeared');if(document.querySelector('#sessions [aria-selected="true"]')?.id.slice(2)===window.platformDestination)throw Error('deleted copy remains selected');if(window.platformDestinationTitle&&document.querySelector('.session-heading h1')?.textContent===window.platformDestinationTitle)throw Error('deleted copy detail remains visible');})()`)
-	js(`(async()=>{[...document.querySelectorAll('nav [role=option]')].find(e=>e.textContent.includes('回收站')).click();await window.platformWait(()=>document.querySelector('[role=list][aria-label="回收站"] [role=listitem]'));const row=[...document.querySelectorAll('[role=list][aria-label="回收站"] [role=listitem]')].find(e=>e.textContent.includes('把 CAS 打包改成按天分片'));if(!row)throw Error('copied session absent from trash');row.querySelector('button').click();await window.platformWait(()=>document.querySelector('#sessions [aria-selected="true"]')?.id.slice(2)===window.platformDestination);await window.platformWait(()=>document.getElementById('copy-main'));})()`)
-	if _, err := core.API().Thread(context.Background(), destinationID, 0, ""); err != nil {
-		panic(fmt.Sprintf("restored native session readback: %v", err))
-	}
-	result["trashRestore"] = true
 	js(`window.platformNav('设置').click()`)
 	js(`(async()=>{const tab=()=>[...document.querySelectorAll('[role=tab]')].find(e=>e.textContent.trim()==='通用');await window.platformWait(tab);tab().click()})()`)
 	versionJSON, _ := json.Marshal(strings.TrimSpace(appVersionFile))

@@ -209,29 +209,6 @@ func TestUnknownContentFieldsAndToolLayout(t *testing.T) {
 	}
 }
 
-func TestArchiveRestoresPreviousIndexState(t *testing.T) {
-	c := fixture(t)
-	idx := addIndex(t, c)
-	ctx := context.Background()
-	p := planFor(t, c, "hidden-task")
-	if _, err := c.Apply(ctx, p); err != nil {
-		t.Fatal(err)
-	}
-	idx.Exec(`UPDATE tasks SET archived=1 WHERE task_id=?`, p.Target.Session)
-	receipt, err := c.Archive(ctx, engine.SessionRef{Session: p.Target.Session})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = c.Unarchive(ctx, engine.SessionRef{Session: p.Target.Session}, receipt); err != nil {
-		t.Fatal(err)
-	}
-	var archived int
-	idx.QueryRow(`SELECT archived FROM tasks WHERE task_id=?`, p.Target.Session).Scan(&archived)
-	if archived != 1 {
-		t.Fatal("changed original desktop archive state")
-	}
-}
-
 func TestToolRetryDeclarationOrderAndTextLikeFile(t *testing.T) {
 	parts := []core.JsonObject{{"id": "old", "type": "tool", "callID": "a", "declarationIndex": 0}, {"id": "b", "type": "tool", "callID": "b", "declarationIndex": 1}, {"id": "text", "type": "text", "text": "explanation"}, {"id": "a", "type": "tool", "callID": "a", "declarationIndex": 0}}
 	active, old := orderedToolParts(parts)

@@ -12,7 +12,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 
@@ -55,7 +54,7 @@ func NewCLI(o CLIOptions) *engine.Connector {
 		o.Command = []string{"cursor-agent"}
 	}
 	c := &cliConnector{id: o.ID, root: o.Root, command: append([]string{}, o.Command...)}
-	return &engine.Connector{ID: c.id, Root: c.root, Harness: "cursor", Variant: "cli", Version: Version, Source: c, Sink: c, Trash: c, Vocabulary: Vocabulary{}, Capabilities: core.Capabilities{Read: core.ReadCaps{Images: true, Reasoning: "plain"}, Write: &core.WriteCaps{Mode: "native-file", Images: true, Reasoning: "plain", Tools: "native", ToolCallID: &core.IDRule{Pattern: `^call_[A-Za-z0-9_]+$`, MaxLength: 64}}, WriteProfile: "cursor-cli-write@1", FormatVersions: []string{cliFormat}}}
+	return &engine.Connector{ID: c.id, Root: c.root, Harness: "cursor", Variant: "cli", Version: Version, Source: c, Sink: c, Vocabulary: Vocabulary{}, Capabilities: core.Capabilities{Read: core.ReadCaps{Images: true, Reasoning: "plain"}, Write: &core.WriteCaps{Mode: "native-file", Images: true, Reasoning: "plain", Tools: "native", ToolCallID: &core.IDRule{Pattern: `^call_[A-Za-z0-9_]+$`, MaxLength: 64}}, WriteProfile: "cursor-cli-write@1", FormatVersions: []string{cliFormat}}}
 }
 func (c *cliConnector) WatchRoots() []string           { return []string{filepath.Join(c.root, "chats")} }
 func (c *cliConnector) NewSessionID(key string) string { return core.UUID5(c.id + ":" + key) }
@@ -67,40 +66,6 @@ func (c *cliConnector) NativeResume(session string) ([]string, map[string]string
 	return append(append([]string{}, c.command...), "--resume", session), map[string]string{"CURSOR_CONFIG_DIR": c.root}
 }
 
-func (c *cliConnector) Files(s engine.SessionRef) []string {
-	if !c.validPath(s.Path, s.Session) {
-		return nil
-	}
-	db, err := openCLI(context.Background(), s.Path)
-	if err != nil {
-		return nil
-	}
-	defer db.Close()
-	meta, _, err := cliMetadata(context.Background(), db)
-	if err != nil || core.S(meta["agentId"]) != s.Session {
-		return nil
-	}
-	// The DB, native metadata and imported assets have the same lifecycle.
-	return []string{filepath.Dir(s.Path)}
-}
-
-var cliProcess = regexp.MustCompile(`(^|[/\\])(?:cursor-agent(?:-local)?|agent(?:-local)?)(?:\.exe)?$`)
-
-func (c *cliConnector) OpenBy(s engine.SessionRef) string {
-	if !c.validPath(s.Path, s.Session) {
-		return "invalid Cursor CLI session path"
-	}
-	if pids, _ := shared.FileHolders(s.Path); len(pids) > 0 {
-		return fmt.Sprintf("Cursor CLI pid %d has it open", pids[0])
-	}
-	processes, _ := shared.ProcessesWithCwd(cliProcess)
-	for _, p := range processes {
-		if strings.Contains(p.Command, s.Session) || (p.Cwd != "" && core.S(s.Meta["cwd"]) != "" && shared.SamePath(p.Cwd, core.S(s.Meta["cwd"]))) {
-			return fmt.Sprintf("Cursor CLI pid %d may have it open", p.Pid)
-		}
-	}
-	return ""
-}
 func (c *cliConnector) sessionDir(cwd, id string) string {
 	h := md5.Sum([]byte(cwd))
 	return filepath.Join(c.root, "chats", hex.EncodeToString(h[:]), id)

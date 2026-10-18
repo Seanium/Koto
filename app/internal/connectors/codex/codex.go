@@ -14,7 +14,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strings"
 	"sync"
 	"unicode"
@@ -518,7 +517,7 @@ func New(o Options) *engine.Connector {
 		o.Bin = "codex"
 	}
 	c := &codexConn{id: o.ID, home: o.Home, shadow: o.Shadow, bin: o.Bin, files: shared.NewPathIndex()}
-	return &engine.Connector{ID: c.id, Root: c.home, Harness: "codex", Version: Version, Capabilities: Capabilities, Vocabulary: vocab, Source: c, Sink: c, Trash: c,
+	return &engine.Connector{ID: c.id, Root: c.home, Harness: "codex", Version: Version, Capabilities: Capabilities, Vocabulary: vocab, Source: c, Sink: c,
 		Dispose: func() {
 			c.mu.Lock()
 			s := c.server
@@ -695,74 +694,5 @@ func (c *codexConn) ensureServer() *AppServer {
 	return c.server
 }
 
-// Archive with Codex's own API (thread/archive): it moves the rollout to archived_sessions and keeps
-// its index right, so `codex resume` finds it again after thread/unarchive.
-func (c *codexConn) Archive(ctx context.Context, s engine.SessionRef) (core.JsonObject, error) {
-	before := c.findRollout(s.Session)
-	if before == "" {
-		return nil, fmt.Errorf("codex thread %s has no rollout under %s", s.Session, c.home)
-	}
-	archived := filepath.Join(c.home, "archived_sessions")
-	if strings.HasPrefix(before, archived+string(filepath.Separator)) {
-		return core.JsonObject{"alreadyArchived": true, "from": before, "path": before}, nil
-	}
-	if _, err := c.ensureServer().Call("thread/archive", map[string]any{"threadId": ThreadOf(s.Session)}); err != nil {
-		return nil, err
-	}
-	after := c.findRollout(s.Session)
-	if !strings.HasPrefix(after, archived+string(filepath.Separator)) {
-		return nil, fmt.Errorf("codex did not archive thread %s", s.Session)
-	}
-	return core.JsonObject{"alreadyArchived": false, "from": before, "path": after}, nil
-}
-
-func (c *codexConn) Unarchive(ctx context.Context, s engine.SessionRef, receipt core.JsonObject) error {
-	if receipt["alreadyArchived"] == true {
-		return nil
-	}
-	if _, err := c.ensureServer().Call("thread/unarchive", map[string]any{"threadId": ThreadOf(s.Session)}); err != nil {
-		return err
-	}
-	now := c.findRollout(s.Session)
-	if now == "" || strings.HasPrefix(now, filepath.Join(c.home, "archived_sessions")+string(filepath.Separator)) {
-		return fmt.Errorf("codex did not unarchive thread %s", s.Session)
-	}
-	return nil
-}
-
-func (c *codexConn) OpenBy(s engine.SessionRef) string {
-	return OpenBy(c.home, s.Session, c.findRollout(s.Session))
-}
-
 var toolNote = regexp.MustCompile(`\[external_agent_tool_(call|result)[^\]]*\][\s\S]*?\[/external_agent_tool_(call|result)\]`)
 var userQuery = regexp.MustCompile(`(?s)^<user_query>(.*)</user_query>$`)
-
-// OpenBy: a thread's writer holds $CODEX_HOME/thread-writer-locks/<thread>.lock (flock, removed on
-// release) and keeps the rollout open for append while the thread is loaded.
-func OpenBy(home, thread, rollout string) string {
-	lock := filepath.Join(home, "thread-writer-locks", thread+".lock")
-	if _, err := os.Stat(lock); err == nil {
-		h, ok := shared.FileHolders(lock)
-		if !ok || len(h) > 0 {
-			if len(h) > 0 {
-				return fmt.Sprintf("Codex holds its writer lock (pid %s)", joinInts(h))
-			}
-			return "Codex holds its writer lock"
-		}
-	}
-	if rollout != "" {
-		if h, _ := shared.FileHolders(rollout); len(h) > 0 {
-			return fmt.Sprintf("Codex pid %s has the rollout open", joinInts(h))
-		}
-	}
-	return ""
-}
-
-func joinInts(xs []int) string {
-	sort.Ints(xs)
-	var s []string
-	for _, x := range xs {
-		s = append(s, fmt.Sprint(x))
-	}
-	return strings.Join(s, ", ")
-}

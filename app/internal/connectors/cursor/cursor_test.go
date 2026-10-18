@@ -306,7 +306,7 @@ func TestEmptyRootDoesNotCreateDatabase(t *testing.T) {
 }
 func TestIDEWriterHasSeparateNativeProfile(t *testing.T) {
 	c := New(Options{Root: t.TempDir()})
-	if c.Sink == nil || c.Trash != nil || c.Capabilities.Write == nil || c.Variant != "ide" || c.Capabilities.WriteProfile != "cursor-ide-write@1" {
+	if c.Sink == nil || c.Capabilities.Write == nil || c.Variant != "ide" || c.Capabilities.WriteProfile != "cursor-ide-write@1" {
 		t.Fatal("ordinary IDE native writer must remain distinct from CLI storage")
 	}
 }

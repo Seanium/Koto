@@ -87,8 +87,6 @@ koto analyze 'claude-code:<session-a>' 'claude-code:<session-b>' --json
 
 Ist `koto` nicht in PATH, den vollständigen Pfad der installierten Datei verwenden. `--json` liefert `state: "copied"` nur nach erfolgreichem Kopieren, bei einer Vorschau `state: "preview"`. Fehler liefern eine Fehlermeldung und einen Exit-Code ungleich null. Einzelne Fragen oder Antworten lassen sich in der App auswählen.
 
-`koto trash <selector>` verschiebt eine Sitzung in den Papierkorb oder das Archiv ihres Agents. `koto restore <trash-id>` stellt sie wieder her, ohne vorhandene Pfade zu überschreiben. Für Tests mit `--data`, Agent-Verzeichnissen und `--only` entbehrliche Verzeichnisse festlegen.
-
 `koto mcp` stellt die schreibgeschützten Werkzeuge `list_sessions` und `get_session` über stdio JSON-RPC bereit.
 
 ## Updates
@@ -108,7 +106,7 @@ App und CLI laden getrennt von GitHub Releases herunter und prüfen vor der Inst
 
 Als Sprache stehen Englisch, vereinfachtes und traditionelles Chinesisch, Japanisch, Deutsch oder die Systemsprache zur Wahl. Das Erscheinungsbild kann System, Hell oder Dunkel sein.
 
-koto speichert Index, Einstellungen, Vergleichsreferenzen und Papierkorbinformationen lokal. Gesprächssicherungen und Kopierverläufe werden nicht gespeichert. Kopierte Anhänge gehören zur neuen Agent-Sitzung. Kopiert wird ausschließlich manuell.
+koto speichert Index, Einstellungen und Vergleichsreferenzen lokal. Gesprächssicherungen und Kopierverläufe werden nicht gespeichert. Kopierte Anhänge gehören zur neuen Agent-Sitzung. Kopiert wird ausschließlich manuell.
 
 Bei geänderter Indexstruktur oder Leselogik wird der Index automatisch neu erstellt. Sitzungen erscheinen schrittweise; ursprüngliche Agent-Dateien und gespeicherte Einstellungen bleiben erhalten.
 

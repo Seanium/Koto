@@ -1,5 +1,14 @@
 # Third-party assets
 
+## Interface icons — `frontend/src/ui/icons.tsx`
+
+The App's controls use a static subset of [Lucide](https://github.com/lucide-icons/lucide/tree/1ef60af944de207e0d5176905a0759ba12e6ee8d/icons),
+pinned to revision `1ef60af944de207e0d5176905a0759ba12e6ee8d`. The original SVG paths
+are unchanged; their wrapper sets size, `currentColor`, and the common stroke style.
+Only used icons are included. The ISC and Feather-derived MIT notices are preserved in
+`licenses/assets/lucide-LICENSE`. Agent marks and the application icon remain separate
+brand assets.
+
 ## Agent (harness) marks — `frontend/src/assets/harness/`
 
 | File | Harness | Upstream icon |
@@ -45,9 +54,9 @@ No Apple font file is included. The rendered Apple artwork is not covered by kot
 
 | File | Used for |
 | --- | --- |
-| `brand/appicon.png` | Fixed master, running App/Dock, About window, Linux launcher |
+| `brand/appicon.png` | Fixed master, Windows/Linux runtime, About window, Linux launcher |
 | `brand/trayicon.png` | 64 px platform tray icon |
-| `build/darwin/icons.icns` | Finder/prelaunch and DMG icon, including Retina representations |
+| `build/darwin/icons.icns` | macOS Finder, running Dock and DMG icon, including Retina representations |
 | `build/windows/icon.ico` | Windows executable, launcher and taskbar |
 | `../site/assets/koto.png` | 128 px website header and footer mark |
 | `../site/favicon.png` | 64 px website favicon |
@@ -61,7 +70,8 @@ node app/scripts/generate-icons.cjs
 
 `KOTO_ICON_SHARP_PATH` and `KOTO_WAILS` can select existing local tools. Rebuild the app
 after regeneration because the runtime PNGs are embedded in Go. macOS packages use
-`CFBundleIconFile` and ICNS; Windows uses ICO; Linux packages install the master PNG.
+`CFBundleIconFile` and ICNS without replacing the running App's icon, so Finder and the Dock
+receive the same standard macOS presentation. Windows uses ICO; Linux packages install the master PNG.
 
 ## macOS installer background
 

@@ -203,30 +203,6 @@ export interface CarryResult {
   resume?: string
 }
 
-// ---------------------------------------------------------------- trash & deliveries
-
-/** One session in 回收站. */
-export interface TrashItem {
-  harness: string
-  session: string
-  connector: string
-  originalPath: string | null
-  via: 'move' | 'archive' | 'hub'
-  note: string | null
-}
-
-/** One trip to the 回收站: a whole thread (harness null) or one Agent's copy of it. Never deleted. */
-export interface TrashEntry {
-  trashId: string
-  thread: string
-  harness: string | null
-  title: string | null
-  items: TrashItem[]
-  trashedAt: number
-  restoredAt: number | null
-}
-
-
 // ---------------------------------------------------------------- misc
 
 export interface ScanReport {

@@ -42,7 +42,9 @@ func mainWindowOptions() application.WebviewWindowOptions {
 	}
 }
 
-func platformApplicationIcon() []byte { return appIconPNG }
+// Keep Finder and the running Dock on macOS' standard bundle-icon rendering.
+// Setting NSApplication.applicationIconImage would bypass that presentation.
+func platformApplicationIcon() []byte { return nil }
 
 func setTrayIcon(t *application.SystemTray, png []byte) {
 	// Preserve the fixed artwork's shading; template images would flatten it.
@@ -50,7 +52,7 @@ func setTrayIcon(t *application.SystemTray, png []byte) {
 }
 
 // setAppearance: "light", "dark", or "" (follow the system).
-func setAppearance(mode string) {
+func setAppearance(_ *UI, mode string) {
 	m := 0
 	switch mode {
 	case "light":
@@ -60,6 +62,8 @@ func setAppearance(mode string) {
 	}
 	C.kotoSetAppearance(C.int(m))
 }
+
+func bindWindowAppearance(*UI) {}
 
 // appMenu: the standard macOS app menu with 设置… (⌘,), plus Edit (copy/paste in inputs) and Window.
 func appMenu(ui *UI) *application.Menu {

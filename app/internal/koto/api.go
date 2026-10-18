@@ -33,14 +33,6 @@ func AsAPIError(err error) *APIError {
 	if errors.As(err, &a) {
 		return a
 	}
-	var te *store.TrashError
-	if errors.As(err, &te) {
-		status := 409
-		if te.Code == "NOT_FOUND" {
-			status = 404
-		}
-		return &APIError{Status: status, Code: te.Code, Msg: te.Msg, Detail: te.Detail}
-	}
 	var ce *engine.CodedError
 	if errors.As(err, &ce) {
 		status := 400
@@ -68,7 +60,7 @@ func AsAPIError(err error) *APIError {
 type Event = map[string]any
 
 // API is the operations the app calls (and the CLI's serve-less commands): conversations from the
-// index, native conversation views, copying and trash.
+// index, native conversation views, and copying.
 type API struct {
 	App  *App
 	Emit func(Event)
@@ -460,43 +452,3 @@ func (a *API) Carry(ctx context.Context, req CarryRequest) (*engine.CarryResult,
 
 // ForgetCopy drops an active operation after its dialog closes.
 func (a *API) ForgetCopy(requestID string) { a.App.Engine.Jobs.Forget(requestID) }
-
-// TrashThread moves a conversation's sessions (or one harness's) to the trash.
-func (a *API) TrashThread(ctx context.Context, sel, harness string) (*store.TrashEntry, error) {
-	if harness != "" && len(a.App.Registry.ByHarness(harness)) == 0 {
-		return nil, apiErr(400, "unknown harness "+harness)
-	}
-	v, err := a.open(ctx, sel)
-	if err != nil {
-		return nil, err
-	}
-	e, err := a.App.Trash.Put(ctx, store.Context{Hub: v.Hub, Engine: v.Engine, Thread: v.Thread, Selector: sel}, harness)
-	if err != nil {
-		return nil, AsAPIError(err)
-	}
-	a.App.Sessions.Close() // working copies hold the moved sessions: rebuild on the next open
-	a.App.Sessions.Invalidate()
-	a.Reindex(ctx)
-	return e, nil
-}
-
-// TrashList is what is in the trash now.
-func (a *API) TrashList() []store.TrashEntry {
-	l := a.App.Store.Trash(false)
-	if l == nil {
-		l = []store.TrashEntry{}
-	}
-	return l
-}
-
-// Restore puts a trash entry back.
-func (a *API) Restore(ctx context.Context, id string) (*store.TrashEntry, error) {
-	e, err := a.App.Trash.Restore(ctx, id)
-	if err != nil {
-		return nil, AsAPIError(err)
-	}
-	a.App.Sessions.Close()
-	a.App.Sessions.Invalidate()
-	a.Reindex(ctx)
-	return e, nil
-}

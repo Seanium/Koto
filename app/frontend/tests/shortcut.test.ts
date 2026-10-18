@@ -7,10 +7,10 @@ test('shortcut hints match Windows and Linux keys while macOS keeps its symbols'
     assert.equal(shortcut('⌘K', platform), 'Ctrl+K')
     assert.equal(shortcut('⌘↵', platform), 'Ctrl+Enter')
     assert.equal(shortcut('⌥⌘R', platform), 'Ctrl+Alt+R')
-    assert.equal(shortcut('Move to Trash (⌘⌫)', platform), 'Move to Trash (Ctrl+Backspace)')
+    assert.equal(shortcut('Shortcut (⌘⌫)', platform), 'Shortcut (Ctrl+Backspace)')
     assert.equal(shortcut('前のメッセージ（⌘↑）', platform), '前のメッセージ（Ctrl+↑）')
   }
-  for (const hint of ['⌘K', '⌘↵', '⌥⌘R', 'Move to Trash (⌘⌫)']) {
+  for (const hint of ['⌘K', '⌘↵', '⌥⌘R', 'Shortcut (⌘⌫)']) {
     assert.equal(shortcut(hint, 'MacIntel'), hint)
   }
 })

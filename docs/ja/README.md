@@ -32,3 +32,7 @@ koto CLI も。<br>
 [使い方](usage.md) · [互換性](compatibility.md) · [開発](development.md) · [貢献](contributing.md)
 
 [MIT ライセンス](../../LICENSE) · [第三者の権利表示](../../THIRD_PARTY_NOTICES.md)
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/chart?repos=seanium/koto&type=date&legend=top-left)](https://www.star-history.com/?repos=seanium%2Fkoto&type=date&legend=top-left)

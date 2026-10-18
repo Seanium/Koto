@@ -54,7 +54,7 @@ func New(o Options) *engine.Connector {
 		o.DBPath = filepath.Join(o.Root, o.DBPath)
 	}
 	c := &connector{id: o.ID, root: o.Root, db: o.DBPath, isolated: explicit}
-	return &engine.Connector{ID: c.id, Root: c.root, Harness: "opencode", Version: Version, Capabilities: Capabilities, Vocabulary: Vocabulary{}, Source: c, Sink: c, Trash: c}
+	return &engine.Connector{ID: c.id, Root: c.root, Harness: "opencode", Version: Version, Capabilities: Capabilities, Vocabulary: Vocabulary{}, Source: c, Sink: c}
 }
 func (c *connector) DatabasePath() string { return c.db }
 func (c *connector) WatchRoots() []string { return []string{filepath.Dir(c.db)} }
@@ -140,42 +140,4 @@ func (c *connector) Discover(ctx context.Context) ([]core.NativeRef, error) {
 		out = append(out, core.NativeRef{Harness: "opencode", Connector: c.id, Session: id, Path: c.db, MtimeMs: float64(updated), Meta: core.JsonObject{"cwd": filepath.FromSlash(cwd), "title": title, "createdAt": float64(created), "updatedAt": float64(updated)}})
 	}
 	return out, rows.Err()
-}
-
-func (c *connector) Archive(ctx context.Context, s engine.SessionRef) (core.JsonObject, error) {
-	db, err := c.open(ctx, true)
-	if err != nil {
-		return nil, err
-	}
-	defer db.Close()
-	stamp := time.Now().UnixMilli()
-	r, err := db.ExecContext(ctx, `UPDATE session SET time_archived=? WHERE id=? AND time_archived IS NULL`, stamp, s.Session)
-	if err != nil {
-		return nil, err
-	}
-	n, _ := r.RowsAffected()
-	if n != 1 {
-		return nil, fmt.Errorf("OpenCode session is absent or already archived: %s", s.Session)
-	}
-	return core.JsonObject{"archivedAt": stamp}, nil
-}
-func (c *connector) Unarchive(ctx context.Context, s engine.SessionRef, receipt core.JsonObject) error {
-	stamp, ok := core.Num(receipt["archivedAt"])
-	if !ok {
-		return fmt.Errorf("invalid OpenCode archive receipt")
-	}
-	db, err := c.open(ctx, true)
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-	r, err := db.ExecContext(ctx, `UPDATE session SET time_archived=NULL WHERE id=? AND time_archived=?`, s.Session, int64(stamp))
-	if err != nil {
-		return err
-	}
-	n, _ := r.RowsAffected()
-	if n != 1 {
-		return fmt.Errorf("OpenCode archive changed; refusing to overwrite it")
-	}
-	return nil
 }

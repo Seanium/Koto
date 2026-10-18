@@ -48,7 +48,7 @@ func New(o Options) *engine.Connector {
 		o.Root = filepath.Join(home, "."+h)
 	}
 	c := &connector{root: o.Root, id: o.ID, harness: h, db: filepath.Join(o.Root, "workbuddy.db"), userID: o.UserID, files: shared.NewPathIndex()}
-	return &engine.Connector{ID: c.id, Harness: h, Root: c.root, Version: Version, Capabilities: Capabilities, Vocabulary: claudecode.Vocabulary{}, Source: c, Sink: c, Trash: c}
+	return &engine.Connector{ID: c.id, Harness: h, Root: c.root, Version: Version, Capabilities: Capabilities, Vocabulary: claudecode.Vocabulary{}, Source: c, Sink: c}
 }
 func (c *connector) open(write bool) (*sql.DB, error) {
 	if _, err := os.Stat(c.db); err != nil {
@@ -267,4 +267,3 @@ func (c *connector) NativeResume(session string) ([]string, map[string]string) {
 		return []string{"xdg-open", u}, nil
 	}
 }
-func (c *connector) Files(s engine.SessionRef) []string { return nil }

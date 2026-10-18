@@ -35,7 +35,7 @@
 .copy-control { display: flex; align-items: center; gap: 8px; margin-left: auto; min-width: 0; }
 .copy-range { white-space: nowrap; }
 .session-header { padding: 24px 24px 16px; gap: 12px; }
-.session-heading { display: grid; grid-template-columns: minmax(0, 1fr) 160px 32px; align-items: center; gap: 12px; height: 36px; }
+.session-heading { display: grid; grid-template-columns: minmax(0, 1fr) 160px auto; align-items: center; gap: 12px; height: 36px; }
 .session-heading h1 { min-width: 0; margin: 0; }
 .session-project { min-width: 0; justify-self: end; max-width: 100%; }
 .session-project .menu-anchor, .session-project .btn { max-width: 100%; min-width: 0; }
@@ -394,12 +394,10 @@ mark { background: var(--flash); color: inherit; border-radius: 2px; }
 input:focus, input:focus-visible { outline: none; }
 .menu-search:focus { box-shadow: inset 0 0 0 1px var(--border); }
 
-.btn-danger { background: #b3261e; color: #fff; box-shadow: none; height: 28px; }
-.btn-danger:hover:not(:disabled) { background: #9c2019; }
-.btn-square[aria-pressed="true"] { background: var(--pressed); }
+.btn-square[aria-expanded="true"] { background: var(--pressed); }
 
 /* Turn labels are navigation only; copying starts in the explicit selection mode. */
-.turn-label { font-size: 11.5px; color: var(--ink-3); margin-bottom: -10px; }
+.turn-label { position: relative; height: 24px; line-height: 24px; padding-left: 32px; font-size: 11.5px; color: var(--ink-3); margin-bottom: -10px; }
 .turn-label-hint { visibility: hidden; font-family: var(--font-ui); }
 .turn:hover .turn-label-hint { visibility: visible; }
 .selection-surface { min-height: 0; }
@@ -412,6 +410,7 @@ input:focus, input:focus-visible { outline: none; }
 .turn-list-row { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 10px 16px; color: var(--ink); background: transparent; border: 0; border-bottom: 1px solid var(--divider); text-align: left; cursor: pointer; }
 .turn-list-row[aria-selected="true"], .analysis-node[aria-pressed="true"] { background: var(--bg-selected); }
 .turn-list-row > .ellipsis { flex: 1; }
+.turn-list-choice { position: relative; display: flex; align-items: center; justify-content: center; width: 16px; height: 24px; flex: none; }
 .turn-list-point { position: relative; flex: none; width: 7px; height: 7px; border: 1.5px solid var(--ink-3); border-radius: 50%; }
 .turn-list-point::after { content: ''; position: absolute; width: 1px; background: var(--border); height: 44px; left: 1.5px; top: 6px; }
 .turn-list-row:last-of-type .turn-list-point::after { display: none; }
@@ -478,17 +477,17 @@ input:focus, input:focus-visible { outline: none; }
 .attachment-preview pre { white-space:pre-wrap; overflow:auto; font-size:13px; margin:0; }
 .attachment-preview audio { width:100%; }
 
-/* Selection stays with the original messages; contrast is carried by a check and an edge. */
-.message-check { display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-size:12px; line-height:24px; color:var(--ink-2); user-select:none; -webkit-user-select:none; flex:none; }
+/* A fixed selection gutter keeps text wrapping and message geometry unchanged. */
+.message-check { position:absolute; left:8px; top:0; display:inline-flex; align-items:center; justify-content:center; width:16px; height:24px; cursor:pointer; color:var(--ink-2); user-select:none; -webkit-user-select:none; }
 .message-check input { margin:0; width:16px; height:16px; accent-color:var(--ink); cursor:pointer; }
-.message-check[data-selected] { color:var(--ink); font-weight:600; }
-.selection-status { font-size:10px; padding:0 5px; line-height:17px; border-radius:4px; color:var(--primary-ink); background:var(--primary); white-space:nowrap; }
-.turn-list .selection-status { display:none; }
-.msg-you > .message-check { display:flex; margin-bottom:8px; }
+.message-check input:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
+.message-check[data-selected] { color:var(--ink); }
+.selection-surface :is(.msg-you, .msg-reply, .preview-reply) { position:relative; padding-left:32px; }
+.msg-you > .message-check { top:8px; }
+.turn-list-choice > .message-check { left:0; }
 [data-content-selected] { background:var(--selection-bg) !important; box-shadow:inset 3px 0 var(--ink); border-radius:8px; }
-.msg-reply[data-content-selected], .preview-reply[data-content-selected] { padding:12px; }
 .turn-list-row[aria-selected="true"] { background:var(--selection-bg); box-shadow:inset 3px 0 var(--ink); }
-.turn-list-row[aria-selected="true"] > .t-meta { color:var(--ink); font-weight:600; }
+.turn-list-row[aria-selected="true"] > .t-meta { color:var(--ink); }
 .turn-list-row[aria-selected="true"] .turn-list-point { background:var(--ink); border-color:var(--ink); }
 .side-children { margin: 3px 0 10px 14px; padding-left: 7px; border-left: 1px solid var(--border); gap: 1px; }
 /* One unobtrusive scrollbar treatment for session lists, turns, messages and popups. */

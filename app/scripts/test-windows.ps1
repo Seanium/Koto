@@ -27,9 +27,9 @@ try {
   if ($process.ExitCode -ne 0) { throw "Application failed with exit code $($process.ExitCode)." }
   if (-not (Test-Path -LiteralPath $report)) { throw "Application exited without a smoke result: $report" }
   $result = Get-Content -LiteralPath $report -Raw | ConvertFrom-Json
-  if (-not $result.passed -or $result.os -ne 'windows' -or -not $result.webviewReady -or -not $result.nativeCopyReadback -or -not $result.trashRestore) { throw "Native smoke failed: $($result.error)" }
+  if (-not $result.passed -or $result.os -ne 'windows' -or -not $result.webviewReady -or -not $result.nativeCopyReadback) { throw "Native smoke failed: $($result.error)" }
   Copy-Item -LiteralPath $report -Destination (Join-Path $appDir ".cache/platform-smoke-windows-$($result.arch).json")
-  Write-Output "Native Windows/$($result.arch) WebView2 copy, view, trash and restore passed."
+  Write-Output "Native Windows/$($result.arch) WebView2 copy and conversation view passed."
 } finally {
   $env:KOTO_APP_SANDBOX = $savedSandbox
   $env:KOTO_APP_PLATFORM_SMOKE = $savedSmoke

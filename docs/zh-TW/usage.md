@@ -87,8 +87,6 @@ koto analyze 'claude-code:<session-a>' 'claude-code:<session-b>' --json
 
 `koto` 不在 PATH 時，請改用已安裝程式的完整路徑。`--json` 只在複製成功後回傳 `state: "copied"`，預覽回傳 `state: "preview"`；失敗會回傳錯誤與非零結束碼。任意選取提問、回覆等內容請使用 App。
 
-`koto trash <selector>` 將工作階段移入回收桶或 Agent 封存區。`koto restore <trash-id>` 還原工作階段，拒絕覆寫既有路徑。測試時以 `--data`、Agent 根目錄和 `--only` 指向可丟棄的目錄。
-
 `koto mcp` 透過 stdio JSON-RPC 提供唯讀的 `list_sessions` 和 `get_session` 工具。
 
 ## 更新
@@ -108,7 +106,7 @@ App 和 CLI 分別從 GitHub Releases 下載，安裝前驗證 SHA-256。正式�
 
 語言可選英語、簡體中文、繁體中文、日語、德語或跟隨系統；外觀可選跟隨系統、淺色和深色。
 
-koto 在本機儲存索引、偏好、比較參照與回收桶資訊，不保存對話備份或複製歷史。複製的附件屬於新的 Agent 工作階段。複製只由使用者手動觸發。
+koto 在本機儲存索引、偏好與比較參照，不保存對話備份或複製歷史。複製的附件屬於新的 Agent 工作階段。複製只由使用者手動觸發。
 
 索引結構或讀取規則變更時會自動重建，對話逐步顯示；原 Agent 檔案與已儲存設定保持不變。
 

@@ -55,7 +55,11 @@ export function SelectionSurface({ children, onFocusTurn }: { children: ReactNod
       suppress.current = false
       if (!selection || e.button !== 0 || !(e.target instanceof Element)) return
       const unit = e.target.closest<HTMLElement>('[data-selection-unit]')
-      if (!unit || e.target.closest('button,a,textarea') || e.target instanceof HTMLInputElement && e.target.disabled) return
+      if (!unit) return
+      const control = e.target.closest('button,a,input,textarea,select,summary,[role="button"],[role="link"],[contenteditable="true"],audio,video')
+      // Range handles retain drag selection. Content controls keep their own click,
+      // keyboard and focus behavior even while a copy range is being selected.
+      if (control && !(control instanceof HTMLInputElement && !control.disabled && control.closest('.message-check'))) return
       const pane = unit.closest<HTMLElement>('.scroll'), events = unit.dataset.selectionEvents
       if (!pane || !events) return
       e.preventDefault(); suppress.current = true

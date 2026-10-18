@@ -1,4 +1,3 @@
-import { tr } from '../i18n/core.ts'
 import { createContext, useContext, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { Conversation } from '../store'
 import type { Turn } from '../api/model'
@@ -29,8 +28,8 @@ export function SelectionCheck({ events: ids, label, disabled = false, scope = '
   const count = events.filter(id => selection?.has(id)).length
   useLayoutEffect(() => { if (ref.current) ref.current.indeterminate = count > 0 && count < events.length }, [count, events.length])
   if (!selection || !events.length) return null
-  return <label className="message-check no-drag" data-selection-unit={disabled ? undefined : scope} data-selection-events={events.join(' ')} data-selected={count > 0 || undefined} onClick={e => e.stopPropagation()}>
+  return <label className="message-check no-drag" data-selection-unit={disabled ? undefined : scope} data-selection-events={events.join(' ')} data-selected={count > 0 || undefined} title={label} onClick={e => e.stopPropagation()}>
     <input ref={ref} type="checkbox" checked={count === events.length} disabled={disabled} onChange={() => selection.toggle(events)} aria-label={label} />
-    <span>{label}</span>{count > 0 && <span className="selection-status">{count === events.length ? tr("已选") : tr("部分已选")}</span>}
+    <span className="sr-only">{label}</span>
   </label>
 }

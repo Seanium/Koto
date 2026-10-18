@@ -39,7 +39,7 @@ Options: --cwd <folder>, --title <text>, --data <folder>, --only <agents>,
 All copies create a new native session.
 ` + "\n" + agentGuide
 
-const agentGuide = `For an AI Agent asked "用 koto CLI 复制当前会话到 pi":
+const agentGuide = `For an AI Agent asked "用 koto 复制当前会话到 pi":
   1. Run koto current --json to resolve the exact source.
      If the host has no session ID, follow the proof command in error.hint.
      Use the exact source.selector returned by that command.

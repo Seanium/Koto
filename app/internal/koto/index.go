@@ -6,7 +6,7 @@ import (
 	"koto/internal/store"
 )
 
-// ScanIndex shares the copy/trash lease across processes and all open views.
+// ScanIndex shares the copy lease across processes and all open views.
 // A decoder change discards offsets, not visible summaries. Discovery is
 // published immediately; histories are enriched in the background.
 func (a *App) ScanIndex(ctx context.Context, progress func(engine.ScanProgress)) engine.ScanReport {
@@ -59,7 +59,7 @@ func (a *App) ScanIndex(ctx context.Context, progress func(engine.ScanProgress))
 }
 
 // RebuildIndex replaces only derived list rows/offsets. User settings, saved
-// comparison selections, trash records and native files are untouched.
+// comparison selections and native files are untouched.
 func (a *API) RebuildIndex(ctx context.Context) (engine.ScanReport, error) {
 	a.scanMu.Lock()
 	defer a.scanMu.Unlock()

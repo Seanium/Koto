@@ -87,8 +87,6 @@ koto analyze 'claude-code:<session-a>' 'claude-code:<session-b>' --json
 
 Use the full path to the installed executable when `koto` is not on PATH. `--json` returns `state: "copied"` only after a successful copy; a preview is `state: "preview"`. Failures return an error and a nonzero exit status. Use the app for arbitrary message selections.
 
-`koto trash <selector>` moves a session to trash or its Agent's archive. `koto restore <trash-id>` restores it without overwriting an existing path. For tests, set `--data`, Agent roots, and `--only` to disposable directories.
-
 `koto mcp` exposes read-only `list_sessions` and `get_session` tools over stdio JSON-RPC.
 
 ## Updates
@@ -108,7 +106,7 @@ Both download from GitHub Releases and verify SHA-256 before installing. Stable 
 
 Choose English, simplified or traditional Chinese, Japanese, German, or the system language. Appearance supports System, Light, and Dark.
 
-koto stores its index, preferences, comparison references, and trash metadata locally. It does not save conversation backups or copy history. Copied attachments belong to the new Agent session. All copying is manual.
+koto stores its index, preferences, and comparison references locally. It does not save conversation backups or copy history. Copied attachments belong to the new Agent session. All copying is manual.
 
 The index rebuilds automatically when its structure or a reader changes. Sessions appear progressively; original Agent files and saved settings are kept.
 

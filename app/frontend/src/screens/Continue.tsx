@@ -2,6 +2,7 @@ import { tr } from '../i18n/core.ts'
 // Copies an explicit, frozen selection to a new native session.
 import { useEffect, useRef, useState } from 'react'
 import { api, copyFailure, shell } from '../api/client'
+import { copyBlocker } from '../api/copyErrors'
 import { lossSentences, productName, productScopeName, tildePath } from '../api/model'
 import { accountName, preferredCopyTarget, productKey } from '../api/identity'
 import type { CarryResult, Loss } from '../api/types'
@@ -72,7 +73,7 @@ export function ContinueSheet({ onClose, hub, title, source, onDone, onOpen }: {
     window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key)
   })
   const chooseFolder = async () => {
-    try { const dir = await shell.pickDirectory(tr("选择新会话的项目文件夹")); if (dir) { setCwd(dir); setError(undefined) } }
+    try { const dir = await shell.pickDirectory(tr("选择新会话的项目目录")); if (dir) { setCwd(dir); setError(undefined) } }
     catch (e) { setError((e as Error).message) }
   }
   const chooseProfile = (id: string) => {
@@ -129,10 +130,10 @@ export function ContinueSheet({ onClose, hub, title, source, onDone, onOpen }: {
               <span className="copy-field-text">{targetAccounts.find(a => a.id === destination.account) ? accountName(targetAccounts.find(a => a.id === destination.account)!) : tr('请选择账号')}</span> {Icon.chevron}
             </Menu>
           </div>}
-          <div className="copy-field"><span className="t-meta copy-field-label">{tr('项目文件夹')}</span>
-            <Menu trigger="secondary" align="under" disabled={busy} label={tr('选择新会话的项目文件夹')} items={[
+          <div className="copy-field"><span className="t-meta copy-field-label">{tr('项目目录')}</span>
+            <Menu trigger="secondary" align="under" disabled={busy} label={tr('选择新会话的项目目录')} items={[
               { label: tr('沿用来源'), sub: frozen.cwd, checked: cwd === undefined, onClick: () => { setCwd(undefined); setError(undefined) } },
-              { separator: true }, { label: tr('选择文件夹…'), onClick: () => void chooseFolder() },
+              { separator: true }, { label: tr('选择目录…'), onClick: () => void chooseFolder() },
             ]}>
               <span className="copy-field-text">{project ? tildePath(project) : tr('沿用来源')}</span> {Icon.chevron}
             </Menu>
@@ -145,7 +146,7 @@ export function ContinueSheet({ onClose, hub, title, source, onDone, onOpen }: {
       {!result && needsAccount && <div className="copy-warning t-meta" role="status" aria-live="polite">
         {targetAccounts.length ? tr('请选择此目录中的目标账号。') : tr('此目录尚无可用账号，请先在目标 App 中创建会话。')}
       </div>}
-      {!result && plan?.plan.mode === 'reject' && <OperationError message={tr("暂时无法复制")} detail={plan.plan.notes.join('; ')} />}
+      {!result && plan?.plan.mode === 'reject' && <OperationError {...copyBlocker(plan.plan.notes)} />}
       {error && <OperationError message={result ? tr("复制已完成，但暂时无法打开新会话") : copyFailure(error)} detail={error} />}
       {error && !plan && <Button small onClick={() => setRetry(n => n + 1)}>{tr("重试预览")}</Button>}
     </div>}

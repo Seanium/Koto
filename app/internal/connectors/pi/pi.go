@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -486,7 +485,7 @@ func New(o Options) *engine.Connector {
 		o.ID = "pi"
 	}
 	c := &piConn{id: o.ID, root: o.Root, sessions: filepath.Join(o.Root, "sessions"), files: shared.NewPathIndex()}
-	return &engine.Connector{ID: c.id, Root: c.root, Harness: "pi", Version: Version, Capabilities: Capabilities, Vocabulary: vocab, Source: c, Sink: c, Trash: c}
+	return &engine.Connector{ID: c.id, Root: c.root, Harness: "pi", Version: Version, Capabilities: Capabilities, Vocabulary: vocab, Source: c, Sink: c}
 }
 
 func (c *piConn) Discover(ctx context.Context) ([]core.NativeRef, error) {
@@ -545,38 +544,8 @@ func (c *piConn) ReadRecordContext(ctx context.Context, session string, index in
 	return engine.ReadRecordAtContext(ctx, p, *offset)
 }
 
-func (c *piConn) Files(s engine.SessionRef) []string {
-	file, ok := c.files.Get(s.Session)
-	if !ok {
-		file = s.Path
-	}
-	if file != "" {
-		if _, err := os.Stat(file); err == nil {
-			return []string{file}
-		}
-	}
-	return nil
-}
-
 func (c *piConn) NewSessionID(key string) string { return core.UUID5("pi\x00" + key) }
 func (c *piConn) ResumeCommand() string          { return "pi --session {id}" }
-
-func (c *piConn) OpenBy(s engine.SessionRef) string {
-	cwd, _ := s.Meta["cwd"].(string)
-	return OpenBy(s.Session, s.Path, cwd)
-}
-
-// AppendBlocked: pi migrates older files (v1/v2) on load and rewrites them; continue those in a new session.
-func (c *piConn) AppendBlocked(s engine.SessionRef) string {
-	v, ok := s.Meta["piVersion"]
-	if !ok || v == nil {
-		return ""
-	}
-	if n, ok := core.Num(v); ok && n == 3 {
-		return ""
-	}
-	return fmt.Sprintf("pi session format v%v (pi rewrites it on load)", v)
-}
 
 func (c *piConn) Plan(in engine.PlanInput) (*engine.DeliveryPlan, error) {
 	t, proj := in.Target, in.Projection
@@ -705,28 +674,4 @@ func (c *piConn) Apply(ctx context.Context, plan *engine.DeliveryPlan) (core.Jso
 		c.files.Set(plan.Target.Session, plan.Target.Path)
 	}
 	return r, err
-}
-
-var piProc = regexp.MustCompile(`pi-coding-agent|(^|/)pi(\s|$)`)
-
-// OpenBy: pi keeps no lock or registry and opens the file only per write, so a running pi whose
-// command line names this session, or that runs in the session's cwd, counts as open.
-func OpenBy(session, file, cwd string) string {
-	procs, _ := shared.ProcessesWithCwd(piProc)
-	for _, p := range procs {
-		if strings.Contains(p.Command, session) || (file != "" && strings.Contains(p.Command, filepath.Base(file))) {
-			if strings.Contains(p.Command, session) {
-				return fmt.Sprintf("pi pid %d has it open", p.Pid)
-			}
-			return fmt.Sprintf("pi pid %d runs in %s", p.Pid, cwd)
-		}
-	}
-	if cwd != "" {
-		for _, p := range procs {
-			if p.Cwd != "" && shared.SamePath(p.Cwd, cwd) {
-				return fmt.Sprintf("pi pid %d runs in %s", p.Pid, cwd)
-			}
-		}
-	}
-	return ""
 }

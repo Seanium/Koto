@@ -60,7 +60,7 @@ func planFor(t *testing.T, c *connector, key string) *engine.DeliveryPlan {
 	}
 	return p
 }
-func TestRoundTripIncrementalAttachmentsAndTrash(t *testing.T) {
+func TestRoundTripIncrementalAttachments(t *testing.T) {
 	c := fixture(t)
 	ctx := context.Background()
 	p := planFor(t, c, "one")
@@ -102,17 +102,6 @@ func TestRoundTripIncrementalAttachmentsAndTrash(t *testing.T) {
 	offset := batches[len(batches)-1].Offset
 	err = c.Tail(ctx, refs[0], &offset, func(core.SourceBatch) error { t.Fatal("unchanged session reread"); return nil })
 	if err != nil {
-		t.Fatal(err)
-	}
-	receipt, err := c.Archive(ctx, engine.SessionRef{Session: p.Target.Session})
-	if err != nil {
-		t.Fatal(err)
-	}
-	refs, err = c.Discover(ctx)
-	if err != nil || len(refs) != 0 {
-		t.Fatal(refs, err)
-	}
-	if err = c.Unarchive(ctx, engine.SessionRef{Session: p.Target.Session}, receipt); err != nil {
 		t.Fatal(err)
 	}
 	db, _ := c.open(ctx, true)
@@ -172,17 +161,6 @@ func TestDesktopIndexTransactionAndUnrelatedRows(t *testing.T) {
 	if err := idx.QueryRow(`SELECT title,provider,archived FROM tasks WHERE task_id=?`, p.Target.Session).Scan(&title, &provider, &archived); err != nil || title != "Test copy" || provider != "glm" || archived != 0 {
 		t.Fatal(title, provider, archived, err)
 	}
-	receipt, err := c.Archive(ctx, engine.SessionRef{Session: p.Target.Session})
-	if err != nil {
-		t.Fatal(err)
-	}
-	idx.QueryRow(`SELECT archived FROM tasks WHERE task_id=?`, p.Target.Session).Scan(&archived)
-	if archived != 1 {
-		t.Fatal("desktop not archived")
-	}
-	if err = c.Unarchive(ctx, engine.SessionRef{Session: p.Target.Session}, receipt); err != nil {
-		t.Fatal(err)
-	}
 	idx.QueryRow(`SELECT title,archived FROM tasks WHERE task_id='old'`).Scan(&title, &archived)
 	if title != "original" || archived != 1 {
 		t.Fatal("unrelated task changed")
@@ -190,7 +168,7 @@ func TestDesktopIndexTransactionAndUnrelatedRows(t *testing.T) {
 	// An interrupted cross-WAL commit can leave the native transcript without its
 	// index row. Reapplying the identical plan repairs only that missing row.
 	idx.Exec(`DELETE FROM tasks WHERE task_id=?`, p.Target.Session)
-	if _, err = c.Apply(ctx, p); err != nil {
+	if _, err := c.Apply(ctx, p); err != nil {
 		t.Fatal(err)
 	}
 	var n int

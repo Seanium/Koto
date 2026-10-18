@@ -484,7 +484,7 @@ func New(o Options) *engine.Connector {
 		o.ID = "dsh"
 	}
 	c := &dshConn{id: o.ID, home: o.Home, root: filepath.Join(o.Home, "sessions"), files: shared.NewPathIndex()}
-	return &engine.Connector{ID: c.id, Root: c.home, Harness: "dsh", Version: Version, Capabilities: Capabilities, Vocabulary: vocab, Source: c, Sink: c, Trash: c}
+	return &engine.Connector{ID: c.id, Root: c.home, Harness: "dsh", Version: Version, Capabilities: Capabilities, Vocabulary: vocab, Source: c, Sink: c}
 }
 
 var genRe = regexp.MustCompile(`^session(?:\.v(\d+))?\.jsonl(\.zstd)?$`)
@@ -568,38 +568,11 @@ func (c *dshConn) ReadRecordContext(ctx context.Context, session string, index i
 	return engine.ReadRecordAtContext(ctx, p, *offset)
 }
 
-// Files: a dsh session is its own directory (every generation, the lock file).
-func (c *dshConn) Files(s engine.SessionRef) []string {
-	file, ok := c.files.Get(s.Session)
-	if !ok {
-		file = s.Path
-	}
-	if file == "" {
-		return nil
-	}
-	if _, err := os.Stat(file); err != nil {
-		return nil
-	}
-	dir := filepath.Dir(file)
-	if filepath.Dir(filepath.Dir(dir)) == c.root && DecodeSegment(filepath.Base(dir)) == s.Session {
-		return []string{dir}
-	}
-	return []string{file}
-}
-
 func (c *dshConn) NewSessionID(key string) string { return "session-" + core.UUID5("dsh\x00"+key) }
 
 // The official headless profile accepts an explicit stdin task. Without the
 // trailing dash an interactive terminal fails immediately with "a task is required".
 func (c *dshConn) ResumeCommand() string { return "dsh headless --session-id {id} -" }
-
-func (c *dshConn) OpenBy(s engine.SessionRef) string {
-	file, ok := c.files.Get(s.Session)
-	if !ok {
-		file = s.Path
-	}
-	return OpenBy(file)
-}
 
 func (c *dshConn) Plan(in engine.PlanInput) (*engine.DeliveryPlan, error) {
 	in, attachments, err := prepareAttachments(in, c.home)
@@ -738,24 +711,4 @@ func (c *dshConn) Apply(ctx context.Context, plan *engine.DeliveryPlan) (core.Js
 		c.files.Set(plan.Target.Session, plan.Target.Path)
 	}
 	return r, err
-}
-
-// OpenBy: dsh holds its session.lock (and the session file) open while the session is loaded.
-func OpenBy(file string) string {
-	if file == "" {
-		return ""
-	}
-	for _, f := range []string{filepath.Join(filepath.Dir(file), "session.lock"), file} {
-		if _, err := os.Stat(f); err != nil {
-			continue
-		}
-		if h, _ := shared.FileHolders(f); len(h) > 0 {
-			var s []string
-			for _, p := range h {
-				s = append(s, strconv.Itoa(p))
-			}
-			return fmt.Sprintf("dsh pid %s has %s open", strings.Join(s, ", "), filepath.Base(f))
-		}
-	}
-	return ""
 }

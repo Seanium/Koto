@@ -321,26 +321,16 @@ func TestCopiedLineageDoesNotRequireOriginal(t *testing.T) {
 }
 
 func TestRequiredNativeAncestorCannotBeSilentlySkipped(t *testing.T) {
-	for _, state := range []string{"missing-path", "trashed"} {
-		t.Run(state, func(t *testing.T) {
-			ss, f := readSessions(t)
-			f.lineages = map[string]*core.Lineage{"b": {Kind: "continue", Harness: "fixture", Session: "a"}}
-			ss.Scan(context.Background(), nil, nil)
-			r, _ := ss.Store.Session("fixture", "a", "fixture-root")
-			if state == "missing-path" {
-				r.Path = ""
-				if err := ss.Store.PutSession(r); err != nil {
-					t.Fatal(err)
-				}
-			} else {
-				if err := ss.Store.AddTrash(TrashEntry{TrashID: "fixture-trash", Items: []TrashItem{{Harness: "fixture", Connector: "fixture-root", Session: "a"}}}); err != nil {
-					t.Fatal(err)
-				}
-			}
-			ss.Invalidate()
-			if _, err := ss.OpenThread(context.Background(), "fixture:b"); err == nil {
-				t.Fatal("unavailable required source silently omitted")
-			}
-		})
+	ss, f := readSessions(t)
+	f.lineages = map[string]*core.Lineage{"b": {Kind: "continue", Harness: "fixture", Session: "a"}}
+	ss.Scan(context.Background(), nil, nil)
+	r, _ := ss.Store.Session("fixture", "a", "fixture-root")
+	r.Path = ""
+	if err := ss.Store.PutSession(r); err != nil {
+		t.Fatal(err)
+	}
+	ss.Invalidate()
+	if _, err := ss.OpenThread(context.Background(), "fixture:b"); err == nil {
+		t.Fatal("unavailable required source silently omitted")
 	}
 }

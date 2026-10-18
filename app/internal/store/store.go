@@ -1,4 +1,4 @@
-// Package store holds the rebuildable native index, analysis selections, settings and trash.
+// Package store holds the rebuildable native index, analysis selections, and settings.
 package store
 
 import (
@@ -31,7 +31,6 @@ CREATE TABLE IF NOT EXISTS sessions (
   PRIMARY KEY (connector, session)
 );
 CREATE INDEX IF NOT EXISTS sessions_first ON sessions(harness, first_native);
-CREATE TABLE IF NOT EXISTS trash (id TEXT PRIMARY KEY, thread TEXT NOT NULL, harness TEXT, title TEXT, items TEXT NOT NULL, trashed_at INTEGER NOT NULL, restored_at INTEGER);
 CREATE TABLE IF NOT EXISTS analyses (id TEXT PRIMARY KEY, name TEXT NOT NULL, sessions TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS locks (name TEXT PRIMARY KEY, owner TEXT NOT NULL, expires INTEGER NOT NULL, info TEXT);
 `
@@ -62,34 +61,6 @@ type Ref struct {
 	Session string `json:"session"`
 }
 
-// TrashItem is one native session moved to the trash: its files, or the harness's own archive.
-type TrashItem struct {
-	Harness      string          `json:"harness"`
-	Session      string          `json:"session"`
-	Connector    string          `json:"connector"`
-	OriginalPath *string         `json:"originalPath"`
-	Via          string          `json:"via"` // move | archive | hub
-	Files        []TrashFile     `json:"files"`
-	Archive      core.JsonObject `json:"archive"`
-	Note         *string         `json:"note"`
-}
-
-type TrashFile struct {
-	From string `json:"from"`
-	To   string `json:"to"`
-}
-
-// TrashEntry is one move to the trash.
-type TrashEntry struct {
-	TrashID    string      `json:"trashId"`
-	Thread     string      `json:"thread"`
-	Harness    *string     `json:"harness"`
-	Title      *string     `json:"title"`
-	Items      []TrashItem `json:"items"`
-	TrashedAt  int64       `json:"trashedAt"`
-	RestoredAt *int64      `json:"restoredAt"`
-}
-
 // Store is an open koto.sqlite.
 type Store struct {
 	Dir   string
@@ -109,7 +80,13 @@ func Open(dir string) (*Store, error) {
 		return nil, err
 	}
 	file := filepath.Join(dir, "koto.sqlite")
-	db, err := sql.Open("sqlite", (&url.URL{Scheme: "file", Path: filepath.ToSlash(file)}).String()+"?_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=busy_timeout(5000)&_txlock=immediate")
+	uriPath := filepath.ToSlash(file)
+	// A drive path needs the leading slash: file:///C:/..., not file://C:/...
+	// (SQLite interprets the latter as an unsupported URI authority).
+	if !strings.HasPrefix(uriPath, "/") {
+		uriPath = "/" + uriPath
+	}
+	db, err := sql.Open("sqlite", (&url.URL{Scheme: "file", Path: uriPath}).String()+"?_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=busy_timeout(5000)&_txlock=immediate")
 	if err != nil {
 		return nil, err
 	}
@@ -340,70 +317,6 @@ func (s *Store) DropUnseen(connector string, seen map[string]bool) (int, error) 
 		}
 	}
 	return len(gone), nil
-}
-
-// ------------------------------------------------------------------ trash
-
-func (s *Store) AddTrash(e TrashEntry) error {
-	items, _ := json.Marshal(e.Items)
-	_, err := s.db.Exec("INSERT INTO trash (id, thread, harness, title, items, trashed_at, restored_at) VALUES (?, ?, ?, ?, ?, ?, NULL)",
-		e.TrashID, e.Thread, e.Harness, e.Title, string(items), e.TrashedAt)
-	return err
-}
-
-// RestoreTrash marks an entry restored.
-func (s *Store) RestoreTrash(id string) {
-	_, _ = s.db.Exec("UPDATE trash SET restored_at = ? WHERE id = ?", nowMs(), id)
-}
-
-func scanTrash(sc interface{ Scan(...any) error }) (TrashEntry, error) {
-	var e TrashEntry
-	var h, t sql.NullString
-	var items string
-	var restored sql.NullInt64
-	if err := sc.Scan(&e.TrashID, &e.Thread, &h, &t, &items, &e.TrashedAt, &restored); err != nil {
-		return e, err
-	}
-	if h.Valid {
-		x := h.String
-		e.Harness = &x
-	}
-	if t.Valid {
-		x := t.String
-		e.Title = &x
-	}
-	if restored.Valid {
-		x := restored.Int64
-		e.RestoredAt = &x
-	}
-	_ = json.Unmarshal([]byte(items), &e.Items)
-	return e, nil
-}
-
-// TrashEntry by id.
-func (s *Store) TrashEntry(id string) (TrashEntry, bool) {
-	e, err := scanTrash(s.db.QueryRow("SELECT id, thread, harness, title, items, trashed_at, restored_at FROM trash WHERE id = ?", id))
-	return e, err == nil
-}
-
-// Trash: what is in it now (all = restored ones too), newest first.
-func (s *Store) Trash(all bool) []TrashEntry {
-	q := "SELECT id, thread, harness, title, items, trashed_at, restored_at FROM trash"
-	if !all {
-		q += " WHERE restored_at IS NULL"
-	}
-	rows, err := s.db.Query(q + " ORDER BY trashed_at DESC")
-	if err != nil {
-		return nil
-	}
-	defer rows.Close()
-	var out []TrashEntry
-	for rows.Next() {
-		if e, err := scanTrash(rows); err == nil {
-			out = append(out, e)
-		}
-	}
-	return out
 }
 
 // ------------------------------------------------------------------ locks

@@ -17,6 +17,9 @@ func mainWindowOptions() application.WebviewWindowOptions {
 		Name: "main", Title: windowTitle(), Width: 1280, Height: 800, MinWidth: 1120, MinHeight: 680, URL: "/",
 		DefaultContextMenuDisabled: true,
 		BackgroundColour:           application.NewRGB(255, 255, 255),
+		// Native appearance is driven by the same preference as the webview.
+		// Disable Wails' separate system-theme listener to avoid overwriting it.
+		Windows: application.WindowsWindow{Theme: application.Light},
 	}
 }
 
@@ -26,8 +29,6 @@ func platformApplicationIcon() []byte { return appIconPNG }
 func setTrayIcon(t *application.SystemTray, png []byte) {
 	t.SetIcon(png)
 }
-
-func setAppearance(string) {}
 
 // No menu bar; 设置 opens from the main window's toolbar and the tray icon.
 func appMenu(*UI) *application.Menu { return nil }

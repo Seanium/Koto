@@ -60,7 +60,7 @@ func planFor(t *testing.T, c *connector, key string) *engine.DeliveryPlan {
 	}
 	return p
 }
-func TestRoundTripIncrementalAttachmentsAndTrash(t *testing.T) {
+func TestRoundTripIncrementalAttachments(t *testing.T) {
 	c := fixture(t)
 	ctx := context.Background()
 	p := planFor(t, c, "one")
@@ -102,17 +102,6 @@ func TestRoundTripIncrementalAttachmentsAndTrash(t *testing.T) {
 	offset := batches[len(batches)-1].Offset
 	err = c.Tail(ctx, refs[0], &offset, func(core.SourceBatch) error { t.Fatal("unchanged session reread"); return nil })
 	if err != nil {
-		t.Fatal(err)
-	}
-	receipt, err := c.Archive(ctx, engine.SessionRef{Session: p.Target.Session})
-	if err != nil {
-		t.Fatal(err)
-	}
-	refs, err = c.Discover(ctx)
-	if err != nil || len(refs) != 0 {
-		t.Fatal(refs, err)
-	}
-	if err = c.Unarchive(ctx, engine.SessionRef{Session: p.Target.Session}, receipt); err != nil {
 		t.Fatal(err)
 	}
 	db, _ := c.open(ctx, true)

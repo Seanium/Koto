@@ -15,6 +15,8 @@ import zcodeSvg from '../assets/harness/zcode.svg?raw'
 import workbuddy from '../assets/harness/workbuddy.svg'
 import cursorSvg from '../assets/harness/cursor.svg?raw'
 import { shortcut } from './shortcut'
+import { Icon } from './icons'
+export { Icon } from './icons'
 
 // ---------------------------------------------------------------- keeping panels inside the window
 
@@ -77,7 +79,7 @@ export function Checkbox({ checked, onChange, children }: { checked: boolean; on
   return (
     <label className="check" onClick={e => { e.preventDefault(); onChange(!checked) }}>
       <button type="button" role="checkbox" aria-checked={checked} className="check-box">
-        {checked && <svg width="10" height="10" viewBox="0 0 10 10"><path d="M1.5 5.2 4 7.6 8.5 2.6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+        {checked && Icon.check}
       </button>
       <span className="grow">{children}</span>
     </label>
@@ -220,9 +222,9 @@ const isSep = (i: MenuItem): i is { separator: true; key?: string } => 'separato
  * `align`: where the list opens — 'left' (default: the right edges line up), 'right' (wide, from the
  * left edge) or 'under' (280px, from the left edge). `header` goes above the items.
  */
-export function Menu({ label, items, children, trigger, pressed, searchable, align = 'left', header, title, width, disabled }: {
+export function Menu({ label, items, children, trigger, pressed, searchable, align = 'left', header, title, width, disabled, square }: {
   label: string; items: MenuItem[]; children: ReactNode; trigger?: 'ghost' | 'secondary' | 'tint'; pressed?: boolean
-  searchable?: string; align?: 'left' | 'right' | 'under'; header?: ReactNode; title?: string; width?: number; disabled?: boolean
+  searchable?: string; align?: 'left' | 'right' | 'under'; header?: ReactNode; title?: string; width?: number; disabled?: boolean; square?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
@@ -266,7 +268,7 @@ export function Menu({ label, items, children, trigger, pressed, searchable, ali
   return (
     <div ref={ref} className="menu-anchor no-drag">
       {trigger
-        ? <Button aria-label={label} variant={trigger} aria-pressed={trigger === 'ghost' ? !!pressed : undefined} title={title ?? label} {...common}>{children}</Button>
+        ? <Button aria-label={label} variant={trigger} className={square ? 'btn-square' : undefined} aria-pressed={trigger === 'ghost' ? !!pressed : undefined} title={title ?? label} {...common}>{children}</Button>
         : <Button variant="ghost" icon aria-label={label} title={title ?? label} {...common}>{children}</Button>}
       {open && createPortal(
         <div ref={panel} style={{ width }} className={`menu menu-floating ${align === 'right' ? 'menu-right' : align === 'under' ? 'menu-under' : trigger ? 'menu-left' : ''}`} role="menu" aria-label={label}>
@@ -358,7 +360,7 @@ export const SearchField = forwardRef<HTMLInputElement, { value: string; onChang
   function SearchField({ value, onChange, placeholder, onKeyDown }, ref) {
     return (
       <label className="search no-drag">
-        <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden><circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" strokeWidth="1.6" /><path d="m11 11 3.5 3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
+        {Icon.search}
         <input ref={ref} value={value} placeholder={placeholder} onChange={e => onChange(e.target.value)} onKeyDown={onKeyDown} spellCheck={false} />
         {!value && <Kbd>⌘K</Kbd>}
       </label>
@@ -371,32 +373,4 @@ export function Kbd({ children }: { children: ReactNode }) {
 
 export function Skeleton({ w, h = 12 }: { w: number | string; h?: number }) {
   return <span className="skel" style={{ display: 'block', width: w, height: h }} />
-}
-
-// ---------------------------------------------------------------- icons (stroke, currentColor)
-
-export const Icon = {
-  info: <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></svg>,
-  file: <svg width="16" height="18" viewBox="0 0 24 24" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"><path d="M14 3H5v18h14V8zM14 3v5h5M8 12h8M8 16h6" /></svg>,
-  refresh: <svg width="15" height="15" viewBox="0 0 20 20" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 8a6.25 6.25 0 1 0-.6 5.2M16 3.5V8h-4.5" /></svg>,
-  back: <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden><path d="M6.3 2.2 3.5 5l2.8 2.8" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>,
-  chevron: <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden><path d="m2.5 3.8 2.5 2.5 2.5-2.5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>,
-  gear: <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"><path d="M19.18 10.22 L21.47 10.42 L21.47 13.58 L19.18 13.78 L18.34 15.82 L19.81 17.58 L17.58 19.81 L15.82 18.34 L13.78 19.18 L13.58 21.47 L10.42 21.47 L10.22 19.18 L8.18 18.34 L6.42 19.81 L4.19 17.58 L5.66 15.82 L4.82 13.78 L2.53 13.58 L2.53 10.42 L4.82 10.22 L5.66 8.18 L4.19 6.42 L6.42 4.19 L8.18 5.66 L10.22 4.82 L10.42 2.53 L13.58 2.53 L13.78 4.82 L15.82 5.66 L17.58 4.19 L19.81 6.42 L18.34 8.18Z" /><circle cx="12" cy="12" r="3" /></svg>,
-  check: <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden><path d="m2.5 7.3 3 3 6-6.3" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>,
-  copy: <svg width="13" height="13" viewBox="0 0 14 14" aria-hidden><rect x="4.5" y="4.5" width="7.5" height="7.5" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.3" /><path d="M9.5 2.5V2a.5.5 0 0 0-.5-.5H2.5A.5.5 0 0 0 2 2v6.5a.5.5 0 0 0 .5.5H3" fill="none" stroke="currentColor" strokeWidth="1.3" /></svg>,
-  terminal: <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="2.5" /><path d="m7.5 9.5 3 2.5-3 2.5M12.5 15h4" /></svg>,
-  desktop: <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="12.5" rx="2" /><path d="M9 20h6M12 16.5V20" /></svg>,
-  all: <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M5 15.5 2.5 18V5.5A2 2 0 0 1 4.5 3.5h11a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5Z" /><path d="M8 18.5h11l2.5 2.5V9a2 2 0 0 0-2-2" /></svg>,
-  more: <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden><circle cx="3.5" cy="8" r="1.2" fill="currentColor" /><circle cx="8" cy="8" r="1.2" fill="currentColor" /><circle cx="12.5" cy="8" r="1.2" fill="currentColor" /></svg>,
-  trash: <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16" /><path d="M9 7V4h6v3" /><path d="M6 7l1 13h10l1-13" /></svg>,
-  disclosure: <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden><path d="m3.8 2.5 2.5 2.5-2.5 2.5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>,
-  folder: <svg width="13" height="13" viewBox="0 0 24 24" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2h8.5A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z" /></svg>,
-  branch: <svg width="13" height="13" viewBox="0 0 24 24" aria-hidden fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="6" cy="5" r="2" /><circle cx="6" cy="19" r="2" /><circle cx="18" cy="9" r="2" /><path d="M6 7v10" /><path d="M18 11c0 4-6 3-11 7" /></svg>,
-  left: <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden><path d="M6.3 2.2 3.5 5l2.8 2.8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>,
-  right: <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden><path d="m3.7 2.2 2.8 2.8-2.8 2.8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>,
-  up: <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden><path d="M6 10V2M2.5 5.5 6 2l3.5 3.5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>,
-  down: <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden><path d="M6 2v8M2.5 6.5 6 10l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>,
-  search: <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden><circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" strokeWidth="1.6" /><path d="m11 11 3.5 3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>,
-  close: <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden><path d="m2.5 2.5 5 5m0-5-5 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>,
-  sync: <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden><path d="M13 6.5A5 5 0 0 0 4 4.4L3 5.5M3 9.5a5 5 0 0 0 9 2.1l1-1.1" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /><path d="M3 2.5v3h3M13 13.5v-3h-3" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>,
 }

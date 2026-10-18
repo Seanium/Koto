@@ -44,7 +44,9 @@ func TestRecordReadsStreamAndRelease(t *testing.T) {
 			if len(scope.streams) != 0 {
 				t.Fatal("request retained streams")
 			}
-			if _, err := open.Stat(); !errors.Is(err, os.ErrClosed) {
+			// Read checks Go's closed descriptor state consistently on every OS;
+			// Windows Stat delegates GetFileType and reports ERROR_INVALID_HANDLE.
+			if _, err := open.Read(make([]byte, 1)); !errors.Is(err, os.ErrClosed) {
 				t.Fatalf("descriptor retained: %v", err)
 			}
 		})
