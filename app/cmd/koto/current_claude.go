@@ -48,7 +48,7 @@ func claudeHostConnector(ctx context.Context, app *koto.App, selector string, ge
 			}
 			native := nativeSession{c, ref}
 			matches = append(matches, native)
-			if engine.ProfileVariant(c) == variant && claudeHostProfile(entrypoint, ref.Meta) {
+			if variant == "" || engine.ProfileVariant(c) == variant && claudeHostProfile(entrypoint, ref.Meta) {
 				candidates = append(candidates, native)
 			}
 		}

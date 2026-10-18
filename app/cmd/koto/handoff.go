@@ -247,7 +247,7 @@ func runHandoff(pos, flags []string, stdout, stderr io.Writer, getenv func(strin
 	defer stop()
 	if (pos[0] == "current" || o.current) && resolvedBy != "KOTO_SESSION" {
 		agent, _, _, _ := core.ParseSessionSelector(selector)
-		if resolvedBy == "CLAUDE_CODE_SESSION_ID" && claudeHostVariant(getenv("CLAUDE_CODE_ENTRYPOINT")) != "" {
+		if resolvedBy == "CLAUDE_CODE_SESSION_ID" && (claudeHostVariant(getenv("CLAUDE_CODE_ENTRYPOINT")) != "" || strings.TrimSpace(getenv("CLAUDE_CONFIG_DIR")) != "") {
 			o.sourceConnector, err = claudeHostConnector(ctx, app, selector, getenv)
 			if err != nil {
 				return fail(err, 1)

@@ -244,3 +244,41 @@ func TestCurrentClaudeDesktopEditionDoesNotClaimOtherAccount(t *testing.T) {
 		})
 	}
 }
+
+func TestCurrentClaudeUnknownHostRootIsOnlyAScopeConstraint(t *testing.T) {
+	for _, entrypoint := range []string{"", "unknown-host"} {
+		t.Run(entrypoint, func(t *testing.T) {
+			s := newClaudeCurrentSandbox(t, "Claude-3p")
+			other := filepath.Join(s.root, "independent Claude root")
+			s.writeClaude(t, other, "UNRELATED ROOT")
+			a, err := koto.New(koto.Config{DataDir: filepath.Join(s.root, "data"), PiRoot: s.pi, Enable: []string{"claude-code", "pi"}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = a.AddRoot("claude-code", other)
+			a.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+			env := map[string]string{"CLAUDE_CODE_SESSION_ID": testThread, "CLAUDE_CODE_ENTRYPOINT": entrypoint, "CLAUDE_CONFIG_DIR": s.claude}
+			r, code, raw := s.run(t, []string{"copy"}, []string{"--current", "--to", "pi"}, env)
+			if code == 0 || r.Error.Code != "SOURCE_AMBIGUOUS" || len(nativeJSONLs(t, s.pi)) != 0 {
+				t.Fatalf("unknown host claimed the CLI binding of a shared root: %s", raw)
+			}
+			// Remove only this fixture's Desktop metadata. The same explicit root
+			// can now prove one source without selecting the unrelated directory.
+			if err := os.RemoveAll(s.desktop); err != nil {
+				t.Fatal(err)
+			}
+			r, code, raw = s.run(t, []string{"current"}, nil, env)
+			if code != 0 || r.Source.Profile != s.cliID {
+				t.Fatalf("unique source in the proven root was not resolved: %s", raw)
+			}
+			env["CLAUDE_CONFIG_DIR"] = filepath.Join(s.root, "not-registered")
+			r, code, raw = s.run(t, []string{"current"}, nil, env)
+			if code == 0 || r.Error.Code != "CURRENT_PROFILE_UNVERIFIED" {
+				t.Fatalf("unknown host substituted an unproven root: %s", raw)
+			}
+		})
+	}
+}
