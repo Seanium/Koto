@@ -58,13 +58,15 @@ Die CLI in einen Ordner im PATH legen oder dem Agent den vollständigen Pfad geb
 
 Dann sagen: **„Kopiere dieses Gespräch mit koto nach pi.“**
 
+Der Agent muss Terminalbefehle ausführen können. Ruft er koto nicht auf, bitte ihn, zuerst `koto --help` auszuführen.
+
 Wenn OpenCode keine Host-Sitzungs-ID liefert, prüft koto den laufenden Werkzeugaufruf.
 
 Die Erkennung nutzt `CODEX_THREAD_ID`, `PI_SESSION_ID`, `DSH_SESSION_ID`, `ANTIGRAVITY_CONVERSATION_ID`, `CURSOR_CONVERSATION_ID` oder `CLAUDE_CODE_SESSION_ID`, sofern der Host eine davon bereitstellt. Andernfalls die genaue Angabe `agent:session-id` direkt oder über `KOTO_SESSION` verwenden. Ein ausdrücklich gesetztes `KOTO_SESSION` hat Vorrang; widersprüchliche Host-IDs werden abgelehnt. koto wählt keine Sitzung nach Aktualität oder Projektordner aus.
 
 WorkBuddy verwendet `CODEBUDDY_SESSION_ID` zusammen mit dem passenden `WORKBUDDY_CONFIG_DIR`. Die Sitzungs-ID allein bestimmt kein WorkBuddy-Profil.
 
-Die Antwort nennt die kopierte Anzahl, Umwandlungshinweise und die Schritte zum Fortsetzen im Ziel-Agent. Die noch laufende Runde einschließlich des Kopierauftrags wird ausgelassen. Die Quelle bleibt unverändert; der Ziel-Agent wird nicht automatisch gestartet.
+Nach erfolgreichem Kopieren nennt die Antwort die kopierte Anzahl, Umwandlungshinweise und die Schritte zum Fortsetzen im Ziel-Agent. Die noch laufende Runde einschließlich des Kopierauftrags wird ausgelassen. Die Quelle bleibt unverändert; der Ziel-Agent wird nicht automatisch gestartet.
 
 DeepSeek Harness setzt die gewählte Sitzung im Headless-Modus fort. Den Befehl starten und die nächste Nachricht eingeben. Unter macOS/Linux in einer neuen Zeile mit **Strg+D** senden; unter Windows die Eingabeaufforderung mit **Enter** bestätigen. Jeder Aufruf beantwortet eine Nachricht.
 

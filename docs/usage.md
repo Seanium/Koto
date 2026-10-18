@@ -58,13 +58,15 @@ Put the CLI in a folder on PATH, or give your Agent its full path. Run Windows c
 
 Ask: **“Use koto to copy this session to pi.”**
 
+The Agent needs to be able to run terminal commands. If it does not call koto, ask it to run `koto --help` first.
+
 OpenCode verifies the running shell-tool invocation when no host session ID is available.
 
 Current-session detection uses `CODEX_THREAD_ID`, `PI_SESSION_ID`, `DSH_SESSION_ID`, `ANTIGRAVITY_CONVERSATION_ID`, `CURSOR_CONVERSATION_ID`, or `CLAUDE_CODE_SESSION_ID` when the host provides one. Otherwise, supply the exact `agent:session-id` directly or through `KOTO_SESSION`. An explicit `KOTO_SESSION` takes priority; conflicting host IDs are rejected. koto never chooses a session by recency or project folder.
 
 WorkBuddy uses `CODEBUDDY_SESSION_ID` together with its matching `WORKBUDDY_CONFIG_DIR`. A session ID alone does not identify a WorkBuddy profile.
 
-The reply includes the copied counts, conversion notes, and instructions for continuing in the target Agent. The unfinished current turn, including the copy request, is excluded. The source stays unchanged; the target Agent is not launched automatically.
+After a successful copy, the reply includes the copied counts, conversion notes, and instructions for continuing in the target Agent. The unfinished current turn, including the copy request, is excluded. The source stays unchanged; the target Agent is not launched automatically.
 
 DeepSeek Harness uses its headless interface for exact-session continuation. Run the command and type your next message. On macOS/Linux, submit on a new line with **Ctrl+D**; on Windows, the command prompts for a message and **Enter** submits it. Each command answers one message.
 

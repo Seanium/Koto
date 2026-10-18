@@ -58,13 +58,15 @@ CLI を PATH 内のフォルダーに置くか、Agent にフルパスを伝え�
 
 **「koto で今の対話を pi にコピーして。」**と頼みます。
 
+Agent がターミナルのコマンドを実行できる必要があります。koto を呼び出さない場合は、まず `koto --help` を実行するよう頼んでください。
+
 OpenCode がホストのセッション ID を提供しない場合は、実行中のツール呼び出しで現在のセッションを確認します。
 
 自動識別には、ホストが提供する `CODEX_THREAD_ID`、`PI_SESSION_ID`、`DSH_SESSION_ID`、`ANTIGRAVITY_CONVERSATION_ID`、`CURSOR_CONVERSATION_ID`、`CLAUDE_CODE_SESSION_ID` を使います。提供されない場合は、正確な `agent:session-id` を直接、または `KOTO_SESSION` で指定します。明示的な `KOTO_SESSION` を優先し、複数のホスト ID が競合する場合はエラーを返します。更新日時やプロジェクトフォルダーからは推測しません。
 
 WorkBuddy は `CODEBUDDY_SESSION_ID` と対応する `WORKBUDDY_CONFIG_DIR` でコピー元を確認します。セッション ID だけでは保存先を特定しません。
 
-回答にはコピー数、変換内容、コピー先の Agent で会話を続ける方法が含まれます。コピーの依頼を含む、未完了のターンは引き継ぎません。コピー元は変わらず、コピー先の Agent は自動起動しません。
+コピーに成功すると、回答にコピー数、変換内容、コピー先の Agent で会話を続ける方法が含まれます。コピーの依頼を含む、未完了のターンは引き継ぎません。コピー元は変わらず、コピー先の Agent は自動起動しません。
 
 DeepSeek Harness は headless モードで指定したセッションを再開します。コマンドを実行して次のメッセージを入力します。macOS/Linux は改行して **Ctrl+D**、Windows は入力欄で **Enter** を押して送信します。1 回の実行で 1 件のメッセージに回答します。
 

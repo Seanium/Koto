@@ -58,13 +58,15 @@ irm https://kotoai.site/install.ps1 | iex
 
 直接說：**「用 koto 複製目前的對話到 pi」**
 
+需要 Agent 能執行終端機指令；若它沒有呼叫 koto，可請它先執行 `koto --help`。
+
 OpenCode 未提供宿主工作階段 ID 時，koto 透過正在執行的工具呼叫確認目前的工作階段。
 
 自動辨識使用宿主提供的 `CODEX_THREAD_ID`、`PI_SESSION_ID`、`DSH_SESSION_ID`、`ANTIGRAVITY_CONVERSATION_ID`、`CURSOR_CONVERSATION_ID` 或 `CLAUDE_CODE_SESSION_ID`。沒有這些資訊時，需要確切的 `agent:session-id`，可直接指定或透過 `KOTO_SESSION` 提供。明確設定的 `KOTO_SESSION` 優先；多個宿主 ID 衝突時會報錯。koto 不依時間或專案目錄猜測工作階段。
 
 WorkBuddy 使用 `CODEBUDDY_SESSION_ID` 與相符的 `WORKBUDDY_CONFIG_DIR` 確認來源；只有對話 ID 無法確定 WorkBuddy 目錄。
 
-回覆會說明複製數量、轉換情況，以及如何在目標 Agent 中繼續聊。目前未完成的輪次（包括這則複製請求）不會帶入新對話。原始對話保持不變，目標 Agent 不會自動啟動。
+複製成功後，回覆會說明複製數量、轉換情況，以及如何在目標 Agent 中繼續聊。目前未完成的輪次（包括這則複製請求）不會帶入新對話。原始對話保持不變，目標 Agent 不會自動啟動。
 
 DeepSeek Harness 使用 headless 介面繼續指定會話。執行命令並輸入下一則訊息：macOS/Linux 換行後按 **Ctrl+D** 提交；Windows 依提示輸入，按 **Enter** 提交。每次執行回答一則訊息。
 
