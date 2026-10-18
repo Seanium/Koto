@@ -64,7 +64,7 @@ OpenCode 未提供宿主会话 ID 时，koto 通过正在运行的工具调用�
 
 WorkBuddy 使用 `CODEBUDDY_SESSION_ID` 与匹配的 `WORKBUDDY_CONFIG_DIR` 确认来源；仅有会话 ID 不能确定 WorkBuddy 目录。
 
-回复会说明复制数量、转换情况，并给出继续聊的命令。当前未完成的轮次（包括这条复制请求）不会带入新会话。原会话保持不变，目标 Agent 不会自动启动。
+回复会说明复制数量、转换情况，以及如何在目标 Agent 中继续聊。当前未完成的轮次（包括这条复制请求）不会带入新会话。原会话保持不变，目标 Agent 不会自动启动。
 
 DeepSeek Harness 使用 headless 界面精确续聊。运行命令并输入下一条消息：macOS/Linux 换行后按 **Ctrl+D** 提交；Windows 按提示输入，按 **Enter** 提交。每次运行回答一条消息。
 

@@ -23,6 +23,8 @@ All copies create a new native session; existing session IDs and standalone file
 
 Cursor Desktop and CLI use separate stores and continuation methods. ZCode support covers the production native agent, not Preview or external agents launched by ZCode. WorkBuddy and WorkBuddy AI remain separate destinations. Historical account labels do not change the credentials used for continuation.
 
+If a copied session does not appear in Claude Desktop, restart the app to refresh its session list.
+
 ## Attachments
 
 | Material | Claude Code | pi | Codex | DeepSeek Harness | Antigravity CLI | OpenCode |

@@ -64,7 +64,7 @@ OpenCode 未提供宿主工作階段 ID 時，koto 透過正在執行的工具�
 
 WorkBuddy 使用 `CODEBUDDY_SESSION_ID` 與相符的 `WORKBUDDY_CONFIG_DIR` 確認來源；只有對話 ID 無法確定 WorkBuddy 目錄。
 
-回覆會說明複製數量、轉換情況，並提供繼續聊的指令。目前未完成的輪次（包括這則複製請求）不會帶入新對話。原始對話保持不變，目標 Agent 不會自動啟動。
+回覆會說明複製數量、轉換情況，以及如何在目標 Agent 中繼續聊。目前未完成的輪次（包括這則複製請求）不會帶入新對話。原始對話保持不變，目標 Agent 不會自動啟動。
 
 DeepSeek Harness 使用 headless 介面繼續指定會話。執行命令並輸入下一則訊息：macOS/Linux 換行後按 **Ctrl+D** 提交；Windows 依提示輸入，按 **Enter** 提交。每次執行回答一則訊息。
 

@@ -64,7 +64,7 @@ Current-session detection uses `CODEX_THREAD_ID`, `PI_SESSION_ID`, `DSH_SESSION_
 
 WorkBuddy uses `CODEBUDDY_SESSION_ID` together with its matching `WORKBUDDY_CONFIG_DIR`. A session ID alone does not identify a WorkBuddy profile.
 
-The reply includes the copied counts, conversion notes, and command to continue. The unfinished current turn, including the copy request, is excluded. The source stays unchanged; the target Agent is not launched automatically.
+The reply includes the copied counts, conversion notes, and instructions for continuing in the target Agent. The unfinished current turn, including the copy request, is excluded. The source stays unchanged; the target Agent is not launched automatically.
 
 DeepSeek Harness uses its headless interface for exact-session continuation. Run the command and type your next message. On macOS/Linux, submit on a new line with **Ctrl+D**; on Windows, the command prompts for a message and **Enter** submits it. Each command answers one message.
 

@@ -23,6 +23,8 @@ OpenCode 1.19.3 の v1 形式に対応しています。v2 の保存形式は明
 
 Cursor Desktop と CLI は保存先と継続方法が異なります。ZCode は製品版のネイティブ Agent に対応し、Preview や ZCode から起動する外部 Agent は対象外です。WorkBuddy 中国版と国際版は別のコピー先です。履歴のアカウント表示は、継続時の認証情報を変更しません。
 
+コピーした会話が Claude Desktop に表示されない場合は、アプリを再起動して会話一覧を更新してください。
+
 ## 添付ファイル
 
 | 素材 | Claude Code | pi | Codex | DeepSeek Harness | Antigravity CLI | OpenCode |

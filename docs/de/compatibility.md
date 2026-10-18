@@ -23,6 +23,8 @@ Jede Kopie erstellt eine neue native Sitzung; bestehende Sitzungs-IDs und einzel
 
 Cursor Desktop und CLI haben getrennte Speicher und Fortsetzungswege. ZCode unterstützt den nativen Agent der regulären Version, nicht Preview oder extern gestartete Agents. WorkBuddy und WorkBuddy AI sind getrennte Ziele. Historische Kontokennungen ändern nicht die Anmeldung beim Fortsetzen.
 
+Falls die kopierte Sitzung in Claude Desktop nicht erscheint, starten Sie die App neu, um die Sitzungsliste zu aktualisieren.
+
 ## Anhänge
 
 | Material | Claude Code | pi | Codex | DeepSeek Harness | Antigravity CLI | OpenCode |

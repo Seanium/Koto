@@ -23,6 +23,8 @@
 
 Cursor Desktop 與 CLI 的儲存與續聊入口獨立。ZCode 支援正式版的原生 Agent，不含 Preview 或由 ZCode 啟動的外部 Agent。WorkBuddy 中國版與國際版是獨立目標。歷史帳號標示不會改變續聊使用的憑據。
 
+若 Claude Desktop 未顯示複製的對話，請重新啟動應用程式以更新對話清單。
+
 ## 附件
 
 | 素材 | Claude Code | pi | Codex | DeepSeek Harness | Antigravity CLI | OpenCode |
