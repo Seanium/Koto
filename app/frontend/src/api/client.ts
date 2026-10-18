@@ -112,13 +112,13 @@ export interface AppInfo { version: string; projectURL: string }
 export interface UpdateState {
   revision: number; phase: 'idle' | 'checking' | 'current' | 'available' | 'downloading' | 'restarting' | 'error'
   current: string; latest: string; url: string; error: string; downloaded: number; total: number
+  errorCode: string; errorStage: string; retryAt: number
 }
 export function onUpdate(cb: (state: UpdateState) => void): () => void {
   return Events.On('koto:update', event => cb(unwrap(event.data) as UpdateState))
 }
 
 export interface Prefs {
-  liveMinutes: number
   agentOrder?: string[]
   /** Opener ids (see OpenersInfo); '' = the first installed one. *Custom: the template for 'custom'. */
   terminal: string; terminalCustom: string; editor: string; editorCustom: string

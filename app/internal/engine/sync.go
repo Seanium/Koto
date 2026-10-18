@@ -105,8 +105,6 @@ type Engine struct {
 	Hub      *hub.Hub
 	Registry *Registry
 	Log      Logger
-	// LiveMs: a target modified more recently (and not by our own last delivery) is live; 0 disables.
-	LiveMs   int64
 	LockWait time.Duration
 	Locks    Locker
 	Jobs     *CopyJobs
@@ -117,7 +115,7 @@ type Engine struct {
 
 // New makes an engine with the defaults (live 120 s, lock wait 120 s, lease 24 h).
 func New(h *hub.Hub, r *Registry) *Engine {
-	return &Engine{Jobs: NewCopyJobs(), Hub: h, Registry: r, Log: SilentLogger, LiveMs: 120_000, LockWait: 120 * time.Second}
+	return &Engine{Jobs: NewCopyJobs(), Hub: h, Registry: r, Log: SilentLogger, LockWait: 120 * time.Second}
 }
 
 // exclusive runs fn as one operation: no other operation of this engine, nor of another process on this data, interleaves.

@@ -1,0 +1,13 @@
+{
+  "name": "koto-updates",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test worker.test.mjs",
+    "dev": "sh ./wrangler.sh dev --persist-to ../app/.cache/cloudflare/state",
+    "deploy": "sh ./wrangler.sh deploy"
+  },
+  "devDependencies": {
+    "wrangler": "4.151.1"
+  }
+}

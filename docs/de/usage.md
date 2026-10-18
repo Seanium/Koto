@@ -100,7 +100,7 @@ koto update --check
 koto update
 ```
 
-App und CLI laden getrennt von GitHub Releases herunter und prüfen vor der Installation SHA-256. Stabile Versionen erhalten standardmäßig nur stabile Updates. Mit `--channel beta` auch Vorabversionen beziehen.
+App und CLI prüfen neue Versionen über den Cloudflare-Updatedienst, laden ihre separaten Pakete von GitHub Releases herunter und prüfen vor der Installation SHA-256. Stabile Versionen erhalten standardmäßig nur stabile Updates. Mit `--channel beta` auch Vorabversionen beziehen.
 
 ## Einstellungen und Speicherung
 

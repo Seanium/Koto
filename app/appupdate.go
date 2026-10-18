@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"runtime"
 	"strings"
@@ -18,6 +19,9 @@ type UpdateState struct {
 	Latest     string `json:"latest"`
 	URL        string `json:"url"`
 	Error      string `json:"error"`
+	ErrorCode  string `json:"errorCode"`
+	ErrorStage string `json:"errorStage"`
+	RetryAt    int64  `json:"retryAt"`
 	Downloaded int64  `json:"downloaded"`
 	Total      int64  `json:"total"`
 }
@@ -32,9 +36,30 @@ type appUpdater struct {
 	busy    bool
 	ctx     context.Context
 	cancel  context.CancelFunc
-	client  *update.Client
+	client  updateClient
 	emit    func(UpdateState)
 	quit    func()
+}
+
+type updateClient interface {
+	Check(context.Context, string, update.Product, string, string, string) (*update.Result, error)
+	Prepare(context.Context, *update.Result, update.Location, func(int64, int64)) (*update.Prepared, error)
+}
+
+func updateFailed(s *UpdateState, err error, stage string) {
+	s.Phase, s.Error, s.ErrorStage = "error", err.Error(), stage
+	s.ErrorCode, s.RetryAt = "", 0
+	s.URL = update.ReleasesPage
+	if errors.Is(err, update.ErrStaleFeed) {
+		s.ErrorCode = "STALE_FEED"
+	}
+	var request *update.RequestError
+	if errors.As(err, &request) {
+		s.ErrorCode = request.Code()
+		if !request.RetryAt.IsZero() {
+			s.RetryAt = request.RetryAt.UnixMilli()
+		}
+	}
 }
 
 func newAppUpdater(emit func(UpdateState), quit func()) *appUpdater {
@@ -62,7 +87,7 @@ func (u *appUpdater) publish(fn func(*UpdateState)) {
 
 func (u *appUpdater) check(force bool) UpdateState {
 	u.mu.Lock()
-	if u.busy || (!force && !u.checked.IsZero() && time.Since(u.checked) < time.Hour) {
+	if u.busy || u.state.RetryAt > time.Now().UnixMilli() || (!force && u.state.RetryAt == 0 && u.state.ErrorCode != "STALE_FEED" && !u.checked.IsZero() && time.Since(u.checked) < time.Hour) {
 		state := u.state
 		u.mu.Unlock()
 		return state
@@ -71,6 +96,7 @@ func (u *appUpdater) check(force bool) UpdateState {
 	u.state.Phase = "checking"
 	u.state.Revision++
 	u.state.Error = ""
+	u.state.ErrorCode, u.state.ErrorStage, u.state.RetryAt = "", "", 0
 	state := u.state
 	u.mu.Unlock()
 	go func() {
@@ -80,8 +106,8 @@ func (u *appUpdater) check(force bool) UpdateState {
 			u.checked = time.Now()
 			u.busy = false
 			if err != nil {
-				s.Phase = "error"
-				s.Error = err.Error()
+				s.Latest = ""
+				updateFailed(s, err, "check")
 				return
 			}
 			s.Latest = result.Latest
@@ -111,6 +137,7 @@ func (u *appUpdater) install() error {
 	u.publish(func(s *UpdateState) {
 		s.Phase = "downloading"
 		s.Error = ""
+		s.ErrorCode, s.ErrorStage, s.RetryAt = "", "", 0
 		s.Downloaded = 0
 		s.Total = result.Asset.Size
 	})
@@ -119,7 +146,7 @@ func (u *appUpdater) install() error {
 		if err == nil {
 			return
 		}
-		u.publish(func(s *UpdateState) { u.busy = false; s.Phase = "error"; s.Error = err.Error() })
+		u.publish(func(s *UpdateState) { u.busy = false; updateFailed(s, err, "install") })
 	}()
 	return nil
 }

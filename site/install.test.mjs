@@ -24,7 +24,7 @@ esac
 const digest = createHash('sha256').update(payload).digest('hex');
 
 test('CLI shell installer validates before replacing and cleans failed downloads', { skip: process.platform === 'win32' }, async t => {
-  for (const scenario of ['ok', 'corrupt', 'missing-checksum', 'duplicate-checksum', 'download-failure', 'wrong-version', 'symlink', 'install-failure']) {
+  for (const scenario of ['ok', 'corrupt', 'missing-checksum', 'duplicate-checksum', 'download-failure', 'wrong-version', 'symlink', 'install-failure', 'latest-ok', 'latest-unavailable', 'latest-invalid', 'latest-multiline']) {
     await t.test(scenario, async () => {
       const root = await mkdtemp(join(tmpdir(), 'koto-install-test-'));
       try {
@@ -44,6 +44,12 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 case "$url" in
+  'https://updates.kotoai.site/api/latest?format=tag')
+    : > "$MOCK_ROOT/called-feed"
+    [ "$SCENARIO" != latest-unavailable ] || exit 22
+    if [ "$SCENARIO" = latest-invalid ]; then printf 'not a version\\n'; exit 0; fi
+    printf '${version}\\n'
+    if [ "$SCENARIO" = latest-multiline ]; then printf 'unexpected extra line\\n'; fi ;;
   */SHA256SUMS)
     : > "$output"
     [ "$SCENARIO" != missing-checksum ] || exit 0
@@ -63,12 +69,15 @@ esac
           await writeFile(join(root, 'existing'), 'original');
           await symlink(join(root, 'existing'), old);
         } else { await writeFile(old, 'original'); }
-        const result = spawnSync('sh', [installer, '--version', version, '--dir', dest], {
+        const latest = scenario.startsWith('latest-');
+        const result = spawnSync('sh', [installer, ...(latest ? [] : ['--version', version]), '--dir', dest], {
           env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, MOCK_ROOT: root, SCENARIO: scenario }, encoding: 'utf8', timeout: 10000,
         });
-        assert.equal(result.status === 0, scenario === 'ok', result.stdout + result.stderr);
-        assert.equal(await readFile(old, 'utf8'), scenario === 'ok' ? payload : 'original');
-        if (scenario === 'ok' || scenario === 'install-failure') assert.equal(await readFile(join(root, 'dispatch'), 'utf8'), `${await realpath(old)}\n${digest}\n`);
+        const success = scenario === 'ok' || scenario === 'latest-ok';
+        assert.equal(result.status === 0, success, result.stdout + result.stderr);
+        assert.equal(await readFile(old, 'utf8'), success ? payload : 'original');
+        if (success || scenario === 'install-failure') assert.equal(await readFile(join(root, 'dispatch'), 'utf8'), `${await realpath(old)}\n${digest}\n`);
+        assert.equal((await readdir(root)).includes('called-feed'), latest);
         assert.deepEqual(await readdir(dest), ['koto']);
       } finally { await rm(root, { recursive: true, force: true }); }
     });

@@ -374,5 +374,13 @@
   "未能复制会话文件路径，请重试。": "Der Pfad der Sitzungsdatei konnte nicht kopiert werden. Bitte versuche es erneut.",
   "全部会话目录": "Alle Sitzungsordner",
   "项目目录：{0}": "Projektordner: {0}",
-  "原项目目录已不存在，请选择一个存在的目录。": "Der ursprüngliche Projektordner existiert nicht mehr. Wähle einen vorhandenen Ordner."
+  "原项目目录已不存在，请选择一个存在的目录。": "Der ursprüngliche Projektordner existiert nicht mehr. Wähle einen vorhandenen Ordner.",
+  "更新服务暂时限制了请求。请在 {0} 后重试，或手动下载。": "Der Update-Dienst begrenzt vorübergehend Anfragen. Versuche es nach {0} erneut oder lade das Update manuell herunter.",
+  "更新服务暂时限制了请求。请稍后重试，或手动下载。": "Der Update-Dienst begrenzt vorübergehend Anfragen. Versuche es später erneut oder lade das Update manuell herunter.",
+  "更新服务拒绝了请求。请稍后重试，或手动下载。": "Der Update-Dienst hat die Anfrage abgelehnt. Versuche es später erneut oder lade das Update manuell herunter.",
+  "暂时无法检查更新：{0}": "Updates können momentan nicht geprüft werden: {0}",
+  "手动下载": "Manuell herunterladen",
+  "暂时无法确认最新版本，请稍后重试或手动下载。": "Die neueste Version kann momentan nicht bestätigt werden. Versuche es später erneut oder lade das Update manuell herunter.",
+  "更新服务暂时不可用，请稍后重试或手动下载。": "Der Update-Dienst ist vorübergehend nicht erreichbar. Versuche es später erneut oder lade das Update manuell herunter.",
+  "正在下载…": "Wird heruntergeladen…"
 }

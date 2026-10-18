@@ -374,5 +374,13 @@
   "未能复制会话文件路径，请重试。": "Could not copy the session file path. Please try again.",
   "全部会话目录": "All session folders",
   "项目目录：{0}": "Project folder: {0}",
-  "原项目目录已不存在，请选择一个存在的目录。": "The original project folder no longer exists. Select an existing folder."
+  "原项目目录已不存在，请选择一个存在的目录。": "The original project folder no longer exists. Select an existing folder.",
+  "更新服务暂时限制了请求。请在 {0} 后重试，或手动下载。": "The update service is temporarily limiting requests. Try again after {0}, or download manually.",
+  "更新服务暂时限制了请求。请稍后重试，或手动下载。": "The update service is temporarily limiting requests. Try again later, or download manually.",
+  "更新服务拒绝了请求。请稍后重试，或手动下载。": "The update service refused the request. Try again later, or download manually.",
+  "暂时无法检查更新：{0}": "Unable to check for updates right now: {0}",
+  "手动下载": "Download manually",
+  "暂时无法确认最新版本，请稍后重试或手动下载。": "Unable to confirm the latest version right now. Try again later or download manually.",
+  "更新服务暂时不可用，请稍后重试或手动下载。": "The update service is temporarily unavailable. Try again later or download manually.",
+  "正在下载…": "Downloading…"
 }

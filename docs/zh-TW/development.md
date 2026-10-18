@@ -10,6 +10,7 @@
 - `app/internal/`：連接器、複製計畫、比較與本機儲存。
 - `app/build/`、`app/scripts/`：原生封裝與驗證。
 - `site/`：專案網站；`docs/`：與 App 語言一致的使用及開發文件。
+- `updates/`：Cloudflare 更新服務與固定版本的本機 Wrangler，見[部署說明](../../updates/README.md)。
 - `scripts/`：唯讀原始碼檢查與第三方授權維護。
 - `app/.tools/`、`app/.cache/`：由 Git 忽略的本機環境與測試證據；`app/bin/`：產生的安裝套件。
 
@@ -35,6 +36,7 @@ npm --prefix app/frontend ci
 npm --prefix app/frontend run build
 go -C app test -race ./...
 node --experimental-strip-types --test app/frontend/tests/*.test.ts
+node --test site/*.test.mjs updates/*.test.mjs
 go -C app build -o bin/koto ./cmd/koto
 ```
 

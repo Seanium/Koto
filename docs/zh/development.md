@@ -10,6 +10,7 @@
 - `app/internal/`：连接器、复制计划、对比与本地存储。
 - `app/build/`、`app/scripts/`：原生打包与验证。
 - `site/`：项目网站；`docs/`：与 App 语言一致的使用和开发文档。
+- `updates/`：Cloudflare 更新服务与固定版本的本地 Wrangler，见[部署说明](../../updates/README.md)。
 - `scripts/`：只读源码检查与第三方许可维护。
 - `app/.tools/`、`app/.cache/`：被 Git 忽略的本地环境与测试证据；`app/bin/`：生成的安装包。
 
@@ -35,6 +36,7 @@ npm --prefix app/frontend ci
 npm --prefix app/frontend run build
 go -C app test -race ./...
 node --experimental-strip-types --test app/frontend/tests/*.test.ts
+node --test site/*.test.mjs updates/*.test.mjs
 go -C app build -o bin/koto ./cmd/koto
 ```
 

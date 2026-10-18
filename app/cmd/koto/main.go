@@ -70,7 +70,6 @@ options
   --level L0|L1|L2|L3   projection level for carry
   --max-tokens <n>      token budget for carry (older turns summarized)
   --title <text>        a new session's title
-  --live-ms <n>         how recent a write makes a session look open (default 120000; 0 disables)
   --dry-run             plan only; print records and losses
   --json                machine-readable output
 ` + "\n" + agentGuide
@@ -128,7 +127,7 @@ func main() {
 	workBuddyRoot, workBuddyAIRoot := s("workbuddy-root"), s("workbuddy-ai-root")
 	cursorRoot, cursorBin := s("cursor-root"), s("cursor-bin")
 	cursorAppRoot := s("cursor-app-root")
-	only, to, level, maxTokens, harness, liveMs, limit, cwd, title := s("only"), s("to"), s("level"), s("max-tokens"), s("harness"), s("live-ms"), s("limit"), s("cwd"), s("title")
+	only, to, level, maxTokens, harness, limit, cwd, title := s("only"), s("to"), s("level"), s("max-tokens"), s("harness"), s("limit"), s("cwd"), s("title")
 	profile, account, toProfile, toAccount, toRoot := s("profile"), s("account"), s("to-profile"), s("to-account"), s("to-root")
 	dry, asJSON, h := b("dry-run"), b("json"), b("help")
 	if err := fs.Parse(flags); err != nil {
@@ -163,10 +162,6 @@ func main() {
 	cfg.ZCodeBin, cfg.WorkBuddyRoot, cfg.WorkBuddyAIRoot = *zcodeBin, *workBuddyRoot, *workBuddyAIRoot
 	cfg.CursorRoot, cfg.CursorBin = *cursorRoot, *cursorBin
 	cfg.CursorAppRoot = *cursorAppRoot
-	if *liveMs != "" {
-		n, _ := strconv.ParseInt(*liveMs, 10, 64)
-		cfg.LiveMs = &n
-	}
 	if *only != "" {
 		cfg.Enable = strings.Split(*only, ",")
 	}

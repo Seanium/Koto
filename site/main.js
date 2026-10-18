@@ -1,7 +1,7 @@
 import { locales, resolveLocale, watchAppearance } from './preferences.mjs';
-import { translations } from './translations.mjs?v=beta-0.1.0-2';
-import { createTypewriter, cycleAgentLogos, createDialogue } from './motion.mjs?v=beta-0.1.0-2';
-import { publication, releaseAssets, downloadURL, matchingAsset } from './publication.mjs?v=beta-0.1.0-2';
+import { translations } from './translations.mjs?v=0.1.0-review-20261018-b';
+import { createTypewriter, cycleAgentLogos, createDialogue } from './motion.mjs?v=0.1.0-review-20261018-b';
+import { publication, releaseAssets, downloadURL, matchingAsset } from './publication.mjs?v=0.1.0-review-20261018-b';
 import { detectSystem } from './detection.mjs';
 
 const languageSelect = document.getElementById('language-select');
@@ -69,7 +69,7 @@ installCopy.addEventListener('click', async () => {
 releaseSelect.addEventListener('change', () => { releaseManuallySelected = true; productChoices.set(activeProduct, releaseSelect.value); renderDownload(); });
 const screenshots = [...document.querySelectorAll('.screenshot')];
 // Refresh this content revision whenever screenshot assets are replaced.
-const screenshotRevision = '28ac01627d11';
+const screenshotRevision = '7e52925550c8';
 let activeLocale = 'en';
 let activeTheme = document.documentElement.dataset.theme || 'light';
 function renderScreenshots() {

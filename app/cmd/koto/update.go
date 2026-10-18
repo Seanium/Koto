@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -39,11 +40,26 @@ func runUpdate(args []string, out, errOut io.Writer) int {
 		fmt.Fprint(errOut, updateHelp)
 		return 2
 	}
-	fail := func(err error) int {
+	fail := func(err error, stage string) int {
 		if *asJSON {
-			_ = json.NewEncoder(out).Encode(map[string]any{"ok": false, "error": err.Error()})
+			failure := map[string]any{"ok": false, "error": err.Error(), "stage": stage, "url": update.ReleasesPage}
+			if errors.Is(err, update.ErrStaleFeed) {
+				failure["code"] = "STALE_FEED"
+			}
+			var request *update.RequestError
+			if errors.As(err, &request) {
+				failure["code"] = request.Code()
+				if !request.RetryAt.IsZero() {
+					failure["retryAt"] = request.RetryAt.UnixMilli()
+				}
+			}
+			_ = json.NewEncoder(out).Encode(failure)
 		} else {
-			fmt.Fprintln(errOut, "Update failed:", err)
+			label := "Update failed:"
+			if stage == "check" {
+				label = "Unable to check for updates:"
+			}
+			fmt.Fprintln(errOut, label, err)
 		}
 		return 1
 	}
@@ -52,24 +68,24 @@ func runUpdate(args []string, out, errOut io.Writer) int {
 	client := update.NewClient()
 	r, err := client.Check(ctx, version, update.CLI, runtime.GOOS, runtime.GOARCH, *channel)
 	if err != nil {
-		return fail(err)
+		return fail(err, "check")
 	}
 	installed := false
 	if r.Available && !*check {
 		location, err := update.Locate(update.CLI)
 		if err != nil {
-			return fail(err)
+			return fail(err, "install")
 		}
 		prepared, err := client.Prepare(ctx, r, location, nil)
 		if err != nil {
-			return fail(err)
+			return fail(err, "install")
 		}
 		defer prepared.Close()
 		if err := prepared.InstallContext(ctx); err != nil {
-			return fail(err)
+			return fail(err, "install")
 		}
 		if err := prepared.Commit(); err != nil {
-			return fail(err)
+			return fail(err, "install")
 		}
 		installed = true
 	}

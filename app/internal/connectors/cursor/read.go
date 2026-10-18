@@ -261,12 +261,11 @@ func tailConversation(ctx context.Context, tx querier, ref core.NativeRef, from 
 				x := float64(n)
 				ts = &x
 			}
-			text := user.text(1)
-			for _, p := range parts {
-				if core.S(p["type"]) == "text" && core.S(p["text"]) == "<user_query>\n"+text+"\n</user_query>" {
-					p["text"] = text
-				}
-			}
+			// This typed native field is the text entered in Cursor's composer.
+			// The model message can additionally contain timestamps, XML wrappers
+			// and selected context. Keep those parts intact for copying; the UI
+			// and native composer use the independently stored original text.
+			attrs["displayText"] = user.text(1)
 			if indexOnly {
 				err = indexSelectedFiles(user, &parts)
 			} else {

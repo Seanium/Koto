@@ -209,7 +209,7 @@ export function SetConnectorEnabled(id: string, enabled: boolean): $CancellableP
 }
 
 /**
- * SetPrefs saves the preferences; the core reopens when the open-session window changed.
+ * SetPrefs saves display and opener preferences.
  */
 export function SetPrefs(p: $models.Prefs): $CancellablePromise<void> {
     return $Call.ByID(4147788612, p);

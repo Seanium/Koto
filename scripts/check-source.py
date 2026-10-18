@@ -25,6 +25,8 @@ EXACT = {
     "app/frontend/vite.config.ts", ".github/workflows/pages.yml", ".github/workflows/ci.yml",
     "app/scripts/dmg-requirements.txt", "app/scripts/render-installer-emoji.swift", "app/scripts/generate-icons.cjs",
     "site/install.sh", "site/install.ps1",
+    "updates/package.json", "updates/package-lock.json", "updates/wrangler.jsonc",
+    "updates/worker.mjs", "updates/worker.test.mjs", "updates/wrangler.sh", "updates/README.md",
 }
 TREES = {
     "docs": {".md"},

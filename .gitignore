@@ -17,6 +17,9 @@ coverage/
 .env
 .env.*
 !.env.example
+.wrangler/
+.dev.vars
+.dev.vars.*
 *.pem
 *.key
 /design/

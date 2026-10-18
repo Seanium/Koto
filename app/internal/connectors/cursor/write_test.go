@@ -28,6 +28,90 @@ func prepare(t *testing.T, c *connector, key string, items []planner.Item, h *hu
 	}
 	return p
 }
+
+func TestIDEWithoutProjectUsesNativeEmptyWindow(t *testing.T) {
+	c, _ := setup(t)
+	h := hub.New()
+	u := projected("user", "No repository selected")
+	u.Parts = append(u.Parts, core.Part{"type": "file", "name": "材料.txt", "mediaType": "text/plain", "blob": h.PutBlob([]byte("NO_REPO_FILE 中文🐙"))})
+	p, err := c.Plan(engine.PlanInput{Hub: h, Projection: &planner.Projection{Items: []planner.Item{u, projected("assistant", "Ready")}}, Target: engine.DeliveryTarget{Mode: "create", Session: c.NewSessionID("no-repo")}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Target.Cwd != "" {
+		t.Fatal("invented a project directory", p.Target.Cwd)
+	}
+	var d ideDelivery
+	if err := json.Unmarshal([]byte(p.Content), &d); err != nil {
+		t.Fatal(err)
+	}
+	for _, w := range []core.JsonObject{core.Obj(d.Header["workspaceIdentifier"]), core.Obj(d.Metadata["workspaceIdentifier"]), core.Obj(core.Obj(d.Header["agentLocation"])["environment"])} {
+		if len(w) != 1 || w["id"] != "empty-window" {
+			t.Fatal("incorrect native no-project identity", w)
+		}
+	}
+	state, err := readState(core.S(d.Metadata["conversationState"]))
+	if err != nil || state.has(9) || state.text(22) != "ide" {
+		t.Fatal("copied an execution directory into an empty workspace", err)
+	}
+	if len(d.Assets) == 0 {
+		t.Fatal("attachment was not independently materialized")
+	}
+	assetRoot := filepath.Join(c.root, "User", "workspaceStorage", "empty-window", "koto", p.Target.Session)
+	for path := range d.Assets {
+		if !strings.HasPrefix(path, assetRoot+string(filepath.Separator)) {
+			t.Fatal("attachment depends on another workspace", path)
+		}
+	}
+	if _, err := c.Apply(context.Background(), p); err != nil {
+		t.Fatal(err)
+	}
+	events, _, _, err := readAll(t, c, p.Target.Session)
+	if err != nil || len(events) != 2 {
+		t.Fatal("no-project history could not be read", len(events), err)
+	}
+	if _, err := c.Apply(context.Background(), p); err != nil {
+		t.Fatal("no-project idempotency", err)
+	}
+}
+
+func TestNativeOriginalTextAndModelContextRemainSeparate(t *testing.T) {
+	for _, original := range []string{"An ordinary question 中文🐙", "<timestamp>authored</timestamp>\n<user_query>literal XML</user_query>", ""} {
+		t.Run(original, func(t *testing.T) {
+			c, _ := setup(t)
+			modelText := "<timestamp>native timestamp</timestamp>\n<user_query>\n" + original + "\n</user_query>\nSELECTED_CONTEXT_5831"
+			u := projected("user", modelText)
+			u.Event.Actor = "user"
+			u.Event.Attrs = core.JsonObject{"displayText": original}
+			for round := 0; round < 3; round++ {
+				p := prepare(t, c, "display-"+original+string(rune('0'+round)), []planner.Item{u, projected("assistant", "answer")}, hub.New())
+				var d ideDelivery
+				if err := json.Unmarshal([]byte(p.Content), &d); err != nil {
+					t.Fatal(err)
+				}
+				if d.Bubbles[0]["text"] != original {
+					t.Fatal("native UI text replaced by model context", d.Bubbles[0]["text"])
+				}
+				if _, err := c.Apply(context.Background(), p); err != nil {
+					t.Fatal(err)
+				}
+				events, _, _, err := readAll(t, c, p.Target.Session)
+				if err != nil || len(events) != 2 {
+					t.Fatal("round trip", len(events), err)
+				}
+				if got, ok := events[0].Attrs["displayText"].(string); !ok || got != original {
+					t.Fatal("original input changed or lost", events[0].Attrs)
+				}
+				if len(events[0].Parts) != 1 || events[0].Parts[0]["text"] != modelText {
+					t.Fatal("actual model context changed", events[0].Parts)
+				}
+				u.Parts = events[0].Parts
+				u.Event.Attrs = events[0].Attrs
+			}
+		})
+	}
+}
+
 func TestSelectedIRRebuildsIndependentModelHistory(t *testing.T) {
 	c, f := setup(t)
 	ctx := context.Background()

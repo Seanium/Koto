@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -162,6 +163,36 @@ func (c *cliConnector) validPath(path, id string) bool {
 	_, e = hex.DecodeString(parts[0])
 	return e == nil
 }
+
+// The ordinary CLI records the local workspace separately from its model
+// checkpoint. On Windows the checkpoint can contain a server execution URI.
+// Accept the explicit local path only when it belongs to this workspace index.
+func cliLocalCwd(directory, workspace string) string {
+	p := filepath.Join(directory, "meta.json")
+	st, err := os.Lstat(p)
+	if err != nil || !st.Mode().IsRegular() || st.Size() > 64<<10 {
+		return ""
+	}
+	f, err := os.Open(p)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+	var meta struct {
+		SchemaVersion int    `json:"schemaVersion"`
+		Cwd           string `json:"cwd"`
+	}
+	b, err := io.ReadAll(io.LimitReader(f, (64<<10)+1))
+	if err != nil || len(b) > 64<<10 || json.Unmarshal(b, &meta) != nil || meta.SchemaVersion != 1 || meta.Cwd == "" {
+		return ""
+	}
+	hash := md5.Sum([]byte(meta.Cwd))
+	if hex.EncodeToString(hash[:]) != workspace {
+		return ""
+	}
+	return meta.Cwd
+}
+
 func (c *cliConnector) Discover(ctx context.Context) ([]core.NativeRef, error) {
 	base := filepath.Join(c.root, "chats")
 	workspaces, e := os.ReadDir(base)
@@ -219,8 +250,8 @@ func (c *cliConnector) Discover(ctx context.Context) ([]core.NativeRef, error) {
 			if len(root) == 0 {
 				continue
 			}
-			cwd := ""
-			if uris := root.all(9); len(uris) > 0 {
+			cwd := cliLocalCwd(filepath.Dir(path), w.Name())
+			if uris := root.all(9); cwd == "" && len(uris) > 0 {
 				u, err := url.Parse(string(uris[0]))
 				if err == nil {
 					cwd, _ = shared.FileURLPath(u)

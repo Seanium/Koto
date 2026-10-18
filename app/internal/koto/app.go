@@ -35,8 +35,6 @@ type Config struct {
 	// ClaudeDesktopDirs: nil = every existing profile (unless ClaudeRoot is given); NoDesktop disables.
 	ClaudeDesktopDirs []string
 	NoDesktop         bool
-	// LiveMs: the live-session guard window (nil = 120 s; 0 disables).
-	LiveMs *int64
 	// Enable: which built-in connectors (nil = all).
 	Enable []string
 	Extra  []*engine.Connector
@@ -269,14 +267,11 @@ func New(cfg Config) (*App, error) {
 		}
 	}
 	a.Sessions = store.NewSessions(st, r)
-	a.Sessions.Log, a.Sessions.LiveMs = cfg.Log, cfg.LiveMs
+	a.Sessions.Log = cfg.Log
 	a.Hub = hub.New()
 	a.Engine = engine.New(a.Hub, r)
 	a.Engine.Log, a.Engine.Locks = cfg.Log, store.NewEngineLocks(st)
 	a.Sessions.Jobs = a.Engine.Jobs
-	if cfg.LiveMs != nil {
-		a.Engine.LiveMs = *cfg.LiveMs
-	}
 	return a, nil
 }
 

@@ -2,6 +2,7 @@ package cursor
 
 import (
 	"context"
+	"crypto/md5"
 	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
@@ -19,6 +20,45 @@ import (
 	"koto/internal/hub"
 	"koto/internal/planner"
 )
+
+func TestCLILocalMetadataOverridesServerCheckpointDirectory(t *testing.T) {
+	c := NewCLI(CLIOptions{Root: t.TempDir()}).Source.(*cliConnector)
+	p, err := c.Plan(engine.PlanInput{Hub: hub.New(), Projection: &planner.Projection{Items: []planner.Item{projected("user", "hello")}}, Target: engine.DeliveryTarget{Mode: "create", Session: c.NewSessionID("server-cwd"), Cwd: c.root}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = c.Apply(context.Background(), p); err != nil {
+		t.Fatal(err)
+	}
+	// This is the ordinary Windows CLI's local sidecar shape. The model
+	// checkpoint remains independent, as it is for server-backed execution.
+	local := `C:\workspace [native] 中文`
+	hash := md5.Sum([]byte(local))
+	dir := filepath.Join(c.root, "chats", hex.EncodeToString(hash[:]), p.Target.Session)
+	if err = os.MkdirAll(filepath.Dir(dir), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err = os.Rename(filepath.Dir(p.Target.Path), dir); err != nil {
+		t.Fatal(err)
+	}
+	metadata, _ := json.Marshal(core.JsonObject{"schemaVersion": 1, "cwd": local, "hasConversation": true})
+	if err = os.WriteFile(filepath.Join(dir, "meta.json"), metadata, 0600); err != nil {
+		t.Fatal(err)
+	}
+	refs, err := c.Discover(context.Background())
+	if err != nil || len(refs) != 1 || refs[0].Meta["cwd"] != local {
+		t.Fatal("local workspace lost", refs, err)
+	}
+	for _, wrong := range []string{`{"schemaVersion":1,"cwd":"elsewhere"}`, `{"schemaVersion":2,"cwd":"C:\\workspace [native] 中文"}`, `invalid`} {
+		if err = os.WriteFile(filepath.Join(dir, "meta.json"), []byte(wrong), 0600); err != nil {
+			t.Fatal(err)
+		}
+		refs, err = c.Discover(context.Background())
+		if err != nil || len(refs) != 1 || refs[0].Meta["cwd"] != c.root {
+			t.Fatal("unproven sidecar replaced checkpoint path", refs, err)
+		}
+	}
+}
 
 func TestCLINativeSelectedRoundTrip(t *testing.T) {
 	c := NewCLI(CLIOptions{Root: t.TempDir(), Command: []string{"cursor-agent"}}).Source.(*cliConnector)

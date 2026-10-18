@@ -10,6 +10,7 @@
 - `app/internal/`：コネクター、コピー計画、比較、ローカルストレージ。
 - `app/build/`、`app/scripts/`：ネイティブパッケージの作成と検証。
 - `site/`：プロジェクトサイト。`docs/`：アプリと同じ言語の利用・開発ガイド。
+- `updates/`：Cloudflare 更新サービスと固定バージョンのローカル Wrangler。[デプロイ手順](../../updates/README.md)。
 - `scripts/`：読み取り専用のソース確認と第三者ライセンスの管理。
 - `app/.tools/`、`app/.cache/`：Git 管理外のローカル環境とテスト記録。`app/bin/`：生成したパッケージ。
 
@@ -35,6 +36,7 @@ npm --prefix app/frontend ci
 npm --prefix app/frontend run build
 go -C app test -race ./...
 node --experimental-strip-types --test app/frontend/tests/*.test.ts
+node --test site/*.test.mjs updates/*.test.mjs
 go -C app build -o bin/koto ./cmd/koto
 ```
 

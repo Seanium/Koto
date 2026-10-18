@@ -219,6 +219,15 @@ func analysisContentDisplay(events []*core.Event) (canonical string, display ana
 	calls := map[string]string{}
 	for _, e := range events {
 		var parts []core.Part
+		displayText, hasDisplayText := e.Attrs["displayText"].(string)
+		if hasDisplayText && displayText != "" {
+			displayText = strings.ReplaceAll(displayText, "\r\n", "\n")
+			lines = append(lines, analysisJoin([]analysisDisplay{analysisRole(e.Actor), {text: displayText}}, "\n"))
+			if preview == "" {
+				r := []rune(displayText)
+				preview = string(r[:min(len(r), 100)])
+			}
+		}
 		for _, p := range e.Parts {
 			cp := core.Part{}
 			for k, v := range p {
@@ -236,6 +245,11 @@ func analysisContentDisplay(events []*core.Event) (canonical string, display ana
 				cp["text"] = strings.ReplaceAll(t, "\r\n", "\n")
 			}
 			parts = append(parts, cp)
+			// Native display text is only a presentation hint. Canonical content
+			// above retains the complete context for comparison and copying.
+			if hasDisplayText && core.S(cp["type"]) == "text" {
+				continue
+			}
 			if core.S(cp["type"]) == "text" && preview == "" {
 				preview = core.S(cp["text"])
 				r := []rune(preview)

@@ -105,7 +105,7 @@ func TestNativeReadPreservesContentAndSource(t *testing.T) {
 	if len(ev) != 8 {
 		t.Fatalf("got %d records", len(ev))
 	}
-	if ev[0].Kind != "context" || ev[1].Kind != "context" || ev[2].Actor != "user" || core.S(ev[2].Parts[0]["text"]) != "Remember MARKER_FIRST." {
+	if ev[0].Kind != "context" || ev[1].Kind != "context" || ev[2].Actor != "user" || core.S(ev[2].Attrs["displayText"]) != "Remember MARKER_FIRST." || core.S(ev[2].Parts[0]["text"]) != "<user_query>\nRemember MARKER_FIRST.\n</user_query>" {
 		t.Fatal("native system/user boundary lost")
 	}
 	if core.S(ev[3].Attrs["stopReason"]) != "stop" || core.S(ev[7].Attrs["stopReason"]) != "stop" {

@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"strconv"
 	"sync"
 	"time"
 
@@ -26,7 +25,6 @@ type CoreStatus struct {
 type Core struct {
 	OnEvent  func(raw string)
 	OnStatus func(CoreStatus)
-	LiveMs   func() *int64
 
 	lifecycle sync.Mutex
 	requests  sync.WaitGroup
@@ -39,13 +37,9 @@ type Core struct {
 }
 
 // configFromEnv: KOTO_APP_SANDBOX puts every root under one folder (development and previews).
-func configFromEnv(live *int64) koto.Config {
-	cfg := koto.Config{LiveMs: live}
+func configFromEnv() koto.Config {
+	cfg := koto.Config{}
 	cfg.DataDir = os.Getenv("KOTO_APP_DATA_DIR")
-	if ms := os.Getenv("KOTO_APP_LIVE_MS"); ms != "" {
-		n, _ := strconv.ParseInt(ms, 10, 64)
-		cfg.LiveMs = &n
-	}
 	if s := os.Getenv("KOTO_APP_SANDBOX"); s != "" {
 		j := func(d string) string { return filepath.Join(s, d) }
 		cfg.DataDir, cfg.ClaudeRoot, cfg.PiRoot, cfg.CodexHome = j("hub"), j("claude"), j("pi"), j("codex")
@@ -95,11 +89,7 @@ func (c *Core) start() {
 		return
 	}
 	c.setStatus(CoreStatus{State: "starting"})
-	var live *int64
-	if c.LiveMs != nil {
-		live = c.LiveMs()
-	}
-	app, err := koto.New(configFromEnv(live))
+	app, err := koto.New(configFromEnv())
 	if err != nil {
 		c.setStatus(CoreStatus{State: "error", Error: err.Error()})
 		return
@@ -139,7 +129,7 @@ func (c *Core) stop() {
 	}
 }
 
-// Restart reopens (after a preference change or a failure).
+// Restart reopens the core after a failure.
 func (c *Core) Restart() {
 	c.lifecycle.Lock()
 	defer c.lifecycle.Unlock()

@@ -10,6 +10,7 @@ The source tree keeps the desktop and CLI in `app/`. The desktop uses Wails v3 w
 - `app/internal/`: connectors, copy planning, comparison, and local storage.
 - `app/build/`, `app/scripts/`: native packaging and verification.
 - `site/`: project website; `docs/`: user and contributor guides in all app languages.
+- `updates/`: Cloudflare update service and pinned local Wrangler; see [deployment](../updates/README.md).
 - `scripts/`: read-only source checks and third-party license maintenance.
 - `app/.tools/`, `app/.cache/`: ignored local environments and test evidence; `app/bin/`: generated packages.
 
@@ -35,6 +36,7 @@ npm --prefix app/frontend ci
 npm --prefix app/frontend run build
 go -C app test -race ./...
 node --experimental-strip-types --test app/frontend/tests/*.test.ts
+node --test site/*.test.mjs updates/*.test.mjs
 go -C app build -o bin/koto ./cmd/koto
 ```
 

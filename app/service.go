@@ -235,14 +235,11 @@ func (s *AppService) SetUILocale(locale string) {
 	}
 }
 
-// SetPrefs saves the preferences; the core reopens when the open-session window changed.
+// SetPrefs saves display and opener preferences.
 func (s *AppService) SetPrefs(p Prefs) error {
 	old := s.prefs.Get()
 	if err := s.prefs.Set(p); err != nil {
 		return err
-	}
-	if old.LiveMinutes != s.prefs.Get().LiveMinutes {
-		go s.core.Restart()
 	}
 	if old.Appearance != s.prefs.Get().Appearance {
 		setAppearance(s.ui, s.prefs.Get().Appearance)

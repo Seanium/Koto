@@ -3,7 +3,7 @@
 set -eu
 
 fail() { printf 'koto: %s\n' "$*" >&2; exit 1; }
-usage() { printf '%s\n' 'Usage: install.sh [--version VERSION] [--dir DIRECTORY]' 'Default: GitHub Latest release, installed to ~/.local/bin/koto.'; }
+usage() { printf '%s\n' 'Usage: install.sh [--version VERSION] [--dir DIRECTORY]' 'Default: latest stable release, installed to ~/.local/bin/koto.'; }
 tag=
 install_dir=${KOTO_INSTALL_DIR:-"$HOME/.local/bin"}
 while [ "$#" -gt 0 ]; do
@@ -30,10 +30,10 @@ if [ "$os" = darwin ] && [ "$(sysctl -n hw.optional.arm64 2>/dev/null || :)" = 1
 repo=https://github.com/Seanium/koto
 fetch() { curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --connect-timeout 15 --max-time 300 "$@"; }
 if [ -z "$tag" ]; then
-  latest=$(fetch --head --output /dev/null --write-out '%{url_effective}' "$repo/releases/latest")
-  case "$latest" in "$repo/releases/tag/"*) tag=${latest##*/} ;; *) fail 'GitHub did not return a release' ;; esac
+  tag=$(fetch 'https://updates.kotoai.site/api/latest?format=tag') || fail 'cannot confirm the latest version; try again later or specify --version'
 fi
 case "$tag" in v*) ;; *) tag=v$tag ;; esac
+case "$tag" in *[!A-Za-z0-9.-]*) fail 'invalid version' ;; esac
 printf '%s\n' "$tag" | LC_ALL=C grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$' || fail 'invalid version'
 asset=koto-cli-$os-$arch
 mkdir -p "$install_dir"

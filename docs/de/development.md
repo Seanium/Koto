@@ -10,6 +10,7 @@ Desktop-App und CLI liegen in `app/`. Die Desktop-App verwendet Wails v3 mit der
 - `app/internal/`: Konnektoren, Kopierplanung, Vergleich und lokale Speicherung.
 - `app/build/`, `app/scripts/`: native Pakete und Prüfungen.
 - `site/`: Projektwebsite; `docs/`: Nutzungs- und Entwicklungsanleitungen in allen App-Sprachen.
+- `updates/`: Cloudflare-Updatedienst und festgelegte lokale Wrangler-Version; siehe [Deployment](../../updates/README.md).
 - `scripts/`: schreibgeschützte Quellcodeprüfung und Pflege der Drittanbieterlizenzen.
 - `app/.tools/`, `app/.cache/`: von Git ignorierte lokale Umgebungen und Testnachweise; `app/bin/`: erzeugte Pakete.
 
@@ -35,6 +36,7 @@ npm --prefix app/frontend ci
 npm --prefix app/frontend run build
 go -C app test -race ./...
 node --experimental-strip-types --test app/frontend/tests/*.test.ts
+node --test site/*.test.mjs updates/*.test.mjs
 go -C app build -o bin/koto ./cmd/koto
 ```
 

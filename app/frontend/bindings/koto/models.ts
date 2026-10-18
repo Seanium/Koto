@@ -47,11 +47,6 @@ export interface OpenersInfo {
 
 export interface Prefs {
     /**
-     * LiveMinutes: a session modified within this many minutes counts as open; 0 = never.
-     */
-    "liveMinutes": number;
-
-    /**
      * Terminal / Editor: an opener id from the preset tables (openers.go); "" or not installed = the
      * first installed one. *Custom: the template for id "custom".
      */
@@ -84,6 +79,9 @@ export interface UpdateState {
     "latest": string;
     "url": string;
     "error": string;
+    "errorCode": string;
+    "errorStage": string;
+    "retryAt": number;
     "downloaded": number;
     "total": number;
 }

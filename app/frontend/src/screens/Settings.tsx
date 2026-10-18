@@ -4,6 +4,7 @@ import { setAppearance } from '../appearance'
 
 import { useEffect, useState } from 'react'
 import { api, onUpdate, refreshOpeners, shell, useOpeners, type AppInfo, type Opener, type Prefs, type UpdateState } from '../api/client'
+import { updateErrorMessage } from '../api/updateErrors'
 import { AGENTS, openerName, productName } from '../api/model'
 import type { Connector } from '../api/types'
 import type { Hub } from '../store'
@@ -83,21 +84,27 @@ function General() {
 
 function UpdateLine({ version }: { version?: string }) {
   const [state, setState] = useState<UpdateState>()
-  const [error, setError] = useState('')
+  const [error, setError] = useState<{ message: string; stage: 'check' | 'install' | 'link' }>()
+  const [now, setNow] = useState(Date.now)
+  useEffect(() => {
+    if (!state?.retryAt || state.retryAt <= Date.now()) return
+    const timer = setTimeout(() => setNow(Date.now()), Math.min(state.retryAt - Date.now(), 2_147_483_647))
+    return () => clearTimeout(timer)
+  }, [state?.retryAt, now])
   useEffect(() => {
     let active = true
     const accept = (next: UpdateState) => {
       if (active) setState(previous => !previous || next.revision >= previous.revision ? next : previous)
     }
     const off = onUpdate(accept)
-    void shell.updateState().then(accept).catch(e => { if (active) setError(String(e)) })
+    void shell.updateState().then(accept).catch(e => { if (active) setError({ message: String(e), stage: 'check' }) })
     return () => { active = false; off() }
   }, [])
   const check = () => {
-    setError('')
-    void shell.checkUpdates().then(next => setState(previous => !previous || next.revision >= previous.revision ? next : previous)).catch(e => setError(String(e)))
+    setError(undefined)
+    void shell.checkUpdates().then(next => setState(previous => !previous || next.revision >= previous.revision ? next : previous)).catch(e => setError({ message: String(e), stage: 'check' }))
   }
-  const install = () => { setError(''); void shell.installUpdate().catch(e => setError(String(e))) }
+  const install = () => { setError(undefined); void shell.installUpdate().catch(e => setError({ message: String(e), stage: 'install' })) }
   const phase = state?.phase
   const busy = phase === 'checking' || phase === 'downloading' || phase === 'restarting'
   const percent = state?.total ? Math.min(100, Math.floor(state.downloaded * 100 / state.total)) : 0
@@ -105,12 +112,15 @@ function UpdateLine({ version }: { version?: string }) {
     <Line title={tr("版本")}>
       <span className="t-3 selectable">{version ?? '—'}</span>
       {phase === 'available' ? <Button onClick={install}>{tr("更新并重启")}</Button> :
-        <Button variant="ghost" disabled={busy || !version} onClick={check}>{phase === 'checking' ? tr("正在检查…") : phase === 'downloading' ? tr("正在下载 {0}%", [percent]) : phase === 'restarting' ? tr("正在重启…") : tr("检查更新")}</Button>}
+        <Button variant="ghost" disabled={busy || !version || (state?.retryAt ?? 0) > Math.max(now, Date.now())} onClick={check}>{phase === 'checking' ? tr("正在检查…") : phase === 'downloading' ? ((state?.total ?? 0) > 0 ? tr("正在下载 {0}%", [percent]) : tr("正在下载…")) : phase === 'restarting' ? tr("正在重启…") : tr("检查更新")}</Button>}
     </Line>
     {(phase === 'current' || phase === 'available') && <span className="t-meta" style={{ padding: '0 16px 12px' }} role="status">
       {phase === 'current' ? tr("已是最新版本") : tr("新版本 {0}", [state?.latest ?? ''])}
     </span>}
-    {(error || state?.error) && <div className="note selectable" style={{ padding: '0 16px 12px' }} role="alert">{tr("更新失败：{0}", [error || state?.error || ''])}</div>}
+    {(error || state?.error) && <div className="col g1" style={{ padding: '0 16px 12px' }}>
+      <div className="note selectable" role="alert">{error ? error.stage === 'link' ? tr('无法打开链接') : updateErrorMessage({ error: error.message, errorStage: error.stage }) : updateErrorMessage(state!)}</div>
+      <Button variant="ghost" onClick={() => { void shell.openExternal('https://github.com/Seanium/koto/releases').catch(e => setError({ message: String(e), stage: 'link' })) }}>{tr('手动下载')}</Button>
+    </div>}
   </div>
 }
 

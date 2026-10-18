@@ -63,6 +63,24 @@ func TestAnalysisHashesBeyondDisplayLimit(t *testing.T) {
 	ok(t, a != b, "full content is compared even outside the preview")
 }
 
+func TestAnalysisDisplayTextDoesNotReplaceComparisonContent(t *testing.T) {
+	event := &core.Event{Kind: "message", Actor: "user", Parts: []core.Part{
+		{"type": "text", "text": "<native_context>necessary model context</native_context>"},
+		{"type": "text", "text": "original question"},
+		{"type": "image", "name": "attachment", "blob": core.JsonObject{"sha256": "image-hash"}},
+	}}
+	canonical, _, _ := analysisContentDisplay([]*core.Event{event})
+	event.Attrs = core.JsonObject{"displayText": "原始提问\r\n第二行"}
+	before := core.ToJSON(event)
+	withHint, display, preview := analysisContentDisplay([]*core.Event{event})
+	eq(t, withHint, canonical, "display hint altered canonical comparison")
+	eq(t, preview, "原始提问\n第二行")
+	ok(t, strings.Contains(display.text, "原始提问\n第二行"))
+	ok(t, strings.Contains(display.text, "image-hash"), "display lost the attachment")
+	ok(t, !strings.Contains(display.text, "native_context") && !strings.Contains(display.text, "original question"))
+	eq(t, core.ToJSON(event), before, "display mutated complete source content")
+}
+
 func TestAnalysisDisplayLabelsDoNotAnnotateNativeContent(t *testing.T) {
 	events := []*core.Event{
 		{Kind: "message", Actor: "user", Parts: []core.Part{{"type": "text", "text": "提问\r\n回复\n工具", "signature": "omit", "sealed": "omit"}}},

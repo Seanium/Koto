@@ -412,9 +412,8 @@ func main() {
 	codexRollout("01a0ec12-95a6-7c33-9ebd-b5e33eeb5c03", work+"/web-app", 300, "跑一遍 lint 并修掉报错", "npm run lint -- --fix", "✔ 0 problems", "lint 已经干净了。")
 
 	// ---------------------------------------------------------------- copies
-	zero := int64(0)
 	app, err := koto.New(koto.Config{DataDir: j("hub"), ClaudeRoot: j("claude"), PiRoot: j("pi"), CodexHome: j("codex"), CodexShadow: j("codex-shadow"),
-		DshHome: j("dsh"), AntigravityRoot: j("antigravity"), OpenCodeRoot: j("opencode"), NoDesktop: true, LiveMs: &zero, Enable: []string{"claude-code", "pi", "codex", "dsh"}})
+		DshHome: j("dsh"), AntigravityRoot: j("antigravity"), OpenCodeRoot: j("opencode"), NoDesktop: true, Enable: []string{"claude-code", "pi", "codex", "dsh"}})
 	must(err)
 	defer app.Close()
 	api := &koto.API{App: app}

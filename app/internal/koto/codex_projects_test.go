@@ -2,6 +2,7 @@ package koto
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"koto/internal/connectors/shared"
 	"koto/internal/core"
 	"koto/internal/engine"
 	"koto/internal/store"
@@ -27,6 +29,14 @@ func (s *projectCountSource) Tail(ctx context.Context, r core.NativeRef, o *core
 func TestCodexProjectMoveUpdatesNavigationAndCopyWithoutReparse(t *testing.T) {
 	s := newSandbox(t)
 	file := writeCodexRollout(t, s.Codex, "", nil)
+	// A native thread can have a cwd in SQLite without belonging to any project.
+	// Keep this present through attach/detach so nil project metadata cannot turn
+	// into a typed nil map that compares as {} but persists as JSON null.
+	db, err := sql.Open("sqlite", shared.FileURL(filepath.Join(s.Codex, "state_5.sqlite")).String())
+	must(t, err)
+	defer db.Close()
+	_, err = db.Exec(`CREATE TABLE threads(id TEXT PRIMARY KEY,cwd TEXT); INSERT INTO threads VALUES(?,?)`, CodexThread, "/work/proj")
+	must(t, err)
 	before, err := os.ReadFile(file)
 	must(t, err)
 	oldTime := time.Now().Add(-time.Hour)
@@ -50,6 +60,16 @@ func TestCodexProjectMoveUpdatesNavigationAndCopyWithoutReparse(t *testing.T) {
 		t.Fatal("fixture has no historical cwd")
 	}
 	initialTails := count.tails.Load()
+	assertQuietScan := func() {
+		t.Helper()
+		for i := 0; i < 3; i++ {
+			report := a.ScanIndex(ctx, nil)
+			eq(t, len(report.Errors), 0)
+			eq(t, report.Changed, 0, "unchanged project metadata republished the row")
+		}
+		eq(t, count.tails.Load(), initialTails, "unchanged project metadata reread rollout")
+	}
+	assertQuietScan()
 	writeProject := func(dir string) {
 		data, _ := json.Marshal(core.JsonObject{"local-projects": core.JsonObject{"project": core.JsonObject{"id": "project", "rootPaths": []string{dir}}}, "thread-project-assignments": core.JsonObject{CodexThread: core.JsonObject{"projectKind": "local", "projectId": "project"}}, "thread-project-membership-host-ids": core.JsonObject{CodexThread: "local"}})
 		must(t, os.WriteFile(filepath.Join(s.Codex, ".codex-global-state.json"), data, 0600))
@@ -75,6 +95,7 @@ func TestCodexProjectMoveUpdatesNavigationAndCopyWithoutReparse(t *testing.T) {
 	must(t, err)
 	eq(t, cached, view, "project move evicted message view")
 	eq(t, count.tails.Load(), initialTails, "metadata-only change reread rollout")
+	assertQuietScan()
 	b := a.WithResume(*view.Hub.Binding(c.Harness, CodexThread, c.ID))
 	eq(t, core.S(b.Meta["cwd"]), current)
 	eq(t, core.S(b.Meta["historicalCwd"]), historical)
@@ -100,6 +121,8 @@ func TestCodexProjectMoveUpdatesNavigationAndCopyWithoutReparse(t *testing.T) {
 	eq(t, core.S(stale.Meta["cwd"]), historical, "detached project retained a stale current directory")
 	_, retained := stale.Meta["currentProject"]
 	ok(t, !retained, "detached project retained stale metadata")
+	initialTails = count.tails.Load()
+	assertQuietScan()
 	delete(row.Meta, "currentCwd")
 	delete(row.Meta, "currentProject")
 	must(t, a.Store.PutSession(row))

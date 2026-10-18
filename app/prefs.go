@@ -1,7 +1,7 @@
 package main
 
-// App preferences (not hub state): what to do when the target session looks open, and how long
-// "open" lasts. Stored next to the sandbox in development, else in the user config dir.
+// App preferences are independent of the derived index. They live beside the
+// sandbox in development and in the user config directory otherwise.
 
 import (
 	"encoding/json"
@@ -11,8 +11,6 @@ import (
 )
 
 type Prefs struct {
-	// LiveMinutes: a session modified within this many minutes counts as open; 0 = never.
-	LiveMinutes int `json:"liveMinutes"`
 	// Terminal / Editor: an opener id from the preset tables (openers.go); "" or not installed = the
 	// first installed one. *Custom: the template for id "custom".
 	Terminal       string `json:"terminal"`
@@ -30,7 +28,7 @@ type Prefs struct {
 
 type WindowFrame struct{ X, Y, W, H int }
 
-var defaultPrefs = Prefs{LiveMinutes: 2, Language: "system"}
+var defaultPrefs = Prefs{Language: "system"}
 
 type prefStore struct {
 	mu   sync.Mutex
@@ -85,9 +83,6 @@ func (s *prefStore) Set(p Prefs) error {
 	if p.Window == nil {
 		p.Window = s.p.Window // the frontend does not send it
 	}
-	if p.LiveMinutes < 0 {
-		p.LiveMinutes = 0
-	}
 	p.Language = normalLanguage(p.Language)
 	return s.saveLocked(p)
 }
@@ -139,10 +134,4 @@ func (s *prefStore) saveLocked(p Prefs) error {
 	}
 	s.p = p
 	return nil
-}
-
-// liveMs: the open-session window in ms.
-func (p Prefs) liveMs() *int64 {
-	n := int64(p.LiveMinutes) * 60_000
-	return &n
 }

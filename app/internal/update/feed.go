@@ -3,16 +3,22 @@ package update
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 )
 
 const Repository = "https://github.com/Seanium/koto"
-const releasesAPI = "https://api.github.com/repos/Seanium/koto/releases?per_page=100"
+const ReleasesPage = Repository + "/releases"
+const releasesAPI = "https://updates.kotoai.site/api/releases"
+const maxAssetSize = 1 << 30
+
+var ErrStaleFeed = errors.New("update information is out of date; the latest version cannot be confirmed; try again later or download from " + ReleasesPage)
 
 type Product string
 
@@ -33,6 +39,7 @@ type release struct {
 	Draft      bool    `json:"draft"`
 	Prerelease bool    `json:"prerelease"`
 	Assets     []Asset `json:"assets"`
+	Stale      bool    `json:"stale"`
 }
 
 type Result struct {
@@ -47,8 +54,11 @@ type Result struct {
 }
 
 type Client struct {
-	http *http.Client
-	api  string
+	http       *http.Client
+	api        string
+	rateMu     sync.Mutex
+	rateLimits map[string]*RequestError
+	now        func() time.Time
 }
 
 func NewClient() *Client {
@@ -118,7 +128,7 @@ func (c *Client) Check(ctx context.Context, current string, product Product, goo
 	}
 	var releases []release
 	if err := json.Unmarshal(b, &releases); err != nil {
-		return nil, fmt.Errorf("invalid GitHub release response: %w", err)
+		return nil, fmt.Errorf("invalid update feed response: %w", err)
 	}
 	var newest *release
 	var newestVersion version
@@ -134,6 +144,9 @@ func (c *Client) Check(ctx context.Context, current string, product Product, goo
 	}
 	if newest == nil {
 		return nil, fmt.Errorf("no published %s release is available", channel)
+	}
+	if newest.Stale && !Newer(newest.Tag, current) {
+		return nil, ErrStaleFeed
 	}
 	return resultForRelease(newest, current, product, name)
 }
@@ -168,7 +181,10 @@ func resultForRelease(r *release, current string, product Product, name string) 
 func validateAsset(a Asset, tag string) error {
 	expected := Repository + "/releases/download/" + tag + "/" + a.Name
 	u, err := url.Parse(a.URL)
-	if err != nil || u.Scheme != "https" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || a.URL != expected || a.Size <= 0 || a.Size > 1<<30 {
+	if err != nil || u.Scheme != "https" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || a.URL != expected || a.Size < 0 || a.Size > maxAssetSize {
+		return fmt.Errorf("invalid release asset %q", a.Name)
+	}
+	if (a.Digest != "" && !validSHA256Digest(a.Digest)) || (a.Size == 0 && !validSHA256Digest(a.Digest)) || (a.Name == "SHA256SUMS" && (a.Size == 0 || a.Size > 128<<10 || !validSHA256Digest(a.Digest))) {
 		return fmt.Errorf("invalid release asset %q", a.Name)
 	}
 	return nil
@@ -179,6 +195,12 @@ func (c *Client) get(ctx context.Context, address string) (*http.Response, error
 	if err != nil {
 		return nil, err
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if err := c.cooldown(req.URL.Host); err != nil {
+		return nil, err
+	}
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("User-Agent", "koto-updater")
 	resp, err := c.http.Do(req)
@@ -187,10 +209,16 @@ func (c *Client) get(ctx context.Context, address string) (*http.Response, error
 	}
 	if resp.StatusCode != http.StatusOK {
 		resp.Body.Close()
-		if resp.StatusCode == 403 || resp.StatusCode == 429 {
-			return nil, fmt.Errorf("GitHub refused the update request (HTTP %d); retry later", resp.StatusCode)
+		err := responseError(resp.StatusCode, resp.Header, c.clock())
+		if err.RetryAt.After(c.clock()) {
+			c.rateMu.Lock()
+			if c.rateLimits == nil {
+				c.rateLimits = make(map[string]*RequestError)
+			}
+			c.rateLimits[req.URL.Host] = err
+			c.rateMu.Unlock()
 		}
-		return nil, fmt.Errorf("update request failed: HTTP %d", resp.StatusCode)
+		return nil, err
 	}
 	return resp, nil
 }
@@ -231,7 +259,7 @@ func (c *Client) releaseAsset(ctx context.Context, tag, current string, product 
 	}
 	var r release
 	if err = json.Unmarshal(b, &r); err != nil {
-		return nil, fmt.Errorf("invalid GitHub release response: %w", err)
+		return nil, fmt.Errorf("invalid update feed response: %w", err)
 	}
 	if r.Tag != tag || r.Draft {
 		return nil, fmt.Errorf("release tag is not the requested published version")

@@ -19,7 +19,7 @@ export function threadTitle(t: { bindings: Binding[]; events?: HubEvent[] | numb
     if (typeof title === 'string' && title.trim()) return title.trim()
   }
   const first = Array.isArray(t.events) && t.events.find(e => e.actor === 'user' && e.kind === 'message')
-  const text = first && partsText(first.parts)
+  const text = first && (typeof first.attrs?.displayText === 'string' ? userDisplayText(first) : partsText(first.parts))
   return text ? oneLine(text, 80) : tr("未命名会话")
 }
 
@@ -48,6 +48,15 @@ const filesOf = (parts: Part[]): TurnFile[] => parts.flatMap(p => p.type === 'fi
 const imagesOf = (parts: Part[]): TurnImage[] => parts.flatMap(p =>
   p.type === 'image' && p.blob?.sha256 ? [{ sha: p.blob.sha256, mediaType: p.mediaType, name: p.name }]
   : p.type === 'tool_result' ? imagesOf(p.parts) : [])
+
+/** Native user text can differ from the model request's wrapper. It is display-only. */
+export function userDisplayText(event: HubEvent): string {
+  if (event.actor === 'user' && typeof event.attrs?.displayText === 'string') {
+    const unavailable = partsText(event.parts.filter(p => p.type !== 'text' && p.type !== 'file'))
+    return [event.attrs.displayText, unavailable].filter(Boolean).join('\n')
+  }
+  return partsText(event.parts.filter(p => p.type !== 'file'))
+}
 
 export interface Turn {
   /** 1-based. */
@@ -81,7 +90,7 @@ export function turnsOf(events: HubEvent[], midTurn = false): Turn[] {
     // visible reply content nor selectable IDs (including trailing copy boundaries).
     if (e.kind === 'context') continue
     if (e.kind === 'message' && e.actor === 'user' && e.parts.some(p => p.type === 'text' || p.type === 'image' || p.type === 'file' || p.type === 'opaque')) {
-      cur = { index: turns.length + 1, harness: e.provenance.source.harness, connector: e.provenance.source.connector, time: e.time, user: partsText(e.parts.filter(p => p.type !== 'file')), promptId: e.id, images: imagesOf(e.parts), files: filesOf(e.parts), imagesFirst: e.parts.findIndex(p => p.type === 'image') < e.parts.findIndex(p => p.type === 'text'), steps: [], eventIds: [e.id] }
+      cur = { index: turns.length + 1, harness: e.provenance.source.harness, connector: e.provenance.source.connector, time: e.time, user: userDisplayText(e), promptId: e.id, images: imagesOf(e.parts), files: filesOf(e.parts), imagesFirst: e.parts.findIndex(p => p.type === 'image') < e.parts.findIndex(p => p.type === 'text'), steps: [], eventIds: [e.id] }
       turns.push(cur)
       continue
     }

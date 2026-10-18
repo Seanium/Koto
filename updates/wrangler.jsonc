@@ -1,0 +1,11 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "koto-updates",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-10-18",
+  "workers_dev": true,
+  "routes": [
+    { "pattern": "updates.kotoai.site", "custom_domain": true }
+  ],
+  "observability": { "enabled": true }
+}

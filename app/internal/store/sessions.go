@@ -51,7 +51,6 @@ type Sessions struct {
 	Store    *Store
 	Registry *engine.Registry
 	Log      engine.Logger
-	LiveMs   *int64
 
 	mu        sync.Mutex
 	life      context.Context
@@ -493,22 +492,32 @@ func note(s *SessionRow, d *core.DraftEvent) {
 				break
 			}
 		}
+		if text, ok := d.Attrs["displayText"].(string); ok {
+			if s.FirstPrompt == "" {
+				s.FirstPrompt = promptExcerpt(text)
+			}
+			return
+		}
 		for _, p := range d.Parts {
 			if core.S(p["type"]) != "text" {
 				continue
 			}
 			if text := core.S(p["text"]); text != "" {
 				if s.FirstPrompt == "" {
-					r := []rune(strings.TrimSpace(ws.ReplaceAllString(text, " ")))
-					if len(r) > 200 {
-						r = r[:200]
-					}
-					s.FirstPrompt = string(r)
+					s.FirstPrompt = promptExcerpt(text)
 				}
 			}
 			break
 		}
 	}
+}
+
+func promptExcerpt(text string) string {
+	r := []rune(strings.TrimSpace(ws.ReplaceAllString(text, " ")))
+	if len(r) > 200 {
+		r = r[:200]
+	}
+	return string(r)
 }
 
 // ------------------------------------------------------------------ groups
@@ -847,9 +856,6 @@ func (ss *Sessions) OpenThread(ctx context.Context, selector string) (*OpenThrea
 	}
 	e := engine.New(h, ss.Registry)
 	e.Log, e.Locks = ss.Log, NewEngineLocks(ss.Store)
-	if ss.LiveMs != nil {
-		e.LiveMs = *ss.LiveMs
-	}
 	e.Jobs = ss.Jobs
 	// A working copy refreshes only its own sessions (a copy plans after a rescan): reading every
 	// session on disk into it would mix conversations and cost the memory the index saves.

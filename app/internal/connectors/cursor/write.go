@@ -87,13 +87,15 @@ func (c *connector) Plan(in engine.PlanInput) (*engine.DeliveryPlan, error) {
 	if target.Cwd == "" {
 		target.Cwd = in.Projection.Hints.Cwd
 	}
-	if target.Cwd == "" {
+	if target.Cwd == "" && c.assetBase != "" {
 		return nil, fmt.Errorf("Cursor requires a project directory")
 	}
 	var err error
-	target.Cwd, err = filepath.Abs(target.Cwd)
-	if err != nil {
-		return nil, err
+	if target.Cwd != "" {
+		target.Cwd, err = filepath.Abs(target.Cwd)
+		if err != nil {
+			return nil, err
+		}
 	}
 	target.Path = c.db
 	if target.Title == "" {
@@ -101,15 +103,21 @@ func (c *connector) Plan(in engine.PlanInput) (*engine.DeliveryPlan, error) {
 	}
 	d := ideDelivery{Blobs: map[string][]byte{}, Assets: map[string][]byte{}, Bubbles: []core.JsonObject{}}
 	now := time.Now().UnixMilli()
-	workspaceID := core.SHA256Hex(shared.FileURL(target.Cwd).String())[:32]
-	if c.assetBase == "" {
-		workspaceID, err = folderWorkspaceID(target.Cwd)
-		if err != nil {
-			return nil, fmt.Errorf("Cursor target workspace: %w", err)
+	// Ordinary Cursor's "Start from scratch" conversations use this native
+	// empty-window identity, with no folder URI or invented project directory.
+	workspaceID := "empty-window"
+	workspace := core.JsonObject{"id": workspaceID}
+	if target.Cwd != "" {
+		workspaceURI := shared.FileURL(target.Cwd)
+		workspaceID = core.SHA256Hex(workspaceURI.String())[:32]
+		if c.assetBase == "" {
+			workspaceID, err = folderWorkspaceID(target.Cwd)
+			if err != nil {
+				return nil, fmt.Errorf("Cursor target workspace: %w", err)
+			}
 		}
+		workspace = core.JsonObject{"id": workspaceID, "uri": core.JsonObject{"$mid": 1, "scheme": "file", "authority": workspaceURI.Host, "fsPath": target.Cwd, "path": workspaceURI.Path, "external": workspaceURI.String()}}
 	}
-	workspaceURI := shared.FileURL(target.Cwd)
-	workspace := core.JsonObject{"id": workspaceID, "uri": core.JsonObject{"$mid": 1, "scheme": "file", "authority": workspaceURI.Host, "fsPath": target.Cwd, "path": workspaceURI.Path, "external": workspaceURI.String()}}
 	// Reuse the target's existing workspace identity, never a source agent's ID.
 	db, e := c.open(context.Background())
 	if e == nil {
@@ -127,7 +135,7 @@ func (c *connector) Plan(in engine.PlanInput) (*engine.DeliveryPlan, error) {
 				}
 				w := core.Obj(h["workspaceIdentifier"])
 				id := core.S(w["id"])
-				if core.S(core.Obj(w["uri"])["fsPath"]) == target.Cwd && id != "" && filepath.Base(id) == id && id != "." && id != ".." && !strings.ContainsAny(id, `/\`) {
+				if target.Cwd != "" && core.S(core.Obj(w["uri"])["fsPath"]) == target.Cwd && id != "" && filepath.Base(id) == id && id != "." && id != ".." && !strings.ContainsAny(id, `/\`) {
 					workspace = w
 					workspaceID = id
 					break
@@ -152,7 +160,14 @@ func (c *connector) Plan(in engine.PlanInput) (*engine.DeliveryPlan, error) {
 	// The runtime initializes its start timestamp and IANA timezone together.
 	// Supplying only field 26 makes getOrInitializeConversationStartedDate fail
 	// before a model request, even though the protobuf itself decodes correctly.
-	root := wireMessage{wireText(9, shared.FileURL(target.Cwd).String()), wireInt(10, 1), wireText(22, "cli")}
+	root := wireMessage{wireInt(10, 1)}
+	if target.Cwd != "" {
+		root = append(root, wireText(9, shared.FileURL(target.Cwd).String()), wireText(22, "cli"))
+	} else {
+		// Let the native empty window initialize its execution directory when
+		// continued. It is separate from a project's storage identity.
+		root = append(root, wireText(22, "ide"))
+	}
 	var turn wireMessage
 	uid := ""
 	stepIndex := 0
@@ -333,7 +348,11 @@ func (c *connector) Plan(in engine.PlanInput) (*engine.DeliveryPlan, error) {
 					return nil, fmt.Errorf("Cursor selected tool call has no result before next turn")
 				}
 			}
-			start(strings.Join(text, "\n"), it.Key, ts, selected, bc)
+			displayText := strings.Join(text, "\n")
+			if original, ok := it.Event.Attrs["displayText"].(string); ok && it.Event.Actor == "user" && it.Synthetic == "" {
+				displayText = original
+			}
+			start(displayText, it.Key, ts, selected, bc)
 		}
 		msg := core.JsonObject{"role": role, "content": model}
 		if role == "assistant" {

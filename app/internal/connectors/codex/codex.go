@@ -594,7 +594,9 @@ func (c *codexConn) Discover(ctx context.Context) ([]core.NativeRef, error) {
 		meta["currentCwd"], meta["currentProject"] = nil, nil
 		if location, ok := locations[ThreadOf(s)]; ok {
 			meta["currentCwd"] = location.cwd
-			meta["currentProject"] = location.project
+			if location.project != nil {
+				meta["currentProject"] = location.project
+			}
 		}
 		if title, ok := names[ThreadOf(s)]; ok {
 			meta["title"] = title

@@ -12,7 +12,8 @@ import (
 )
 
 // Download streams into a private staging directory and returns only after the
-// exact byte count, published SHA-256 and (when present) GitHub digest agree.
+// known byte count, published SHA-256 and feed digest agree. An unknown size
+// still requires a digest and cannot exceed the same 1 GiB download limit.
 // Failure removes the partial file; an installed executable is never touched.
 func (c *Client) Download(ctx context.Context, r *Result, dir string, progress func(int64, int64)) (string, error) {
 	tag := r.Tag
@@ -37,13 +38,20 @@ func (c *Client) Download(ctx context.Context, r *Result, dir string, progress f
 		return "", err
 	}
 	if r.Asset.Digest != "" && r.Asset.Digest != "sha256:"+want {
-		return "", fmt.Errorf("release checksum disagrees with GitHub")
+		return "", fmt.Errorf("release checksum disagrees with update metadata")
 	}
 	resp, err := c.get(ctx, r.Asset.URL)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
+	limit := r.Asset.Size
+	if limit == 0 {
+		limit = maxAssetSize
+	}
+	if resp.ContentLength > limit {
+		return "", fmt.Errorf("download exceeds the allowed size of %d bytes", limit)
+	}
 	f, err := os.CreateTemp(dir, ".koto-download-*")
 	if err != nil {
 		return "", err
@@ -57,7 +65,7 @@ func (c *Client) Download(ctx context.Context, r *Result, dir string, progress f
 		}
 	}()
 	hash := sha256.New()
-	var input io.Reader = io.LimitReader(resp.Body, r.Asset.Size+1)
+	var input io.Reader = io.LimitReader(resp.Body, limit+1)
 	if progress != nil {
 		input = &progressReader{Reader: input, total: r.Asset.Size, notify: progress}
 	}
@@ -65,7 +73,10 @@ func (c *Client) Download(ctx context.Context, r *Result, dir string, progress f
 	if err != nil {
 		return "", err
 	}
-	if n != r.Asset.Size {
+	if n > limit {
+		return "", fmt.Errorf("download exceeds the allowed size of %d bytes", limit)
+	}
+	if r.Asset.Size > 0 && n != r.Asset.Size {
 		return "", fmt.Errorf("download size mismatch: expected %d, received %d", r.Asset.Size, n)
 	}
 	if hex.EncodeToString(hash.Sum(nil)) != want {
@@ -86,6 +97,14 @@ func (c *Client) Download(ctx context.Context, r *Result, dir string, progress f
 	}
 	complete = true
 	return final, nil
+}
+
+func validSHA256Digest(value string) bool {
+	if !strings.HasPrefix(value, "sha256:") || len(value) != len("sha256:")+sha256.Size*2 {
+		return false
+	}
+	_, err := hex.DecodeString(strings.TrimPrefix(value, "sha256:"))
+	return err == nil
 }
 
 func checksum(b []byte, name string) (string, error) {

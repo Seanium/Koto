@@ -188,6 +188,7 @@ jobs:
           npm --prefix app/frontend run build
           node --experimental-strip-types --test app/frontend/tests/*.test.ts 2>&1 | tee app/.cache/ci/frontend-tests.txt
           node --test site/*.test.mjs
+          node --test updates/*.test.mjs
 
       - name: Run native Go tests
         id: core
@@ -243,8 +244,8 @@ jobs:
           sandbox = evidence/'mac-sandbox'
           result_file = evidence/'platform-smoke-macos.json'
           subprocess.run([os.environ['KOTO_CI_GO'],'run','./cmd/seed',str(sandbox)],cwd=app,check=True)
-          (sandbox/'app-prefs.json').write_text(json.dumps({'liveMinutes':0,'language':'zh','appearance':'light'}))
-          environment = dict(os.environ, KOTO_APP_SANDBOX=str(sandbox), KOTO_APP_PLATFORM_SMOKE=str(result_file), KOTO_APP_LIVE_MS='0')
+          (sandbox/'app-prefs.json').write_text(json.dumps({'language':'zh','appearance':'light'}))
+          environment = dict(os.environ, KOTO_APP_SANDBOX=str(sandbox), KOTO_APP_PLATFORM_SMOKE=str(result_file))
           binary = app/'bin/release'/('darwin-'+os.environ['KOTO_CI_ARCH'])/'koto.app/Contents/MacOS/koto'
           with (evidence/'native-macos.log').open('w') as output:
               subprocess.run([str(binary)],env=environment,stdout=output,stderr=subprocess.STDOUT,timeout=120,check=True)

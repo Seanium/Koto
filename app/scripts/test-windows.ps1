@@ -10,15 +10,13 @@ $sandbox = Join-Path $appDir (".cache/windows-smoke-" + [guid]::NewGuid().ToStri
 $report = "$sandbox-result.json"
 $savedSandbox = $env:KOTO_APP_SANDBOX
 $savedSmoke = $env:KOTO_APP_PLATFORM_SMOKE
-$savedLive = $env:KOTO_APP_LIVE_MS
 Push-Location $appDir
 try {
   & $Go run ./cmd/seed $sandbox
   if ($LASTEXITCODE -ne 0) { throw "Sandbox seed failed" }
-  [System.IO.File]::WriteAllText((Join-Path $sandbox 'app-prefs.json'), '{"language":"zh","appearance":"light","liveMinutes":0}', [System.Text.UTF8Encoding]::new($false))
+  [System.IO.File]::WriteAllText((Join-Path $sandbox 'app-prefs.json'), '{"language":"zh","appearance":"light"}', [System.Text.UTF8Encoding]::new($false))
   $env:KOTO_APP_SANDBOX = $sandbox
   $env:KOTO_APP_PLATFORM_SMOKE = $report
-  $env:KOTO_APP_LIVE_MS = '0'
   $process = Start-Process -FilePath $binary -PassThru -RedirectStandardOutput "$sandbox-stdout.log" -RedirectStandardError "$sandbox-stderr.log"
   if (-not $process.WaitForExit(180000)) {
     $process.Kill()
@@ -33,6 +31,5 @@ try {
 } finally {
   $env:KOTO_APP_SANDBOX = $savedSandbox
   $env:KOTO_APP_PLATFORM_SMOKE = $savedSmoke
-  $env:KOTO_APP_LIVE_MS = $savedLive
   Pop-Location
 }

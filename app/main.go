@@ -147,7 +147,7 @@ func main() {
 	ui := &UI{}
 	marks := make(chan string, 32)
 	prefs := loadPrefs()
-	core := &Core{LiveMs: func() *int64 { return prefs.Get().liveMs() }}
+	core := &Core{}
 	svc := &AppService{core: core, ui: ui, prefs: prefs, mark: func(m string) {
 		select {
 		case marks <- m:

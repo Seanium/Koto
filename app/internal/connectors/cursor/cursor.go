@@ -22,7 +22,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const Version = "cursor-connector@0.3.0"
+const Version = "cursor-connector@0.4.1"
 const format = "cursor-ide-3.25-protobuf"
 const maxBlobBytes = 64 << 20
 

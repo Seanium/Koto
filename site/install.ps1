@@ -9,7 +9,8 @@ $ErrorActionPreference = 'Stop'
 $repo = 'https://github.com/Seanium/koto'
 $headers = @{ 'User-Agent' = 'koto-installer'; Accept = 'application/vnd.github+json' }
 if (-not $Version) {
-    $release = Invoke-RestMethod -Uri 'https://api.github.com/repos/Seanium/koto/releases/latest' -Headers $headers -TimeoutSec 30
+    $release = Invoke-RestMethod -Uri 'https://updates.kotoai.site/api/latest' -Headers $headers -TimeoutSec 30
+    if ($release.stale) { throw 'Cannot confirm the latest version; try again later or specify -Version.' }
     $Version = $release.tag_name
 }
 if (-not $Version.StartsWith('v')) { $Version = 'v' + $Version }
@@ -61,5 +62,19 @@ try {
     Write-Output "Installed koto CLI $($Version.Substring(1)) at $target"
     if (($env:PATH -split ';') -notcontains $InstallDir) { Write-Output "Add this directory to your PATH: $InstallDir" }
 } finally {
-    Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
+    # Windows can briefly retain the exited payload's image mapping, especially
+    # under x64 emulation. Retry only transient access/sharing errors, and never
+    # remove anything outside this invocation's unique staging directory.
+    $cleanupDeadline = [DateTime]::UtcNow.AddSeconds(5)
+    while (Test-Path -LiteralPath $stage) {
+        try { Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction Stop; break }
+        catch {
+            $code = $_.Exception.HResult -band 0xFFFF
+            if ($code -notin @(5,32,33) -or [DateTime]::UtcNow -ge $cleanupDeadline) {
+                Write-Warning "Could not remove installer temporary files: $stage"
+                break
+            }
+            Start-Sleep -Milliseconds 100
+        }
+    }
 }

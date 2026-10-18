@@ -43,12 +43,10 @@ func newSandbox(t *testing.T) *sandbox {
 	return s
 }
 
-var zero int64
-
-// app opens an App on the sandbox; edit tweaks the config (Enable, LiveMs…).
+// app opens an App on the sandbox; edit tweaks the configuration.
 func (s *sandbox) app(edit ...func(*Config)) *App {
 	s.t.Helper()
-	cfg := Config{DataDir: s.Data, ClaudeRoot: s.Claude, PiRoot: s.Pi, CodexHome: s.Codex, CodexShadow: s.Shadow, DshHome: s.Dsh, AntigravityRoot: s.Agy, OpenCodeRoot: s.OpenCode, ZCodeRoot: s.ZCode, NoDesktop: true, LiveMs: &zero}
+	cfg := Config{DataDir: s.Data, ClaudeRoot: s.Claude, PiRoot: s.Pi, CodexHome: s.Codex, CodexShadow: s.Shadow, DshHome: s.Dsh, AntigravityRoot: s.Agy, OpenCodeRoot: s.OpenCode, ZCodeRoot: s.ZCode, NoDesktop: true}
 	cfg.WorkBuddyRoot, cfg.WorkBuddyAIRoot = filepath.Join(s.Root, "workbuddy"), filepath.Join(s.Root, "workbuddy-ai")
 	cfg.CursorRoot = filepath.Join(s.Root, "cursor")
 	for _, e := range edit {
