@@ -949,7 +949,12 @@ func (c *cc) ReadRecordContext(ctx context.Context, session string, index int, o
 func exists(p string) bool { _, err := os.Stat(p); return err == nil }
 
 func (c *cc) NewSessionID(key string) string { return core.UUID5("claude-code\x00" + key) }
-func (c *cc) ResumeCommand() string          { return "claude --resume {id}" }
+func (c *cc) ResumeCommand() string {
+	if c.desktopScope != "" {
+		return ""
+	}
+	return "claude --resume {id}"
+}
 
 func (c *cc) Plan(in engine.PlanInput) (*engine.DeliveryPlan, error) {
 	t := in.Target

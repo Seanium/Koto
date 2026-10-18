@@ -89,6 +89,23 @@ func TestClaudeDiscoveryCancellation(t *testing.T) {
 	}
 }
 
+func TestDesktopResumeDoesNotOpenCLIInAnotherProfile(t *testing.T) {
+	t.Setenv(engine.ResumeEnvVar("claude-code"), "")
+	root := filepath.Join(t.TempDir(), ".claude")
+	id := "11111111-1111-4111-8111-111111111111"
+	cli := New(Options{Root: root})
+	if got := engine.ResumeArgv(cli, "claude-code", id); strings.Join(got, " ") != "claude --resume "+id {
+		t.Fatalf("CLI resume: %v", got)
+	}
+	for _, profile := range []string{"Claude", "Claude-3p"} {
+		scope := filepath.Join(t.TempDir(), profile, "claude-code-sessions", "account", "org")
+		c := New(Options{Root: root, ID: "desktop-scope", DesktopScope: scope, Identity: scopeIdentity(profile, "account", "org", profile+"/claude-code-sessions")})
+		if got := engine.ResumeArgv(c, "claude-code", id); len(got) != 0 || c.Sink.ResumeCommand() != "" {
+			t.Fatalf("%s leaked CLI resume for Desktop account scope: %v", profile, got)
+		}
+	}
+}
+
 func desktopRecord(t *testing.T, path, session, title string) {
 	t.Helper()
 	if e := os.MkdirAll(filepath.Dir(path), 0700); e != nil {
