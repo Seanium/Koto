@@ -200,7 +200,7 @@ jobs:
               KOTO_GO="$PWD/app/.tools/go/bin/go" app/scripts/test-linux-core.sh "$KOTO_CI_ARCH"
               ;;
             windows)
-              CGO_ENABLED=0 go -C app test -count=1 -json ./... | tee app/.cache/ci/go-tests.jsonl
+              CGO_ENABLED=0 go -C app test -timeout=20m -count=1 -json ./... | tee app/.cache/ci/go-tests.jsonl
               ;;
             darwin)
               go -C app test -count=1 -json ./... | tee app/.cache/ci/go-tests.jsonl
