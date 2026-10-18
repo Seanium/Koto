@@ -287,45 +287,17 @@ func TailJSONL(ctx context.Context, ref core.NativeRef, from *core.SourceOffset,
 			if err := ctx.Err(); err != nil {
 				return err
 			}
-			prefix, n := core.ZeroPrefix, 0
-			var endPos, lastStart int64
-			lastHash := ""
-			checkpoints := map[int]string{}
-			for _, c := range off.Checkpoints {
-				checkpoints[c.At] = c.Hash
-			}
-			matched := 0
-			verify := func(l line) bool {
-				if ctx.Err() != nil || n == off.Records {
-					return false
-				}
-				if len(l.raw) == 0 {
-					endPos = l.end
-					return true
-				}
-				h := core.SHA256Hex(l.raw)
-				prefix = core.ChainPrefix(prefix, h)
-				n++
-				if checkpoints[n] == prefix {
-					matched = n
-				}
-				lastStart, lastHash, endPos = l.start, h, l.end
-				return true
-			}
-			if isZst {
-				if err := forDecodedLines(ctx, file, 0, verify); err != nil {
-					return err
-				}
-			} else if err := forFileLines(ctx, file, 0, st.Size(), verify); err != nil {
+			verified, err := verifyFilePrefix(ctx, file, st.Size(), off)
+			if err != nil {
 				return err
 			}
 			if err := ctx.Err(); err != nil {
 				return err
 			}
-			if n == off.Records && prefix == off.PrefixHash {
-				pos.FileID, pos.ByteOff, pos.LastStart, pos.LastHash = file, endPos, lastStart, lastHash
+			if verified.records == off.Records && verified.prefix == off.PrefixHash {
+				pos.FileID, pos.ByteOff, pos.LastStart, pos.LastHash = file, verified.end, verified.lastStart, verified.lastHash
 			} else {
-				rewritten = &struct{ AtRecord int }{matched}
+				rewritten = &struct{ AtRecord int }{verified.matched}
 				off = emptyOffset(dec.FormatVersion(), file)
 				pos = &off.Position
 			}
