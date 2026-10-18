@@ -480,12 +480,12 @@ input:focus, input:focus-visible { outline: none; }
 .attachment-preview pre { white-space:pre-wrap; overflow:auto; font-size:13px; margin:0; }
 .attachment-preview audio { width:100%; }
 
-/* A fixed selection gutter keeps text wrapping and message geometry unchanged. */
+/* Fixed gutters keep content clear of the selection outline in every state. */
 .message-check { position:absolute; left:8px; top:0; display:inline-flex; align-items:center; justify-content:center; width:16px; height:24px; cursor:pointer; color:var(--ink-2); user-select:none; -webkit-user-select:none; }
 .message-check input { margin:0; width:16px; height:16px; accent-color:var(--ink); cursor:pointer; }
 .message-check input:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
 .message-check[data-selected] { color:var(--ink); }
-.selection-surface :is(.msg-you, .msg-reply, .preview-reply) { position:relative; padding-left:32px; }
+.selection-surface :is(.msg-you, .msg-reply, .preview-reply) { position:relative; padding-left:32px; padding-right:var(--s3); }
 .msg-you > .message-check { top:8px; }
 .turn-list-choice > .message-check { left:0; }
 .selection-surface [data-content-selected] { border-radius:var(--r2); }

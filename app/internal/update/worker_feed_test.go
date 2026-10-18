@@ -162,9 +162,16 @@ func TestNoPublishedReleaseIsTypedOnlyForFreshFeed(t *testing.T) {
 	}{
 		{"stable-beta-only", "0.1.0", "stable", `[{"tag_name":"v0.1.0-beta.2","prerelease":true}]`, true, false},
 		{"empty-beta", "0.1.0-beta.1", "beta", `[]`, true, false},
+		{"empty-with-whitespace", "0.1.0", "auto", " \n [] \t", true, false},
 		{"draft-only", "0.1.0", "stable", `[{"tag_name":"v0.1.0","draft":true}]`, true, false},
 		{"stale-beta-only", "0.1.0", "stable", `[{"tag_name":"v0.1.0-beta.2","stale":true}]`, false, true},
 		{"malformed", "0.1.0", "stable", `{`, false, false},
+		{"null", "0.1.0", "auto", `null`, false, false},
+		{"null-with-whitespace", "0.1.0", "auto", " \n null \t", false, false},
+		{"object", "0.1.0", "auto", `{}`, false, false},
+		{"string", "0.1.0", "auto", `"[]"`, false, false},
+		{"number", "0.1.0", "auto", `0`, false, false},
+		{"boolean", "0.1.0", "auto", `false`, false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, tc.body) }))
@@ -175,7 +182,11 @@ func TestNoPublishedReleaseIsTypedOnlyForFreshFeed(t *testing.T) {
 			if result != nil || err == nil || errors.As(err, &unpublished) != tc.noRelease || errors.Is(err, ErrStaleFeed) != tc.stale {
 				t.Fatalf("result=%+v err=%v", result, err)
 			}
-			if tc.noRelease && unpublished.Channel != tc.channel {
+			channel := tc.channel
+			if channel == "auto" {
+				channel = "beta"
+			}
+			if tc.noRelease && unpublished.Channel != channel {
 				t.Fatalf("wrong channel: %+v", unpublished)
 			}
 		})

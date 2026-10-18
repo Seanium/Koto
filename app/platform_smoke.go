@@ -167,8 +167,9 @@ document.querySelector('.sheet-foot button').click()`)
 	js(`window.platformNav('设置').click()`)
 	js(`(async()=>{const tab=()=>[...document.querySelectorAll('[role=tab]')].find(e=>e.textContent.trim()==='通用');await window.platformWait(tab);tab().click()})()`)
 	versionJSON, _ := json.Marshal(strings.TrimSpace(appVersionFile))
-	js(`window.platformWait(()=>document.body.textContent.includes(` + string(versionJSON) + `)&&document.body.textContent.includes('github.com/Seanium/koto'))`)
+	js(`window.platformWait(()=>{const project=document.querySelector('button[aria-label="GitHub · Seanium/koto"]');return document.body.textContent.includes(` + string(versionJSON) + `)&&project&&!project.disabled&&project.querySelector('svg[data-icon="github"]')&&project.getAttribute('title')==='https://github.com/Seanium/koto'})`)
 	result["appInfo"] = strings.TrimSpace(appVersionFile)
+	result["projectLink"] = true
 	// Assert rendered colours, not only the selected preference: Windows/Linux
 	// previously saved appearance while leaving the WebView in the system theme.
 	js(`window.platformAppearance=(label)=>[...document.querySelectorAll('[aria-label="外观"] button')].find(e=>e.textContent.trim()===label);window.platformColours=()=>{const s=getComputedStyle(document.body);return [s.backgroundColor,s.color].join('|')}`)

@@ -137,6 +137,9 @@ func (c *Client) Check(ctx context.Context, current string, product Product, goo
 	if err := json.Unmarshal(b, &releases); err != nil {
 		return nil, fmt.Errorf("invalid update feed response: %w", err)
 	}
+	if releases == nil {
+		return nil, fmt.Errorf("invalid update feed response: expected a release array")
+	}
 	var stale bool
 	var newest *release
 	var newestVersion version
