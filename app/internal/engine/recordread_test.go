@@ -1,8 +1,10 @@
 package engine
 
 import (
+	"bufio"
 	"context"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -81,22 +83,54 @@ func TestRecordReadsBoundOpenFilesAndDetectRewrite(t *testing.T) {
 
 func TestCompressedRecordReadCancellation(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "large.jsonl.zst")
-	if err := os.WriteFile(file, core.ZstdCompress([]byte(strings.Repeat("x", 32<<20)+"\nlast\n")), 0600); err != nil {
+	if err := os.WriteFile(file, core.ZstdCompress([]byte("first\n"+strings.Repeat("x", 32<<20)+"\nlast\n")), 0600); err != nil {
 		t.Fatal(err)
 	}
-	for _, offset := range []int64{0, 32<<20 + 1} {
-		ctx, cancel := context.WithCancel(context.Background())
-		ctx, done := withRecordReads(ctx)
-		go func() { time.Sleep(time.Millisecond); cancel() }()
-		start := time.Now()
-		_, err := ReadRecordAtContext(ctx, file, offset)
-		if !errors.Is(err, context.Canceled) {
-			t.Fatalf("cancel offset %d: %v", offset, err)
-		}
-		if time.Since(start) > time.Second {
-			t.Fatal("cancellation took over a second")
-		}
-		done()
-		cancel()
+	for name, offset := range map[string]int64{"read": 6, "skip": 32<<20 + 7} {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			ctx, done := withRecordReads(ctx)
+			defer done() // A failed assertion must also release the request's files.
+			if got, err := ReadRecordAtContext(ctx, file, 0); err != nil || string(got) != "first" {
+				t.Fatalf("prime stream: %q %v", got, err)
+			}
+			scope := ctx.Value(recordReadsKey{}).(*recordReads)
+			stream := scope.streams[file]
+			// Cancel after the next real read, rather than racing a 1 ms timer
+			// against an operation that can finish sooner on a warm machine.
+			trigger := &cancelRecordReader{Reader: stream.reader, cancel: cancel}
+			stream.reader = bufio.NewReaderSize(trigger, 64<<10)
+			start := time.Now()
+			_, err := ReadRecordAtContext(ctx, file, offset)
+			if !trigger.read || !errors.Is(err, context.Canceled) {
+				t.Fatalf("cancel offset %d: read=%v err=%v", offset, trigger.read, err)
+			}
+			if time.Since(start) > time.Second {
+				t.Fatal("cancellation took over a second")
+			}
+			done()
+			if len(scope.streams) != 0 || len(scope.order) != 0 || stream.frames.decoder != nil {
+				t.Fatal("cancelled request retained stream or decoder")
+			}
+			if _, err := stream.file.Read(make([]byte, 1)); !errors.Is(err, os.ErrClosed) {
+				t.Fatalf("cancelled request retained file descriptor: %v", err)
+			}
+		})
 	}
+}
+
+type cancelRecordReader struct {
+	io.Reader
+	cancel context.CancelFunc
+	read   bool
+}
+
+func (r *cancelRecordReader) Read(p []byte) (int, error) {
+	n, err := r.Reader.Read(p)
+	if n > 0 {
+		r.read = true
+		r.cancel()
+	}
+	return n, err
 }
