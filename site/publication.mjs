@@ -1,7 +1,7 @@
 // Set published only after every listed asset is available on the release.
 export const publication = Object.freeze({
   published: true,
-  version: '0.1.0-beta.2',
+  version: '0.1.0',
   repository: 'https://github.com/Seanium/koto'
 });
 

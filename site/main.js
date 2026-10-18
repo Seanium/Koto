@@ -1,7 +1,7 @@
 import { locales, resolveLocale, watchAppearance } from './preferences.mjs';
-import { translations } from './translations.mjs?v=0.1.0-review-20261018-d';
-import { createTypewriter, cycleAgentLogos, createDialogue } from './motion.mjs?v=0.1.0-review-20261018-d';
-import { publication, releaseAssets, downloadURL, matchingAsset } from './publication.mjs?v=0.1.0-review-20261018-d';
+import { translations } from './translations.mjs?v=0.1.0';
+import { createTypewriter, cycleAgentLogos, createDialogue } from './motion.mjs?v=0.1.0';
+import { publication, releaseAssets, downloadURL, matchingAsset } from './publication.mjs?v=0.1.0';
 import { detectSystem } from './detection.mjs';
 
 const languageSelect = document.getElementById('language-select');
