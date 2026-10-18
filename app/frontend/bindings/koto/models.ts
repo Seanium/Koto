@@ -77,6 +77,7 @@ export interface UpdateState {
     "phase": string;
     "current": string;
     "latest": string;
+    "prerelease": boolean;
     "url": string;
     "error": string;
     "errorCode": string;

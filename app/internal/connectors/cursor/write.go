@@ -221,7 +221,36 @@ func (c *connector) Plan(in engine.PlanInput) (*engine.DeliveryPlan, error) {
 				if typ == "reasoning" && role != "assistant" {
 					return nil, fmt.Errorf("reasoning outside Cursor assistant message")
 				}
-				model = append(model, core.JsonObject{"type": typ, "text": core.S(p["text"])})
+				native := core.JsonObject{"type": typ, "text": core.S(p["text"])}
+				if sealed := core.Obj(p["sealed"]); typ == "reasoning" && len(sealed) != 0 {
+					if core.S(sealed["by"]) != modelAPI {
+						return nil, fmt.Errorf("Cursor cannot replay reasoning from another wire API")
+					}
+					raw, _, err := c.material(in, core.Part{"blob": sealed["blob"]})
+					if err != nil {
+						return nil, err
+					}
+					native = nil
+					if err = json.Unmarshal(raw, &native); err != nil {
+						return nil, err
+					}
+					switch core.S(native["type"]) {
+					case "redacted-reasoning":
+						if _, ok := native["data"].(string); !ok {
+							return nil, fmt.Errorf("invalid Cursor redacted reasoning")
+						}
+					case "reasoning":
+						if core.S(native["text"]) != core.S(p["text"]) {
+							return nil, fmt.Errorf("Cursor reasoning text differs from its native record")
+						}
+					default:
+						return nil, fmt.Errorf("invalid Cursor reasoning record")
+					}
+				}
+				model = append(model, native)
+				if core.S(native["type"]) == "redacted-reasoning" {
+					continue
+				}
 				text = append(text, core.S(p["text"]))
 				if role == "assistant" {
 					which := 1

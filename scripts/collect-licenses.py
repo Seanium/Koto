@@ -115,6 +115,14 @@ def collect(target: Path):
         raise SystemExit("Unexpected Lucide license response")
     (target / "assets/lucide-LICENSE").write_bytes(lucide_license)
 
+    # GitHub uses the same icon family, from before Lucide removed brand icons.
+    with urllib.request.urlopen("https://raw.githubusercontent.com/lucide-icons/lucide/0.468.0/LICENSE", timeout=30) as response:
+        brand_license = response.read()
+    if not brand_license.startswith(b"ISC License"):
+        raise SystemExit("Unexpected Lucide brand license response")
+    (target / "assets/lucide-brands-LICENSE").write_bytes(brand_license)
+
+
     hashes = {path.relative_to(target).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest() for path in sorted(target.rglob("*")) if path.is_file() and path.name != "INDEX.json"}
     (target / "INDEX.json").write_text(json.dumps({"packages": packages, "files": hashes}, indent=2, ensure_ascii=False) + "\n")
     print(f"Preserved {len(hashes)} license files for {len(packages)} installed packages plus included marks.")

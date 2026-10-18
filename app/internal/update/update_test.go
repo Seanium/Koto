@@ -82,7 +82,7 @@ func TestCheckChoosesChannelAndSemanticVersion(t *testing.T) {
 	d, _ := testRelease("v9.0.0", "koto-cli-linux-amd64", []byte("draft"))
 	d.Draft = true
 	client := testClient([]release{a, c, d, b}, nil)
-	for _, test := range []struct{ current, channel, want string }{{"0.1.0-beta.1", "auto", "0.1.0-beta.10"}, {"0.0.7", "auto", "0.0.8"}, {"0.0.7", "beta", "0.1.0-beta.10"}} {
+	for _, test := range []struct{ current, channel, want string }{{"0.1.0-beta.1", "auto", "0.1.0-beta.10"}, {"0.0.7", "auto", "0.1.0-beta.10"}, {"0.0.7", "stable", "0.0.8"}, {"0.0.7", "beta", "0.1.0-beta.10"}} {
 		r, err := client.Check(context.Background(), test.current, CLI, "linux", "amd64", test.channel)
 		if err != nil || r.Latest != test.want || !r.Available {
 			t.Fatalf("%+v: %+v %v", test, r, err)
@@ -264,7 +264,7 @@ func TestReleaseAssetUsesExactInstalledVersion(t *testing.T) {
 	}
 }
 
-func TestBetaUpgradesToStableThenPatch(t *testing.T) {
+func TestDefaultIncludesStableAndFutureBeta(t *testing.T) {
 	name := "koto-cli-linux-arm64"
 	beta, _ := testRelease("v0.1.0-beta.2", name, []byte("beta"))
 	stable, _ := testRelease("v0.1.0", name, []byte("stable"))
@@ -276,7 +276,7 @@ func TestBetaUpgradesToStableThenPatch(t *testing.T) {
 		releases      []release
 	}{
 		{"0.1.0-beta.2", "0.1.0", []release{beta, stable}},
-		{"0.1.0", "0.1.1", []release{future, patch, stable}},
+		{"0.1.0", "0.2.0-beta.1", []release{future, patch, stable}},
 	} {
 		r, err := testClient(test.releases, nil).Check(context.Background(), test.current, CLI, "linux", "arm64", "auto")
 		if err != nil || r.Latest != test.want || !r.Available {

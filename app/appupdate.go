@@ -17,6 +17,7 @@ type UpdateState struct {
 	Phase      string `json:"phase"`
 	Current    string `json:"current"`
 	Latest     string `json:"latest"`
+	Prerelease bool   `json:"prerelease"`
 	URL        string `json:"url"`
 	Error      string `json:"error"`
 	ErrorCode  string `json:"errorCode"`
@@ -106,15 +107,26 @@ func (u *appUpdater) check(force bool) UpdateState {
 			u.checked = time.Now()
 			u.busy = false
 			if err != nil {
-				s.Latest = ""
-				updateFailed(s, err, "check")
+				s.Latest, s.Prerelease = "", false
+				var unpublished *update.NoPublishedReleaseError
+				if errors.As(err, &unpublished) {
+					s.Phase, s.Error, s.ErrorStage, s.RetryAt = "unpublished", "", "", 0
+					s.ErrorCode, s.URL = "NO_PUBLISHED_RELEASE", update.ReleasesPage
+					if unpublished.Channel == "stable" {
+						s.ErrorCode = "NO_PUBLISHED_STABLE_RELEASE"
+					}
+				} else {
+					updateFailed(s, err, "check")
+				}
 				return
 			}
-			s.Latest = result.Latest
+			s.Latest, s.Prerelease = result.Latest, result.Prerelease
 			s.URL = result.URL
 			s.Phase = "current"
 			if result.Available {
 				s.Phase = "available"
+			} else if update.Newer(s.Current, result.Latest) {
+				s.Phase = "ahead"
 			}
 		})
 	}()

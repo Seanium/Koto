@@ -22,7 +22,8 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const Version = "cursor-connector@0.4.1"
+const Version = "cursor-connector@0.4.2"
+const modelAPI = "cursor-model-message"
 const format = "cursor-ide-3.25-protobuf"
 const maxBlobBytes = 64 << 20
 
@@ -58,7 +59,7 @@ func New(o Options) *engine.Connector {
 		}
 	}
 	c := &connector{id: o.ID, root: o.Root, variant: "ide", db: filepath.Join(o.Root, "User", "globalStorage", "state.vscdb")}
-	return &engine.Connector{ID: c.id, Root: c.root, Harness: "cursor", Variant: c.variant, Version: Version, Source: c, Sink: c, Vocabulary: Vocabulary{}, Capabilities: core.Capabilities{Read: core.ReadCaps{Images: true, Reasoning: "plain"}, Write: &core.WriteCaps{Mode: "native-file", Images: true, Reasoning: "plain", Tools: "native", ToolCallID: &core.IDRule{Pattern: `^call_[A-Za-z0-9_]+$`, MaxLength: 64}}, WriteProfile: "cursor-ide-write@1", FormatVersions: []string{format}}}
+	return &engine.Connector{ID: c.id, Root: c.root, Harness: "cursor", Variant: c.variant, Version: Version, Source: c, Sink: c, Vocabulary: Vocabulary{}, Capabilities: core.Capabilities{Read: core.ReadCaps{Images: true, Reasoning: "plain"}, Write: &core.WriteCaps{Mode: "native-file", Images: true, Reasoning: "plain", SameAPI: modelAPI, Tools: "native", ToolCallID: &core.IDRule{Pattern: `^call_[A-Za-z0-9_]+$`, MaxLength: 64}}, WriteProfile: "cursor-ide-write@1", FormatVersions: []string{format}}}
 }
 
 // DefaultAppProfiles discovers the ordinary Cursor App's local store.

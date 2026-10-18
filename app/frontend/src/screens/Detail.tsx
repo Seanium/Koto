@@ -136,30 +136,69 @@ export function Detail({ item, detailError, conversation: c, loadEarlier, onRetr
   </div>
 }
 
+// Clipboard feedback stays beside its control. Only the latest successful
+// request may show it; changing the path or leaving the view cancels its timer.
+function usePathCopy(value: string) {
+  const [feedback, setFeedback] = useState<'success' | 'error'>()
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const request = useRef(0)
+  useEffect(() => {
+    setFeedback(undefined)
+    return () => { request.current++; clearTimeout(timer.current) }
+  }, [value])
+  const copy = async () => {
+    const id = ++request.current
+    clearTimeout(timer.current); setFeedback(undefined)
+    const ok = await shell.copy(value).catch(() => false)
+    if (id !== request.current) return
+    setFeedback(ok ? 'success' : 'error')
+    timer.current = setTimeout(() => setFeedback(undefined), 1800)
+  }
+  return { copy, feedback }
+}
+
+function PathCopyFeedback({ state, error }: { state?: 'success' | 'error'; error: string }) {
+  const bubble = useRef<HTMLSpanElement>(null)
+  const text = state === 'success' ? tr('复制成功') : error
+  useLayoutEffect(() => {
+    if (!state) return
+    const fit = () => {
+      const el = bubble.current
+      if (!el) return
+      el.style.translate = ''
+      const rect = el.getBoundingClientRect(), width = document.documentElement.clientWidth
+      const offset = rect.right > width - 8 ? width - 8 - rect.right : rect.left < 8 ? 8 - rect.left : 0
+      if (offset) el.style.translate = `${Math.round(offset)}px 0`
+    }
+    fit(); window.addEventListener('resize', fit)
+    return () => window.removeEventListener('resize', fit)
+  }, [state, text])
+  return state && <span ref={bubble} className="path-copy-feedback" role="status" aria-live="polite" aria-atomic="true">{text}</span>
+}
+
 /** Native file paths can point at a log or a database shared by several sessions. */
 function SessionFileButton({ path }: { path: string }) {
+  const { copy, feedback } = usePathCopy(path)
   const [note, setNote] = useState<string>()
   const reveal = async () => {
     try { if (!await shell.revealPath(path)) setNote(tr('无法打开会话文件所在目录，文件可能已移动或删除。')) }
     catch { setNote(tr('无法打开会话文件所在目录，文件可能已移动或删除。')) }
   }
-  const copy = async () => {
-    try { if (!await shell.copy(path)) setNote(tr('未能复制会话文件路径，请重试。')) }
-    catch { setNote(tr('未能复制会话文件路径，请重试。')) }
-  }
-  return <>
+  return <span className="path-copy-anchor">
     <Menu trigger="secondary" square label={tr('会话文件')} width={320}
       header={<><span className="t-medium">{tr('会话文件')}</span><span className="mono t-3 selectable" style={{ overflowWrap: 'anywhere' }}>{path}</span></>}
       items={[
         { label: tr('打开会话文件所在目录'), icon: Icon.folder, onClick: () => void reveal() },
         { label: tr('复制会话文件路径'), icon: Icon.copy, onClick: () => void copy() },
       ]}>{Icon.file}</Menu>
+    <PathCopyFeedback state={feedback} error={tr('未能复制会话文件路径，请重试。')} />
     {note && <Toast text={note} onDone={() => setNote(undefined)} />}
-  </>
+  </span>
 }
 
 /** Project actions use cwd; the separate session-file menu uses the native log or database. */
 function ProjectButton({ cwd }: { cwd: string }) {
+  const { copy, feedback } = usePathCopy(cwd)
   const openers = useOpeners()
   const [exists, setExists] = useState(true)
   const [note, setNote] = useState<string>()
@@ -180,7 +219,7 @@ function ProjectButton({ cwd }: { cwd: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cwd, exists])
   return (
-    <>
+    <span className="path-copy-anchor">
         <Menu trigger="tint" align="under" label={tr("项目 {0}", [name])} title={tr("项目操作")}
           header={<><span className="t-medium ellipsis">{name}</span><span className="mono t-3 selectable" style={{ wordBreak: 'break-all' }}>{cwd}</span>{gone && <span className="t-amber">{gone}</span>}</>}
           items={[
@@ -188,12 +227,13 @@ function ProjectButton({ cwd }: { cwd: string }) {
             ...(terminal ? [{ label: tr("在终端中打开"), hint: terminal, hintMono: true, disabled: !exists, title: gone, onClick: () => { void shell.openInTerminal('', cwd).then(fail(tr("打开终端"))) } }] : []),
             ...(editor ? [{ label: tr("在编辑器中打开"), hint: editor, hintMono: true, disabled: !exists, title: gone, onClick: () => { void shell.openInEditor(cwd).then(fail(tr("打开编辑器"))) } }] : []),
             { separator: true },
-            { label: tr("复制路径"), onClick: () => { void shell.copy(cwd) } },
+            { label: tr("复制路径"), onClick: () => void copy() },
           ]}>
           {Icon.folder}<span className="ellipsis">{name}</span>{Icon.chevron}
         </Menu>
+      <PathCopyFeedback state={feedback} error={tr('未能复制项目路径，请重试。')} />
       {note && <Toast text={note} onDone={() => setNote(undefined)} />}
-    </>
+    </span>
   )
 }
 

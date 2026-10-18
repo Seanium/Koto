@@ -52,6 +52,8 @@ func (p *indexContent) UnmarshalJSON(raw []byte) error {
 		switch b.Type {
 		case "text", "reasoning":
 			*p = append(*p, core.Part{"type": b.Type, "text": b.Text})
+		case "redacted-reasoning":
+			*p = append(*p, core.Part{"type": "reasoning"})
 		case "image", "file":
 			*p = append(*p, core.Part{"type": b.Type})
 		case "tool-call":

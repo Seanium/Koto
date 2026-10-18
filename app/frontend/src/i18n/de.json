@@ -382,5 +382,12 @@
   "手动下载": "Manuell herunterladen",
   "暂时无法确认最新版本，请稍后重试或手动下载。": "Die neueste Version kann momentan nicht bestätigt werden. Versuche es später erneut oder lade das Update manuell herunter.",
   "更新服务暂时不可用，请稍后重试或手动下载。": "Der Update-Dienst ist vorübergehend nicht erreichbar. Versuche es später erneut oder lade das Update manuell herunter.",
-  "正在下载…": "Wird heruntergeladen…"
+  "正在下载…": "Wird heruntergeladen…",
+  "复制成功": "Kopiert",
+  "未能复制项目路径，请重试。": "Der Projektpfad konnte nicht kopiert werden. Bitte versuche es erneut.",
+  "暂无已发布的正式版本": "Es wurde noch keine stabile Version veröffentlicht",
+  "暂无已发布的测试版本": "Es wurde noch keine Beta-Version veröffentlicht",
+  "{0}（测试版）": "{0} (Beta)",
+  "仓库最新版本：{0}": "Neueste Repository-Version: {0}",
+  "暂无比当前版本 {0} 更新的版本。": "Es gibt keine neuere Version als die installierte Version {0}."
 }

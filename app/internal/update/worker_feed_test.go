@@ -154,3 +154,52 @@ func TestWorkerExactTagRecoveryMayUseVerifiedStaleMetadata(t *testing.T) {
 		t.Fatal("wrong recovery bytes")
 	}
 }
+
+func TestNoPublishedReleaseIsTypedOnlyForFreshFeed(t *testing.T) {
+	for _, tc := range []struct {
+		name, current, channel, body string
+		noRelease, stale             bool
+	}{
+		{"stable-beta-only", "0.1.0", "stable", `[{"tag_name":"v0.1.0-beta.2","prerelease":true}]`, true, false},
+		{"empty-beta", "0.1.0-beta.1", "beta", `[]`, true, false},
+		{"draft-only", "0.1.0", "stable", `[{"tag_name":"v0.1.0","draft":true}]`, true, false},
+		{"stale-beta-only", "0.1.0", "stable", `[{"tag_name":"v0.1.0-beta.2","stale":true}]`, false, true},
+		{"malformed", "0.1.0", "stable", `{`, false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, tc.body) }))
+			defer server.Close()
+			c := &Client{api: server.URL, http: server.Client()}
+			result, err := c.Check(context.Background(), tc.current, CLI, "linux", "amd64", tc.channel)
+			var unpublished *NoPublishedReleaseError
+			if result != nil || err == nil || errors.As(err, &unpublished) != tc.noRelease || errors.Is(err, ErrStaleFeed) != tc.stale {
+				t.Fatalf("result=%+v err=%v", result, err)
+			}
+			if tc.noRelease && unpublished.Channel != tc.channel {
+				t.Fatalf("wrong channel: %+v", unpublished)
+			}
+		})
+	}
+}
+
+func TestDefaultReleaseChannelIncludesBetaWithoutDowngrade(t *testing.T) {
+	for _, tc := range []struct {
+		name, current, tag             string
+		flagged, prerelease, available bool
+	}{
+		{"ahead-of-public-beta", "0.1.0", "v0.1.0-beta.2", false, true, false},
+		{"same-beta", "0.1.0-beta.2", "v0.1.0-beta.2", false, true, false},
+		{"new-beta", "0.1.0", "v0.1.1-beta.1", false, true, true},
+		{"github-preview-flag", "0.1.0", "v0.1.1", true, true, true},
+		{"beta-to-stable", "0.1.0-beta.2", "v0.1.0", false, false, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r, _ := testRelease(tc.tag, "koto-cli-linux-amd64", []byte("verified"))
+			r.Prerelease = tc.flagged
+			got, err := testClient([]release{r}, nil).Check(context.Background(), tc.current, CLI, "linux", "amd64", "auto")
+			if err != nil || got.Available != tc.available || got.Prerelease != tc.prerelease {
+				t.Fatalf("%+v %v", got, err)
+			}
+		})
+	}
+}

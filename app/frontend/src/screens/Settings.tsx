@@ -4,7 +4,7 @@ import { setAppearance } from '../appearance'
 
 import { useEffect, useState } from 'react'
 import { api, onUpdate, refreshOpeners, shell, useOpeners, type AppInfo, type Opener, type Prefs, type UpdateState } from '../api/client'
-import { updateErrorMessage } from '../api/updateErrors'
+import { updateErrorMessage, unpublishedUpdateMessage } from '../api/updateErrors'
 import { AGENTS, openerName, productName } from '../api/model'
 import type { Connector } from '../api/types'
 import type { Hub } from '../store'
@@ -71,9 +71,9 @@ function General() {
         <Line title={tr("开源许可")}><Button variant="ghost" onClick={() => setNoticesOpen(true)}>{tr("查看许可")}</Button></Line>
         <UpdateLine version={info?.version} />
         <Line title={tr("项目地址")}>
-          <Button variant="ghost" disabled={!info} title={info?.projectURL} onClick={() => {
+          <Button variant="ghost" disabled={!info} title={info?.projectURL} aria-label="GitHub · Seanium/koto" onClick={() => {
             if (info) void shell.openExternal(info.projectURL).then(() => setInfoError(undefined)).catch(e => setInfoError(String(e)))
-          }}>github.com/Seanium/koto</Button>
+          }}>{Icon.github}Seanium/koto</Button>
         </Line>
       </div>
       {noticesOpen && <LicenseSheet onClose={() => setNoticesOpen(false)} />}
@@ -108,18 +108,22 @@ function UpdateLine({ version }: { version?: string }) {
   const phase = state?.phase
   const busy = phase === 'checking' || phase === 'downloading' || phase === 'restarting'
   const percent = state?.total ? Math.min(100, Math.floor(state.downloaded * 100 / state.total)) : 0
+  const releaseLabel = state?.prerelease ? tr('{0}（测试版）', [state.latest]) : state?.latest ?? ''
   return <div className="col">
-    <Line title={tr("版本")}>
+    <Line title={tr("版本")} className="settings-update-row">
       <span className="t-3 selectable">{version ?? '—'}</span>
-      {phase === 'available' ? <Button onClick={install}>{tr("更新并重启")}</Button> :
+      <div className="settings-update-actions">
+      {phase === 'available' ? <Button variant="ghost" onClick={install}>{tr("更新并重启")}</Button> :
         <Button variant="ghost" disabled={busy || !version || (state?.retryAt ?? 0) > Math.max(now, Date.now())} onClick={check}>{phase === 'checking' ? tr("正在检查…") : phase === 'downloading' ? ((state?.total ?? 0) > 0 ? tr("正在下载 {0}%", [percent]) : tr("正在下载…")) : phase === 'restarting' ? tr("正在重启…") : tr("检查更新")}</Button>}
+      <Button variant="ghost" onClick={() => { void shell.openExternal('https://github.com/Seanium/koto/releases').catch(e => setError({ message: String(e), stage: 'link' })) }}>{tr('手动下载')}</Button>
+      </div>
     </Line>
-    {(phase === 'current' || phase === 'available') && <span className="t-meta" style={{ padding: '0 16px 12px' }} role="status">
-      {phase === 'current' ? tr("已是最新版本") : tr("新版本 {0}", [state?.latest ?? ''])}
-    </span>}
+    {(phase === 'current' || phase === 'available' || phase === 'ahead') && <div className="col g1 t-meta" style={{ padding: '0 16px 12px' }} role="status">
+      {phase === 'available' ? tr("新版本 {0}", [releaseLabel]) : <><span>{tr('仓库最新版本：{0}', [releaseLabel])}</span><span>{tr('暂无比当前版本 {0} 更新的版本。', [state?.current ?? version ?? ''])}</span></>}
+    </div>}
+    {phase === 'unpublished' && <span className="t-meta" style={{ padding: '0 16px 12px' }} role="status">{unpublishedUpdateMessage(state?.errorCode)}</span>}
     {(error || state?.error) && <div className="col g1" style={{ padding: '0 16px 12px' }}>
       <div className="note selectable" role="alert">{error ? error.stage === 'link' ? tr('无法打开链接') : updateErrorMessage({ error: error.message, errorStage: error.stage }) : updateErrorMessage(state!)}</div>
-      <Button variant="ghost" onClick={() => { void shell.openExternal('https://github.com/Seanium/koto/releases').catch(e => setError({ message: String(e), stage: 'link' })) }}>{tr('手动下载')}</Button>
     </div>}
   </div>
 }
@@ -176,9 +180,9 @@ function OpenerLine({ title, hint, list, current, custom, placeholder, help, onP
   )
 }
 
-function Line({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+function Line({ title, hint, children, className = '' }: { title: string; hint?: string; children: React.ReactNode; className?: string }) {
   return (
-    <div className="group-row">
+    <div className={`group-row ${className}`}>
       <span className="t-medium grow" title={hint}>{title}</span>
       {children}
     </div>

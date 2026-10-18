@@ -20,6 +20,14 @@ const maxAssetSize = 1 << 30
 
 var ErrStaleFeed = errors.New("update information is out of date; the latest version cannot be confirmed; try again later or download from " + ReleasesPage)
 
+// NoPublishedReleaseError means the feed was reachable but has no release in
+// the requested channel. It is distinct from a failed or stale update check.
+type NoPublishedReleaseError struct{ Channel string }
+
+func (e *NoPublishedReleaseError) Error() string {
+	return fmt.Sprintf("no published %s release is available", e.Channel)
+}
+
 type Product string
 
 const (
@@ -43,14 +51,15 @@ type release struct {
 }
 
 type Result struct {
-	Tag       string  `json:"tag"`
-	Current   string  `json:"current"`
-	Latest    string  `json:"latest"`
-	Available bool    `json:"available"`
-	URL       string  `json:"url"`
-	Product   Product `json:"product"`
-	Asset     Asset   `json:"asset"`
-	Checksums Asset   `json:"checksums"`
+	Tag        string  `json:"tag"`
+	Current    string  `json:"current"`
+	Latest     string  `json:"latest"`
+	Available  bool    `json:"available"`
+	Prerelease bool    `json:"prerelease"`
+	URL        string  `json:"url"`
+	Product    Product `json:"product"`
+	Asset      Asset   `json:"asset"`
+	Checksums  Asset   `json:"checksums"`
 }
 
 type Client struct {
@@ -101,17 +110,15 @@ func AssetName(product Product, goos, arch string) (string, error) {
 }
 
 // Check selects by semantic version instead of /latest, which excludes GitHub
-// prereleases. Auto keeps stable users on stable and beta users on the beta track.
+// prereleases. The default includes both stable and beta releases; callers may
+// explicitly request only stable releases.
 func (c *Client) Check(ctx context.Context, current string, product Product, goos, arch, channel string) (*Result, error) {
-	installed, valid := parseVersion(current)
+	_, valid := parseVersion(current)
 	if !valid {
 		return nil, fmt.Errorf("development builds cannot update themselves")
 	}
 	if channel == "" || channel == "auto" {
-		channel = "stable"
-		if len(installed.pre) > 0 {
-			channel = "beta"
-		}
+		channel = "beta"
 	}
 	if channel != "stable" && channel != "beta" {
 		return nil, fmt.Errorf("update channel must be stable or beta")
@@ -130,10 +137,12 @@ func (c *Client) Check(ctx context.Context, current string, product Product, goo
 	if err := json.Unmarshal(b, &releases); err != nil {
 		return nil, fmt.Errorf("invalid update feed response: %w", err)
 	}
+	var stale bool
 	var newest *release
 	var newestVersion version
 	for i := range releases {
 		r := &releases[i]
+		stale = stale || r.Stale
 		v, ok := parseVersion(r.Tag)
 		if !ok || r.Draft || (channel == "stable" && (r.Prerelease || len(v.pre) > 0)) {
 			continue
@@ -143,7 +152,10 @@ func (c *Client) Check(ctx context.Context, current string, product Product, goo
 		}
 	}
 	if newest == nil {
-		return nil, fmt.Errorf("no published %s release is available", channel)
+		if stale {
+			return nil, ErrStaleFeed
+		}
+		return nil, &NoPublishedReleaseError{Channel: channel}
 	}
 	if newest.Stale && !Newer(newest.Tag, current) {
 		return nil, ErrStaleFeed
@@ -152,7 +164,8 @@ func (c *Client) Check(ctx context.Context, current string, product Product, goo
 }
 
 func resultForRelease(r *release, current string, product Product, name string) (*Result, error) {
-	result := &Result{Tag: r.Tag, Current: current, Latest: strings.TrimPrefix(r.Tag, "v"), Available: Newer(r.Tag, current), URL: Repository + "/releases/tag/" + r.Tag, Product: product}
+	v, _ := parseVersion(r.Tag)
+	result := &Result{Prerelease: r.Prerelease || len(v.pre) > 0, Tag: r.Tag, Current: current, Latest: strings.TrimPrefix(r.Tag, "v"), Available: Newer(r.Tag, current), URL: Repository + "/releases/tag/" + r.Tag, Product: product}
 	for _, asset := range r.Assets {
 		if asset.Name != name && asset.Name != "SHA256SUMS" {
 			continue

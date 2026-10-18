@@ -382,5 +382,12 @@
   "手动下载": "Download manually",
   "暂时无法确认最新版本，请稍后重试或手动下载。": "Unable to confirm the latest version right now. Try again later or download manually.",
   "更新服务暂时不可用，请稍后重试或手动下载。": "The update service is temporarily unavailable. Try again later or download manually.",
-  "正在下载…": "Downloading…"
+  "正在下载…": "Downloading…",
+  "复制成功": "Copied",
+  "未能复制项目路径，请重试。": "Could not copy the project path. Please try again.",
+  "暂无已发布的正式版本": "No stable release has been published yet",
+  "暂无已发布的测试版本": "No beta release has been published yet",
+  "{0}（测试版）": "{0} (beta)",
+  "仓库最新版本：{0}": "Latest repository release: {0}",
+  "暂无比当前版本 {0} 更新的版本。": "No release is newer than your installed version {0}."
 }

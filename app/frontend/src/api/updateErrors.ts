@@ -13,3 +13,7 @@ export function updateErrorMessage(state: { error: string; errorCode?: string; e
   if (state.errorCode === 'HTTP_FORBIDDEN') return tr('更新服务拒绝了请求。请稍后重试，或手动下载。')
   return state.errorStage === 'check' ? tr('暂时无法检查更新：{0}', [state.error]) : tr('更新失败：{0}', [state.error])
 }
+
+export function unpublishedUpdateMessage(code?: string) {
+  return code === 'NO_PUBLISHED_STABLE_RELEASE' ? tr('暂无已发布的正式版本') : tr('暂无已发布的测试版本')
+}

@@ -268,7 +268,7 @@ function Sidebar({ hub, mode, scope, pickScope, openSettings, openAnalysis, open
         <ListRow compact selected={mode.kind === 'sessions' && !expanded} aria-expanded={expanded && mode.kind === 'sessions'}
           onClick={() => { if (mode.kind === 'sessions') setExpanded(!expanded); else { openCopy(); setExpanded(true) } }}
           onKeyDown={e => { if (e.key === 'ArrowLeft' && expanded) { e.preventDefault(); setExpanded(false) } if (e.key === 'ArrowRight' && !expanded) { e.preventDefault(); setExpanded(true) } }}>
-          <span className="row" style={{ width: 16, justifyContent: 'center', color: 'var(--ghost-ink)' }}>{Icon.copy}</span>
+          <span className="row" style={{ width: 16, flexShrink: 0, justifyContent: 'center', color: 'var(--ghost-ink)' }}>{Icon.copy}</span>
           <span className="grow ellipsis">{tr("会话复制")}</span>
           <span className="side-caret" data-open={expanded && mode.kind === 'sessions' || undefined} aria-hidden="true">{Icon.disclosure}</span>
         </ListRow>
@@ -312,7 +312,7 @@ function SideItem({ icon, label, selected, onClick, title, indent, reorder }: {
 }) {
   return (
     <ListRow compact selected={selected} onClick={onClick} title={title} {...reorder} style={{ paddingLeft: indent === 2 ? 58 : indent ? 34 : undefined }}>
-      <span className="row" style={{ width: 16, justifyContent: 'center', color: 'var(--ghost-ink)' }}>{icon}</span>
+      <span className="row" style={{ width: 16, flexShrink: 0, justifyContent: 'center', color: 'var(--ghost-ink)' }}>{icon}</span>
       <span className="grow ellipsis">{label}</span>
     </ListRow>
   )

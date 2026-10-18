@@ -83,3 +83,66 @@ func TestUpdateFailureStages(t *testing.T) {
 		t.Fatalf("stale information reported as current: %+v", s)
 	}
 }
+
+func TestNoPublishedReleaseIsNormalAppStatus(t *testing.T) {
+	for _, channel := range []string{"stable", "beta"} {
+		t.Run(channel, func(t *testing.T) {
+			states := make(chan UpdateState, 2)
+			u := newAppUpdater(func(s UpdateState) { states <- s }, func() { t.Error("unexpected restart") })
+			defer u.cancel()
+			u.client = updateClientStub{check: func() (*update.Result, error) { return nil, &update.NoPublishedReleaseError{Channel: channel} }}
+			u.check(true)
+			select {
+			case s := <-states:
+				code := "NO_PUBLISHED_RELEASE"
+				if channel == "stable" {
+					code = "NO_PUBLISHED_STABLE_RELEASE"
+				}
+				if s.Phase != "unpublished" || s.Error != "" || s.ErrorStage != "" || s.ErrorCode != code || s.URL != update.ReleasesPage || s.Latest != "" {
+					t.Fatalf("%+v", s)
+				}
+				if err := u.install(); err == nil {
+					t.Fatal("unpublished status allowed install")
+				}
+			case <-time.After(time.Second):
+				t.Fatal("no check result")
+			}
+		})
+	}
+}
+
+func TestUpdateCheckPreservesReleaseLabelWithoutDowngrade(t *testing.T) {
+	for _, tc := range []struct {
+		current, latest, phase string
+		beta, available        bool
+	}{
+		{"0.1.0", "0.1.0-beta.2", "ahead", true, false},
+		{"0.1.0-beta.2", "0.1.0-beta.2", "current", true, false},
+		{"0.1.0", "0.1.1-beta.1", "available", true, true},
+		{"0.1.0-beta.2", "0.1.0", "available", false, true},
+	} {
+		t.Run(tc.phase+tc.latest, func(t *testing.T) {
+			states := make(chan UpdateState, 1)
+			u := newAppUpdater(func(s UpdateState) { states <- s }, func() { t.Error("unexpected restart") })
+			defer u.cancel()
+			u.state.Current = tc.current
+			u.client = updateClientStub{check: func() (*update.Result, error) {
+				return &update.Result{Current: tc.current, Latest: tc.latest, Prerelease: tc.beta, Available: tc.available}, nil
+			}}
+			u.check(true)
+			select {
+			case s := <-states:
+				if s.Phase != tc.phase || s.Prerelease != tc.beta || s.Latest != tc.latest || s.Error != "" {
+					t.Fatalf("%+v", s)
+				}
+				if !tc.available {
+					if err := u.install(); err == nil {
+						t.Fatal("older or equal release offered for installation")
+					}
+				}
+			case <-time.After(time.Second):
+				t.Fatal("no check result")
+			}
+		})
+	}
+}

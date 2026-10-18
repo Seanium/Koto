@@ -110,8 +110,8 @@ export const shell = {
 
 export interface AppInfo { version: string; projectURL: string }
 export interface UpdateState {
-  revision: number; phase: 'idle' | 'checking' | 'current' | 'available' | 'downloading' | 'restarting' | 'error'
-  current: string; latest: string; url: string; error: string; downloaded: number; total: number
+  revision: number; phase: 'idle' | 'checking' | 'unpublished' | 'ahead' | 'current' | 'available' | 'downloading' | 'restarting' | 'error'
+  current: string; latest: string; prerelease: boolean; url: string; error: string; downloaded: number; total: number
   errorCode: string; errorStage: string; retryAt: number
 }
 export function onUpdate(cb: (state: UpdateState) => void): () => void {

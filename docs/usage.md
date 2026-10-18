@@ -100,7 +100,7 @@ koto update --check
 koto update
 ```
 
-Both check the Cloudflare update service, download their separate packages from GitHub Releases, and verify SHA-256 before installing. Stable versions stay on the stable channel; use `--channel beta` to opt into prereleases.
+Both check the Cloudflare update service, download their separate packages from GitHub Releases, and verify SHA-256 before installing. Checks include stable releases and clearly labeled prereleases. Updates never downgrade an installed version. Use `--channel stable` to restrict CLI updates to stable releases.
 
 ## Settings and storage
 

@@ -100,7 +100,7 @@ koto update --check
 koto update
 ```
 
-App 和 CLI 通过 Cloudflare 更新服务检查版本，分别从 GitHub Releases 下载，安装前校验 SHA-256。正式版默认只更新到正式版；添加 `--channel beta` 可接收预发布版。
+App 和 CLI 通过 Cloudflare 更新服务检查版本，分别从 GitHub Releases 下载，安装前校验 SHA-256。默认检查正式版和测试版，并标注测试版；不会降级已安装的版本。CLI 可用 `--channel stable` 只检查正式版。
 
 ## 设置与存储
 

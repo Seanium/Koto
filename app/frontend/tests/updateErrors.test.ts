@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict'
-import { updateErrorMessage } from '../src/api/updateErrors.ts'
+import { updateErrorMessage, unpublishedUpdateMessage } from '../src/api/updateErrors.ts'
 import { setLanguage, type Locale } from '../src/i18n/core.ts'
 
 for (const language of ['zh', 'zh-TW', 'en', 'ja', 'de'] as Locale[]) {
   setLanguage(language)
+  const unpublished = unpublishedUpdateMessage('NO_PUBLISHED_STABLE_RELEASE')
+  assert.ok(unpublished.length > 0 && !unpublished.includes('no published stable release is available'))
+  assert.notEqual(unpublished, unpublishedUpdateMessage('NO_PUBLISHED_RELEASE'))
+  if (language !== 'zh') assert.ok(!unpublished.includes('暂无已发布的正式版本'))
   const rate = updateErrorMessage({ error: 'raw HTTP 403', errorCode: 'RATE_LIMITED', errorStage: 'check', retryAt: Date.UTC(2026, 9, 18, 12, 30) })
   const forbidden = updateErrorMessage({ error: 'raw HTTP 403', errorCode: 'HTTP_FORBIDDEN', errorStage: 'check' })
   assert.ok(!rate.includes('GitHub') && !forbidden.includes('GitHub'), 'the update service can have a different origin')

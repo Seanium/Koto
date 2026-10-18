@@ -55,7 +55,7 @@ func NewCLI(o CLIOptions) *engine.Connector {
 		o.Command = []string{"cursor-agent"}
 	}
 	c := &cliConnector{id: o.ID, root: o.Root, command: append([]string{}, o.Command...)}
-	return &engine.Connector{ID: c.id, Root: c.root, Harness: "cursor", Variant: "cli", Version: Version, Source: c, Sink: c, Vocabulary: Vocabulary{}, Capabilities: core.Capabilities{Read: core.ReadCaps{Images: true, Reasoning: "plain"}, Write: &core.WriteCaps{Mode: "native-file", Images: true, Reasoning: "plain", Tools: "native", ToolCallID: &core.IDRule{Pattern: `^call_[A-Za-z0-9_]+$`, MaxLength: 64}}, WriteProfile: "cursor-cli-write@1", FormatVersions: []string{cliFormat}}}
+	return &engine.Connector{ID: c.id, Root: c.root, Harness: "cursor", Variant: "cli", Version: Version, Source: c, Sink: c, Vocabulary: Vocabulary{}, Capabilities: core.Capabilities{Read: core.ReadCaps{Images: true, Reasoning: "plain"}, Write: &core.WriteCaps{Mode: "native-file", Images: true, Reasoning: "plain", SameAPI: modelAPI, Tools: "native", ToolCallID: &core.IDRule{Pattern: `^call_[A-Za-z0-9_]+$`, MaxLength: 64}}, WriteProfile: "cursor-cli-write@1", FormatVersions: []string{cliFormat}}}
 }
 func (c *cliConnector) WatchRoots() []string           { return []string{filepath.Join(c.root, "chats")} }
 func (c *cliConnector) NewSessionID(key string) string { return core.UUID5(c.id + ":" + key) }

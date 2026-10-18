@@ -246,7 +246,7 @@ func tailConversation(ctx context.Context, tx querier, ref core.NativeRef, from 
 		}
 		parts = attachments(parts)
 		kind := "message"
-		attrs := core.JsonObject{"modelMessageIndex": i}
+		attrs := core.JsonObject{"modelMessageIndex": i, "model": map[string]any{"api": modelAPI}}
 		var ts *float64
 		if i < firstUser {
 			kind = "context"
@@ -342,8 +342,28 @@ func modelParts(v any, put func([]byte) core.JsonObject) ([]core.Part, error) {
 		p := core.Obj(v)
 		typ := core.S(p["type"])
 		switch typ {
-		case "text", "reasoning":
+		case "text":
 			out = append(out, core.Part{"type": typ, "text": core.S(p["text"])})
+		case "reasoning", "redacted-reasoning":
+			part := core.Part{"type": "reasoning"}
+			if typ == "redacted-reasoning" {
+				if _, ok := p["data"].(string); !ok {
+					return nil, fmt.Errorf("Cursor redacted reasoning is missing its opaque data")
+				}
+			} else {
+				part["text"] = core.S(p["text"])
+			}
+			// The native SDK may attach encrypted reasoning and provider options.
+			// Preserve its exact object for the same wire format; cross-provider
+			// projection can retain readable text, but cannot decrypt this record.
+			if typ == "redacted-reasoning" {
+				raw, err := json.Marshal(p)
+				if err != nil {
+					return nil, err
+				}
+				part["sealed"] = map[string]any{"by": modelAPI, "blob": put(raw)}
+			}
+			out = append(out, part)
 		case "image", "file":
 			field := "image"
 			if typ == "file" || p["image"] == nil && p["data"] != nil {

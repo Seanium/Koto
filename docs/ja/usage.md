@@ -100,7 +100,7 @@ koto update --check
 koto update
 ```
 
-App と CLI は Cloudflare の更新サービスでバージョンを確認し、それぞれ GitHub Releases からダウンロードして、インストール前に SHA-256 を検証します。安定版は安定版のみを取得します。プレビュー版も使う場合は `--channel beta` を指定してください。
+App と CLI は Cloudflare の更新サービスでバージョンを確認し、それぞれ GitHub Releases からダウンロードして、インストール前に SHA-256 を検証します。安定版とテスト版を確認し、テスト版にはその旨を表示します。インストール済みのバージョンより古いものには更新しません。CLI で安定版だけを確認する場合は `--channel stable` を指定してください。
 
 ## 設定と保存データ
 

@@ -15,9 +15,9 @@ import (
 
 const updateHelp = `Usage: koto update [--check] [--channel stable|beta] [--json]
 
-Check GitHub Releases and update this CLI executable. The desktop app is separate.
+Check published releases and update this CLI executable. The desktop app is separate.
   --check    Check only; do not download or replace anything.
-  --channel  Stable or beta; defaults to the installed version's channel.
+  --channel  Stable or beta; includes stable and beta releases by default.
   --json     Print the result as JSON.
 `
 
@@ -43,6 +43,10 @@ func runUpdate(args []string, out, errOut io.Writer) int {
 	fail := func(err error, stage string) int {
 		if *asJSON {
 			failure := map[string]any{"ok": false, "error": err.Error(), "stage": stage, "url": update.ReleasesPage}
+			var unpublished *update.NoPublishedReleaseError
+			if errors.As(err, &unpublished) {
+				failure["code"], failure["channel"] = "NO_PUBLISHED_RELEASE", unpublished.Channel
+			}
 			if errors.Is(err, update.ErrStaleFeed) {
 				failure["code"] = "STALE_FEED"
 			}
@@ -59,7 +63,12 @@ func runUpdate(args []string, out, errOut io.Writer) int {
 			if stage == "check" {
 				label = "Unable to check for updates:"
 			}
-			fmt.Fprintln(errOut, label, err)
+			var unpublished *update.NoPublishedReleaseError
+			if errors.As(err, &unpublished) {
+				fmt.Fprintf(errOut, "No published %s release is available yet. See %s.\n", unpublished.Channel, update.ReleasesPage)
+			} else {
+				fmt.Fprintln(errOut, label, err)
+			}
 		}
 		return 1
 	}
@@ -89,14 +98,18 @@ func runUpdate(args []string, out, errOut io.Writer) int {
 		}
 		installed = true
 	}
+	label := r.Latest
+	if r.Prerelease {
+		label += " (beta)"
+	}
 	if *asJSON {
-		_ = json.NewEncoder(out).Encode(map[string]any{"ok": true, "current": r.Current, "latest": r.Latest, "available": r.Available, "updated": installed, "url": r.URL})
+		_ = json.NewEncoder(out).Encode(map[string]any{"ok": true, "current": r.Current, "latest": r.Latest, "available": r.Available, "updated": installed, "url": r.URL, "prerelease": r.Prerelease, "ahead": update.Newer(r.Current, r.Latest)})
 	} else if installed {
-		fmt.Fprintf(out, "Updated koto CLI to %s.\n", r.Latest)
+		fmt.Fprintf(out, "Updated koto CLI to %s.\n", label)
 	} else if r.Available {
-		fmt.Fprintf(out, "koto %s is available (installed: %s). Run koto update to install it.\n", r.Latest, r.Current)
+		fmt.Fprintf(out, "koto %s is available (installed: %s). Run koto update to install it.\n", label, r.Current)
 	} else {
-		fmt.Fprintf(out, "koto %s is up to date.\n", r.Current)
+		fmt.Fprintf(out, "Latest published release: %s.\nNo release is newer than installed koto %s.\n", label, r.Current)
 	}
 	return 0
 }
