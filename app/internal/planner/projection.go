@@ -26,7 +26,7 @@ type Item struct {
 	Parts     []core.Part
 	Verbatim  bool
 	Synthetic string
-	// Merged: earlier events folded into this item (consecutive assistant records of one reply).
+	// Merged: other events folded into this item (reply records or question attachments).
 	Merged []core.EventID
 }
 
@@ -157,8 +157,18 @@ func Project(path []*core.Event, o Options) *Projection {
 		}
 	}
 	var items []Item
+	attachmentOwners := core.AttachmentQuestions(events)
+	questionAttachments := map[core.EventID][]*core.Event{}
+	for _, event := range events {
+		if question := attachmentOwners[event.ID]; question != "" {
+			questionAttachments[question] = append(questionAttachments[question], event)
+		}
+	}
 	ctx := 0
 	for _, e0 := range events {
+		if attachmentOwners[e0.ID] != "" {
+			continue
+		}
 		edit, edited := edits[e0.ID]
 		if edited && len(edit) == 0 {
 			continue
@@ -167,6 +177,26 @@ func Project(path []*core.Event, o Options) *Projection {
 		if edited {
 			c := *e0
 			c.Parts = edit
+			e = &c
+		}
+		var merged []core.EventID
+		if attachments := questionAttachments[e.ID]; len(attachments) > 0 {
+			c := *e
+			c.Parts = append([]core.Part{}, e.Parts...)
+			for _, attachment := range attachments {
+				parts := attachment.Parts
+				if edit, changed := edits[attachment.ID]; changed {
+					parts = edit
+				}
+				if len(parts) == 0 {
+					continue
+				}
+				c.Parts = append(c.Parts, parts...)
+				merged = append(merged, attachment.ID)
+				if note := core.S(attachment.Attrs["attachmentPartial"]); note != "" {
+					loss(attachment.ID, "file", "approximated", note)
+				}
+			}
 			e = &c
 		}
 		attrs := e.Attrs
@@ -199,7 +229,12 @@ func Project(path []*core.Event, o Options) *Projection {
 			loss(e.ID, "sidechain", "dropped", "subagent transcript")
 			continue
 		}
-		verbatim := level == "L0" && sameHarness(e) && e.Attrs["filteredContext"] != true && !edited
+		verbatim := level == "L0" && sameHarness(e) && e.Attrs["filteredContext"] != true && !edited && len(merged) == 0 && e.Kind != "attachment"
+		if e.Kind == "attachment" {
+			if note := core.S(e.Attrs["attachmentPartial"]); note != "" {
+				loss(e.ID, "file", "approximated", note)
+			}
+		}
 		parts, assetsChanged := normalizeAssets(e.Parts, e.Actor, verbatim, o, func(field, kind, note string) { loss(e.ID, field, kind, note) })
 		verbatim = verbatim && !assetsChanged
 		if e.Kind == "compaction" {
@@ -215,7 +250,7 @@ func Project(path []*core.Event, o Options) *Projection {
 		if role == "" {
 			continue
 		}
-		items = append(items, Item{Key: e.ID, Event: e, Role: role, Parts: parts, Verbatim: verbatim})
+		items = append(items, Item{Key: e.ID, Event: e, Role: role, Parts: parts, Verbatim: verbatim, Merged: merged})
 	}
 	if ctx > 0 {
 		pr.Notes = append(pr.Notes, fmt.Sprintf("%d harness context events (system prompt, environment, instructions) are not migrated", ctx))

@@ -1,3 +1,4 @@
+import { questionIDs } from '../api/model'
 import { tr } from '../i18n/core.ts'
 import { shortcut } from '../ui/shortcut'
 // Paginated native conversation with inline content selection and quick turn navigation.
@@ -256,7 +257,7 @@ function TurnView({ t, flash, done, hit }: {
       data-selection-unit={selection && eligible ? 'turn' : undefined} data-selection-events={selection?.events(t.eventIds).join(' ')} data-selecting={!!selection || undefined} title={done ? undefined : tr("这一轮还没结束")}>
       {!t.partial && <div className="turn-label mono"><SelectionCheck scope="turn" events={t.eventIds} label={tr("第 {0} 轮 · 整轮", [t.index])} disabled={!eligible} />{tr("第 ")}{t.index} {tr(" 轮")}{!done && <span className="turn-label-hint"> {tr(" · 这一轮还没结束")}</span>}</div>}
       {t.partial ? <div className="switch-line">{tr("第 ")}{t.index} {tr(" 轮很长，这里是它的后半段")}</div> : t.promptId ? <div className="msg-you" data-content-selected={eligible && selection?.has(t.promptId) || undefined} title={t.time ? clockTime(t.time) : undefined}>
-        <SelectionCheck events={[t.promptId]} label={tr("提问")} disabled={!eligible} />
+        <SelectionCheck events={questionIDs(t)} label={tr("提问")} disabled={!eligible} />
         {t.imagesFirst && t.images.length > 0 && <Images images={t.images} />}
         {t.user && <Folded text={t.user} lines={8} keep={6} hit={hit} />}
         {!t.imagesFirst && t.images.length > 0 && <Images images={t.images} />}
@@ -553,7 +554,7 @@ export function TurnPreview({ turn: t }: { turn: Turn }) {
   const selection = useContext(SelectionContext)
   const eligible = !t.partial && (!selection || t.index <= selection.state.through)
   return <div className="col g3">
-    {t.promptId ? <div className="msg-you" data-content-selected={eligible && selection?.has(t.promptId) || undefined}><SelectionCheck events={[t.promptId]} label={tr("提问")} disabled={!eligible} /><Folded text={t.user} lines={12} keep={10} hit="" />{t.images.length > 0 && <Images images={t.images} />}{t.files.map((f,i) => <FileCard key={i} file={f} />)}</div> : <span className="t-meta">{tr("仅回复片段")}</span>}
+    {t.promptId ? <div className="msg-you" data-content-selected={eligible && selection?.has(t.promptId) || undefined}><SelectionCheck events={questionIDs(t)} label={tr("提问")} disabled={!eligible} /><Folded text={t.user} lines={12} keep={10} hit="" />{t.images.length > 0 && <Images images={t.images} />}{t.files.map((f,i) => <FileCard key={i} file={f} />)}</div> : <span className="t-meta">{tr("仅回复片段")}</span>}
     <div className="preview-reply col g3" data-content-selected={eligible && replyIDs(t).some(id => selection?.has(id)) || undefined}><SelectionCheck events={replyIDs(t)} label={tr("回复（含工具记录）")} disabled={!eligible} />{groupSteps(t.steps).map((g, i) => <StepView key={i} g={g} hit="" />)}</div>
   </div>
 }

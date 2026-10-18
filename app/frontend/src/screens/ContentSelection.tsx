@@ -1,11 +1,12 @@
 import { createContext, useContext, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { Conversation } from '../store'
 import type { Turn } from '../api/model'
+import { replyEventIDs } from '../api/model'
 import { beginSelection, paintSelection, selected, selectionEvents, selectionInvalid, selectionSource, type Selection } from './selection'
 
 export interface MessageSelection { state: Selection; has: (id: string) => boolean; events: (ids: string[]) => string[]; toggle: (events: string[]) => void; apply: (s: Selection) => void }
 export const SelectionContext = createContext<MessageSelection | undefined>(undefined)
-export const replyIDs = (t: Turn) => t.eventIds.filter(id => id !== t.promptId)
+export const replyIDs = (t: Turn) => replyEventIDs(t)
 
 /** Transient choices stay in the current conversation; no second view or modal. */
 export function useContentSelection(c?: Conversation) {

@@ -18,6 +18,47 @@ func (Decoder) ParseIndex(raw []byte) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	if row["type"] == "attachment" {
+		if raw, ok := fields["attachment"]; ok && bytes.HasPrefix(bytes.TrimSpace(raw), []byte("{")) {
+			af, err := shared.IndexJSONFields(raw)
+			if err != nil {
+				return nil, err
+			}
+			a, err := shared.IndexJSONValues(af, "type", "filename")
+			if err != nil {
+				return nil, err
+			}
+			if raw, ok := af["content"]; ok && a["type"] == "file" && bytes.HasPrefix(bytes.TrimSpace(raw), []byte("{")) {
+				cf, err := shared.IndexJSONFields(raw)
+				if err != nil {
+					return nil, err
+				}
+				c, err := shared.IndexJSONValues(cf, "type")
+				if err != nil {
+					return nil, err
+				}
+				if raw, ok := cf["file"]; ok && c["type"] == "text" && bytes.HasPrefix(bytes.TrimSpace(raw), []byte("{")) {
+					ff, err := shared.IndexJSONFields(raw)
+					if err != nil {
+						return nil, err
+					}
+					f, err := shared.IndexJSONValues(ff, "filePath")
+					if err != nil {
+						return nil, err
+					}
+					if raw, exists := ff["content"]; exists {
+						f["content"] = nil
+						if raw = bytes.TrimSpace(raw); len(raw) > 0 && raw[0] == '"' {
+							f["content"] = ""
+						}
+					}
+					c["file"] = f
+				}
+				a["content"] = c
+			}
+			row["attachment"] = a
+		}
+	}
 	if raw, ok := fields["message"]; ok {
 		mf, err := shared.IndexJSONFields(raw)
 		if err != nil {

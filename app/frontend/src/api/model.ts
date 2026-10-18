@@ -68,6 +68,8 @@ export interface Turn {
   user: string
   /** Absent when the excerpt starts with a reply. */
   promptId?: string
+  /** The question and any separately recorded native material belonging to it. */
+  promptIds?: string[]
   /** Pictures sent with the user message; imagesFirst: they came before its text. */
   images: TurnImage[]
   files: TurnFile[]
@@ -84,6 +86,7 @@ export interface Turn {
 export function turnsOf(events: HubEvent[], midTurn = false): Turn[] {
   const turns: Turn[] = []
   const tools = new Map<string, ToolStep>()
+  const questions = new Map<string, Turn>()
   let cur: Turn | undefined
   for (const e of events) {
     // Native system/environment records can occur anywhere in a turn. They are neither
@@ -92,11 +95,25 @@ export function turnsOf(events: HubEvent[], midTurn = false): Turn[] {
     if (e.kind === 'message' && e.actor === 'user' && e.parts.some(p => p.type === 'text' || p.type === 'image' || p.type === 'file' || p.type === 'opaque')) {
       cur = { index: turns.length + 1, harness: e.provenance.source.harness, connector: e.provenance.source.connector, time: e.time, user: userDisplayText(e), promptId: e.id, images: imagesOf(e.parts), files: filesOf(e.parts), imagesFirst: e.parts.findIndex(p => p.type === 'image') < e.parts.findIndex(p => p.type === 'text'), steps: [], eventIds: [e.id] }
       turns.push(cur)
+      questions.set(e.id, cur)
       continue
+    }
+    if (e.kind === 'attachment' && e.actor === 'user' && e.parents.length === 1 && !e.attrs?.sidechain) {
+      const question = questions.get(e.parents[0])
+      if (question) {
+        question.promptIds = [...questionIDs(question), e.id]
+        question.eventIds.push(e.id)
+        question.images.push(...imagesOf(e.parts))
+        question.files.push(...filesOf(e.parts))
+        const note = partsText(e.parts.filter(p => p.type === 'text'))
+        if (note) question.user = [question.user, note].filter(Boolean).join('\n')
+        questions.set(e.id, question)
+        continue
+      }
     }
     if (!cur) {
       // A page that starts mid-turn: keep its end as a turn whose start is not loaded yet.
-      if (e.kind === 'message' || e.kind === 'tool_result' || e.kind === 'compaction' || e.kind === 'notification') {
+      if (e.kind === 'message' || e.kind === 'tool_result' || e.kind === 'compaction' || e.kind === 'notification' || e.kind === 'attachment') {
         cur = { index: 1, harness: e.provenance.source.harness, connector: e.provenance.source.connector, time: e.time, user: '', images: [], files: [], steps: [], eventIds: [], partial: midTurn }
         turns.push(cur)
       } else continue // context before the first user message
@@ -120,6 +137,12 @@ export function turnsOf(events: HubEvent[], midTurn = false): Turn[] {
     }
   }
   return turns
+}
+
+export const questionIDs = (turn: Turn) => turn.promptIds ?? (turn.promptId ? [turn.promptId] : [])
+export const replyEventIDs = (turn: Turn) => {
+  const question = new Set(questionIDs(turn))
+  return turn.eventIds.filter(id => !question.has(id))
 }
 
 /** 1-based turn number containing `eventId`; undefined when the id is not on this path. */

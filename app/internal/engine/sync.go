@@ -442,6 +442,7 @@ func (e *Engine) planLocked(ctx context.Context, o CarryOptions) (*Planned, erro
 		return nil, fmt.Errorf("%s does not support selecting a target account; choose its storage profile", sink.ID)
 	}
 	path := e.Hub.Path(head)
+	attachments := core.AttachmentQuestions(path)
 	if o.EventIDs != nil && o.ExcludeEventIDs != nil {
 		return nil, fmt.Errorf("give selected or excluded messages, not both")
 	}
@@ -451,6 +452,11 @@ func (e *Engine) planLocked(ctx context.Context, o CarryOptions) (*Planned, erro
 		excluded := map[string]bool{}
 		for _, id := range o.ExcludeEventIDs {
 			excluded[id] = true
+		}
+		for attachment, question := range attachments {
+			if excluded[question] {
+				excluded[attachment] = true
+			}
 		}
 		o.EventIDs = []string{}
 		for _, ev := range path {
@@ -468,6 +474,13 @@ func (e *Engine) planLocked(ctx context.Context, o CarryOptions) (*Planned, erro
 		selected := map[string]bool{}
 		for _, id := range o.EventIDs {
 			selected[id] = true
+		}
+		if o.ExcludeEventIDs == nil {
+			for attachment, question := range attachments {
+				if selected[question] {
+					selected[attachment] = true
+				}
+			}
 		}
 		if len(selected) == 0 {
 			return nil, fmt.Errorf("select at least one message")

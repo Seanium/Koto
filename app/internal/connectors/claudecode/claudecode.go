@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	Version      = "claude-code-connector@0.2.0"
+	Version      = "claude-code-connector@0.3.0"
 	WriteVersion = "2.1.300"
 )
 
@@ -345,7 +345,7 @@ func jsString(v any) string {
 // record (a sibling of the next tool_use); inside a turn it is re-parented onto the tip.
 type Decoder struct{}
 
-func (Decoder) FormatVersion() string { return "cc-jsonl" }
+func (Decoder) FormatVersion() string { return "cc-jsonl@2" }
 func (Decoder) InitialState() core.JsonObject {
 	return core.JsonObject{"cwd": nil, "turn": []any{}, "tip": nil}
 }
@@ -592,6 +592,9 @@ func decodeCC(r map[string]any, ctx *engine.DecodeContext) engine.DecodeOut {
 		}
 		return draft("message", "assistant", blocks(m["content"], ctx, r), extra, nil)
 	case "attachment":
+		if parts, attrs, ok := attachedFile(r, ctx); ok {
+			return draft("attachment", "user", parts, attrs, nil)
+		}
 		if ctx.IndexOnly {
 			return draft("context", "harness", nil, nil, nil)
 		}

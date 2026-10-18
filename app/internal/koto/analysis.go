@@ -70,6 +70,8 @@ func (a *API) Analyze(ctx context.Context, selectors []string) (*AnalysisResult,
 		row := AnalysisSession{Selector: sel, Title: title, Nodes: []string{}}
 		var turns [][]*core.Event
 		var contextEvents []*core.Event
+		attachmentOwners := core.AttachmentQuestions(events)
+		questionTurns := map[core.EventID]int{}
 		for _, e := range events {
 			if err := ctx.Err(); err != nil {
 				return nil, err
@@ -78,11 +80,20 @@ func (a *API) Analyze(ctx context.Context, selectors []string) (*AnalysisResult,
 				contextEvents = append(contextEvents, e)
 				continue
 			}
-			if e.Kind != "message" && e.Kind != "compaction" && e.Kind != "tool_result" && e.Kind != "notification" {
+			if e.Kind != "message" && e.Kind != "compaction" && e.Kind != "tool_result" && e.Kind != "notification" && e.Kind != "attachment" {
 				continue
+			}
+			if question := attachmentOwners[e.ID]; question != "" {
+				if turn, found := questionTurns[question]; found {
+					turns[turn] = append(turns[turn], e)
+					continue
+				}
 			}
 			if e.Kind == "message" && e.Actor == "user" && hasUserText(e) || len(turns) == 0 {
 				turns = append(turns, nil)
+			}
+			if e.Kind == "message" && e.Actor == "user" {
+				questionTurns[e.ID] = len(turns) - 1
 			}
 			turns[len(turns)-1] = append(turns[len(turns)-1], e)
 		}
@@ -217,6 +228,8 @@ func analysisContentDisplay(events []*core.Event) (canonical string, display ana
 	var content []any
 	var lines []analysisDisplay
 	calls := map[string]string{}
+	attachmentOwners := core.AttachmentQuestions(events)
+	questions := map[core.EventID]map[string]any{}
 	for _, e := range events {
 		var parts []core.Part
 		displayText, hasDisplayText := e.Attrs["displayText"].(string)
@@ -263,7 +276,18 @@ func analysisContentDisplay(events []*core.Event) (canonical string, display ana
 				lines = append(lines, analysisJoin([]analysisDisplay{analysisRole(e.Actor), analysisPart(cp)}, "\n"))
 			}
 		}
-		content = append(content, map[string]any{"role": e.Actor, "kind": e.Kind, "parts": parts})
+		owner := attachmentOwners[e.ID]
+		if question := questions[owner]; owner != "" && question != nil {
+			// A native side record and the same file embedded in a copied user
+			// message represent the same question. Compare material, not wrapping.
+			question["parts"] = append(question["parts"].([]core.Part), parts...)
+		} else {
+			item := map[string]any{"role": e.Actor, "kind": e.Kind, "parts": parts}
+			content = append(content, item)
+			if e.Kind == "message" && e.Actor == "user" {
+				questions[e.ID] = item
+			}
+		}
 	}
 	return core.ToJSON(content), analysisJoin(lines, "\n\n"), preview
 }

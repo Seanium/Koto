@@ -45,6 +45,7 @@ When a role or destination cannot embed a file, koto keeps the complete bytes in
 - Attachments are read from recognized native attachment sources, not arbitrary paths mentioned in messages.
 - Re-copying koto-managed file references checks their directory, real path, size, and SHA-256. External symlinks, traversal, and modified files are rejected.
 - Missing blobs are reported. Remote URIs remain references and are not downloaded for offline storage.
+- If the source saved only part of a text attachment, koto copies that recorded snapshot and labels it as partial. It does not fill gaps from the current file on disk.
 - Individual previews are limited to 25 MiB. Attachment reads are limited to 256 MiB. Limits do not convert a file into a truncated text summary.
 
 ## Verification boundaries

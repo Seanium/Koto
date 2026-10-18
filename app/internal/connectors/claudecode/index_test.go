@@ -116,6 +116,10 @@ func TestSelectiveIndexParserPreservesNativeBindings(t *testing.T) {
 		`{"type":"ai-title","aiTitle":"generated"}`, `{"type":"summary","summary":"short"}`,
 		`{"type":"bridge-session","bridgeSessionId":"bridge"}`, `{"type":"unknown","uuid":"alias","parentUuid":"u1"}`,
 		`{"type":"unknown","uuid":"no-parent"}`, `{"type":"attachment","rendered":[{"content":"skip"}]}`,
+		`{"type":"attachment","uuid":"file","parentUuid":"u1","attachment":{"type":"file","filename":"file.txt","content":{"type":"text","file":{"content":"snapshot","startLine":1,"numLines":1,"totalLines":1}}}}`,
+		`{"type":"attachment","uuid":"missing","parentUuid":"u1","attachment":{"type":"file","filename":"file.txt","content":{"type":"text","file":{"content":null}}}}`,
+		`{"type":"attachment","attachment":"unknown"}`, `{"type":"attachment","attachment":{"type":"file","content":[]}}`,
+		`{"type":"attachment","attachment":{"type":"file","content":{"type":"text","file":42}}}`,
 	}
 	dec := Decoder{}
 	stateA, stateB := dec.InitialState(), dec.InitialState()

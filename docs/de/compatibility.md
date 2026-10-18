@@ -45,6 +45,7 @@ Wenn eine Rolle oder ein Ziel eine Datei nicht einbetten kann, speichert koto di
 - Anhänge werden aus erkannten nativen Anhangsquellen gelesen, nicht aus beliebigen in Nachrichten erwähnten Pfaden.
 - Beim erneuten Kopieren von koto-verwalteten Dateireferenzen werden Verzeichnis, tatsächlicher Pfad, Größe und SHA-256 geprüft. Externe symbolische Links, Pfadtraversierung und veränderte Dateien werden abgelehnt.
 - Fehlende Blobs werden gemeldet. Entfernte URIs bleiben Referenzen und werden nicht zur Offline-Speicherung heruntergeladen.
+- Enthält die ursprüngliche Sitzung nur einen Teil eines Textanhangs, kopiert koto diesen gespeicherten Ausschnitt und kennzeichnet ihn als unvollständig. Fehlende Inhalte werden nicht aus der aktuellen Datei auf dem Datenträger ergänzt.
 - Einzelne Vorschauen sind auf 25 MiB begrenzt, das Lesen von Anhängen auf 256 MiB. Die Grenzen führen nicht dazu, dass eine Datei als abgeschnittene Textzusammenfassung gespeichert wird.
 
 ## Grenzen der Verifikation
