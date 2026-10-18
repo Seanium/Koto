@@ -51,6 +51,7 @@
   "重新扫描": "再スキャン",
   "设置 › Agent": "設定 › Agent",
   "会话": "セッション",
+  "Claude Desktop 的本地 Cowork 日志，只能作为复制来源": "Claude Desktop のローカル Cowork ログ。コピー元としてのみ利用できます",
   "在 Claude Desktop 的 Code 标签里开的会话，和 Claude Code 用的是同一批文件": "Claude Desktop の Code タブで開いたセッション。Claude Code とファイルを共有します。",
   "会话视图": "セッション表示",
   "列表视图": "一覧表示",

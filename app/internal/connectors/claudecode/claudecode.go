@@ -858,6 +858,8 @@ type Options struct {
 type cc struct {
 	id, root, projects string
 	desktopScope       string
+	desktopProfile     string
+	cowork             bool
 	identity           core.SessionIdentity
 	files              *shared.PathIndex
 }
@@ -866,6 +868,16 @@ var sessionFile = regexp.MustCompile(`(?i)^[0-9a-f-]{36}\.jsonl$`)
 
 // New makes a Claude Code connector.
 func New(o Options) *engine.Connector {
+	if root, ok := coworkRootAt(o.Root); ok {
+		if o.ID != "" {
+			root.ID = o.ID
+		}
+		return NewCowork(root)
+	}
+	return newCode(o)
+}
+
+func newCode(o Options) *engine.Connector {
 	if o.ID == "" {
 		o.ID = "claude-code"
 	}
@@ -911,6 +923,9 @@ func (c *cc) Discover(ctx context.Context) ([]core.NativeRef, error) {
 			session := strings.TrimSuffix(f.Name(), ".jsonl")
 			c.files.Set(session, p)
 			meta := core.JsonObject{"projectDir": d.Name(), "identity": core.IdentityMeta(c.identity)}
+			if c.cowork {
+				meta["frontend"], meta["desktopMode"], meta["desktopProfile"] = "claude-desktop", "cowork", c.desktopProfile
+			}
 			out = append(out, core.NativeRef{Harness: "claude-code", Connector: c.id, Session: session, Path: p, Size: st.Size(), MtimeMs: engine.MtimeMs(st), Meta: meta})
 		}
 	}
@@ -953,7 +968,7 @@ func exists(p string) bool { _, err := os.Stat(p); return err == nil }
 
 func (c *cc) NewSessionID(key string) string { return core.UUID5("claude-code\x00" + key) }
 func (c *cc) ResumeCommand() string {
-	if c.desktopScope != "" {
+	if c.desktopScope != "" || c.cowork {
 		return ""
 	}
 	return "claude --resume {id}"
@@ -1055,6 +1070,9 @@ func (c *cc) Apply(ctx context.Context, plan *engine.DeliveryPlan) (core.JsonObj
 }
 
 func (c *cc) checkTargetProfile(target engine.DeliveryTarget) error {
+	if c.cowork {
+		return fmt.Errorf("Claude Desktop Cowork logs are read-only; creating a native Cowork task is not supported")
+	}
 	if target.Profile != "" && target.Profile != c.id || target.Root != "" && filepath.Clean(target.Root) != filepath.Clean(c.root) {
 		return fmt.Errorf("Claude target storage profile changed")
 	}

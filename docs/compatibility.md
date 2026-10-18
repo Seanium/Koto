@@ -6,7 +6,7 @@ The tables describe supported storage formats. Agent updates can change those fo
 
 | Agent | Read | Create a copy |
 | --- | --- | --- |
-| Claude Code / Claude Desktop | JSONL and native forks | New UUID and native JSONL |
+| Claude Code / Claude Desktop (Code) | JSONL and native forks | New UUID and native JSONL |
 | pi | v3 JSONL trees | New session with a new ID/parent chain |
 | Codex | rollout JSONL / zstd | New native rollout, then app-server read validation |
 | DeepSeek Harness | v4 JSONL / zstd | New directory and native compressed log |
@@ -23,7 +23,9 @@ All copies create a new native session; existing session IDs and standalone file
 
 Cursor Desktop and CLI use separate stores and continuation methods. ZCode support covers the production native agent, not Preview or external agents launched by ZCode. WorkBuddy and WorkBuddy AI remain separate destinations. Historical account labels do not change the credentials used for continuation.
 
-If a copied session does not appear in Claude Desktop, restart the app to refresh its session list.
+Claude Desktop supports local Code sessions as sources and destinations. Existing local Cowork logs can be read and copied to supported destinations; creating a new Cowork task is not supported. Cloud Chat history is not part of the local scan.
+
+If a copied Code session does not appear in Claude Desktop, restart the app to refresh its session list.
 
 ## Attachments
 

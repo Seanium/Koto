@@ -6,7 +6,7 @@
 
 | Agent | 讀取 | 建立副本 |
 | --- | --- | --- |
-| Claude Code / Claude Desktop | JSONL 與原生分支 | 新 UUID 與原生 JSONL |
+| Claude Code / Claude Desktop（Code） | JSONL 與原生分支 | 新 UUID 與原生 JSONL |
 | pi | v3 JSONL 樹 | 新工作階段與新的 ID / 父節點鏈 |
 | Codex | rollout JSONL / zstd | 新原生 rollout，再以 app-server 驗證讀取 |
 | DeepSeek Harness | v4 JSONL / zstd | 新目錄與原生壓縮日誌 |
@@ -23,7 +23,9 @@
 
 Cursor Desktop 與 CLI 的儲存與續聊入口獨立。ZCode 支援正式版的原生 Agent，不含 Preview 或由 ZCode 啟動的外部 Agent。WorkBuddy 中國版與國際版是獨立目標。歷史帳號標示不會改變續聊使用的憑據。
 
-若 Claude Desktop 未顯示複製的對話，請重新啟動應用程式以更新對話清單。
+Claude Desktop 支援讀取及建立本機 Code 對話。Cowork 的既有本機日誌可讀取並複製到支援的目標，暫不支援建立 Cowork 任務；雲端 Chat 不在本機掃描範圍內。
+
+若 Claude Desktop 未顯示複製的 Code 對話，請重新啟動應用程式以更新對話清單。
 
 ## 附件
 

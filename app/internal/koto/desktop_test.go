@@ -2,6 +2,7 @@ package koto
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,7 +10,6 @@ import (
 
 	"koto/internal/connectors/claudecode"
 	"koto/internal/core"
-	"koto/internal/engine"
 )
 
 func writeJSON(t *testing.T, file string, v any) {
@@ -60,9 +60,21 @@ func TestDesktopProfiles(t *testing.T) {
 	eq(t, b.Meta["desktopTitle"], any("via gateway"))
 	eq(t, b.Meta["desktopProfile"], any("Claude-3p"))
 	eq(t, binding(t, a.Hub, "claude-code", "33333333-2222-4333-8444-555555555555").Connector, roots[1].ID)
-	// a Cowork session from the account profile can be carried into the gateway profile's root
-	r := carry(t, a, engine.CarryOptions{Selector: "claude-code:22222222", To: roots[1].ID})
-	ok(t, r.Applied && strings.HasPrefix(r.Plan.Target.Path, gw))
+	// A JSONL inside an existing Cowork task is not a new native Cowork task.
+	before := coworkFiles(t, deskRoots(acct, gw)...)
+	api := newAPI(a)
+	eq(t, len(api.Reindex(ctx).Errors), 0)
+	selector := core.SessionSelector(roots[0].ID, "claude-code", "22222222-2222-4333-8444-555555555555")
+	for _, dryRun := range []bool{true, false} {
+		_, err := api.Carry(ctx, CarryRequest{Selector: selector, To: roots[1].ID, DryRun: dryRun})
+		ok(t, err != nil && strings.Contains(err.Error(), "cannot be a delivery target"), fmt.Sprint(err))
+	}
+	eq(t, core.ToJSON(coworkFiles(t, deskRoots(acct, gw)...)), core.ToJSON(before))
+	// The source remains useful: its content can be copied into a supported Code profile.
+	r, err := api.Carry(ctx, CarryRequest{Selector: selector, To: profiles[0].ID})
+	must(t, err)
+	ok(t, r.Applied && strings.HasPrefix(r.Plan.Target.Path, s.Claude))
+	eq(t, core.ToJSON(coworkFiles(t, deskRoots(acct, gw)...)), core.ToJSON(before))
 }
 
 // A session written from Desktop's Code tab says so even when Desktop's index has no entry for it,

@@ -51,6 +51,7 @@
   "重新扫描": "Erneut durchsuchen",
   "设置 › Agent": "Einstellungen › Agents",
   "会话": "Sitzungen",
+  "Claude Desktop 的本地 Cowork 日志，只能作为复制来源": "Lokale Cowork-Protokolle aus Claude Desktop; nur als Kopierquelle verfügbar",
   "在 Claude Desktop 的 Code 标签里开的会话，和 Claude Code 用的是同一批文件": "Im Code-Tab von Claude Desktop geöffnet; teilt Dateien mit Claude Code.",
   "会话视图": "Sitzungsansicht",
   "列表视图": "Listenansicht",

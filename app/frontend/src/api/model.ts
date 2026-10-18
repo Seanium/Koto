@@ -6,8 +6,11 @@ import type { Binding, Connector, HubEvent, Loss, Part } from './types'
 
 // ---------------------------------------------------------------- threads
 
-/** A Claude Code session written from Claude Desktop's Code tab (same files as the CLI). */
+/** A native Claude Desktop binding, including readable local Cowork logs. */
 export const fromDesktop = (b?: { harness: string; meta?: { frontend?: string } | null }) => b?.harness === 'claude-code' && b.meta?.frontend === 'claude-desktop'
+export const desktopSourceDescription = (bindings: Binding[]) => bindings.some(b => b.meta.desktopMode === 'cowork')
+  ? tr("Claude Desktop 的本地 Cowork 日志，只能作为复制来源")
+  : tr("在 Claude Desktop 的 Code 标签里开的会话，和 Claude Code 用的是同一批文件")
 
 export function originBinding(bindings: Binding[]): Binding | undefined {
   return bindings[0]
@@ -295,7 +298,6 @@ export const agentName = (harness: string) => AGENT_NAMES.get(harness) ?? harnes
 export const productName = (harness: string, variant: string) => harness === 'cursor'
   ? variant === 'ide' ? 'Cursor Desktop' : 'Cursor CLI'
   : harness === 'claude-code' && variant === 'desktop' ? 'Claude Desktop'
-  : harness === 'claude-code' && variant === 'cowork' ? 'Claude Cowork'
   : agentName(harness)
 export const productScopeName = (key: string) => productName(...key.split('/') as [string, string])
 

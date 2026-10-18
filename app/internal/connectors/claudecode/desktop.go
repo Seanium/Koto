@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"koto/internal/core"
+	"koto/internal/engine"
 )
 
 var localJSON = regexp.MustCompile(`^local_.*\.json$`)
@@ -147,8 +148,48 @@ func readDesktopScopeContext(ctx context.Context, scope, profile string, identit
 
 // Root is an independent Claude Code transcript root (for example Cowork).
 type Root struct {
-	ID, Root, Label string
-	Identity        core.SessionIdentity
+	ID, Root, Label, Profile string
+	Identity                 core.SessionIdentity
+}
+
+// NewCowork reads the transcript inside an existing native Cowork task. A new
+// JSONL there is not a new Cowork task: its environment and native index are
+// owned by Desktop, so this location cannot be a delivery target.
+func NewCowork(root Root) *engine.Connector {
+	out := newCode(Options{Root: root.Root, ID: root.ID, Identity: root.Identity})
+	source := out.Source.(*cc)
+	source.cowork, source.desktopProfile = true, root.Profile
+	out.ProfileLabel, out.ProfileKind, out.Variant = root.Label, "cowork", "desktop"
+	out.Version += "/cowork@1"
+	out.Sink, out.Capabilities.Write = nil, nil
+	out.Capabilities.WriteProfile = ""
+	return out
+}
+
+// Recognize only the native task layout, including an explicitly configured
+// root or a symlink to it. A generic directory named .claude is still Code.
+func coworkRootAt(path string) (Root, bool) {
+	if path == "" {
+		return Root{}, false
+	}
+	path, err := filepath.Abs(path)
+	if err != nil {
+		return Root{}, false
+	}
+	if real, err := filepath.EvalSymlinks(path); err == nil {
+		path = real
+	}
+	path = filepath.Clean(path)
+	task := filepath.Dir(path)
+	org, account := filepath.Dir(task), filepath.Dir(filepath.Dir(task))
+	base := filepath.Dir(account)
+	if filepath.Base(path) != ".claude" || !strings.HasPrefix(filepath.Base(task), "local_") || filepath.Base(base) != "local-agent-mode-sessions" {
+		return Root{}, false
+	}
+	profile := filepath.Base(filepath.Dir(base))
+	return Root{ID: "claude-cowork-" + core.SHA256Hex(task)[:16], Root: path,
+		Label: profile + " Cowork · " + filepath.Base(account) + " / " + filepath.Base(org), Profile: profile,
+		Identity: scopeIdentity(profile, filepath.Base(account), filepath.Base(org), profile+"/local-agent-mode-sessions")}, true
 }
 
 func DiscoverCoworkRoots(dirs []string) []Root {
@@ -171,7 +212,7 @@ func DiscoverCoworkRoots(dirs []string) []Root {
 			}
 			seen[root] = true
 			profile := filepath.Base(d)
-			out = append(out, Root{ID: "claude-cowork-" + core.SHA256Hex(p)[:16], Root: root, Label: profile + " Cowork · " + parts[0] + " / " + parts[1], Identity: scopeIdentity(profile, parts[0], parts[1], profile+"/local-agent-mode-sessions")})
+			out = append(out, Root{ID: "claude-cowork-" + core.SHA256Hex(p)[:16], Root: root, Label: profile + " Cowork · " + parts[0] + " / " + parts[1], Profile: profile, Identity: scopeIdentity(profile, parts[0], parts[1], profile+"/local-agent-mode-sessions")})
 		})
 	}
 	return out

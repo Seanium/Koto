@@ -4,7 +4,7 @@ import { shortcut } from '../ui/shortcut'
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { api, onContextAction, onNavigate, onSettingsTab, shell, useOpeners } from '../api/client'
-import { clockTime, originBinding, productName, productScopeName, projectName, relativeTime, tildePath } from '../api/model'
+import { clockTime, desktopSourceDescription, originBinding, productName, productScopeName, projectName, relativeTime, tildePath } from '../api/model'
 import { accountLabel, accountName, storageAccount, matchesIdentity, matchesProduct, productKey, UNKNOWN_ACCOUNT } from '../api/identity'
 import { buildSessions, useConversation, useSessionSearch, type Hub, type SessionItem } from '../store'
 import { AgentDisc, agentName, Button, Icon, ListRow, Menu, OperationError, SearchField, Skeleton, Toast } from '../ui'
@@ -399,7 +399,7 @@ function SessionList({ hub, items, selected, onSelect, query, filters, clear, op
             <span className="row g2">
               <span className="grow row g1 t-meta" style={{ minWidth: 0 }}>
                 <span className="ellipsis">{s.project || '—'}</span>
-                {s.desktop && filters.scope !== DESKTOP && <span className="tag" title={tr("在 Claude Desktop 的 Code 标签里开的会话，和 Claude Code 用的是同一批文件")}>Desktop</span>}
+                {s.desktop && filters.scope !== DESKTOP && <span className="tag" title={desktopSourceDescription(s.bindings)}>Desktop</span>}
                 <span className="session-identity ellipsis" title={[accountLabel(originBinding(s.bindings)), originBinding(s.bindings)?.meta.sourceProfile?.root].filter(Boolean).join('\n')}>{accountLabel(originBinding(s.bindings))}</span>
               </span>
             </span>

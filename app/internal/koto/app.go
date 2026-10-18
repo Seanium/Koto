@@ -155,6 +155,12 @@ func New(cfg Config) (*App, error) {
 	a := &App{Cfg: cfg, Defaults: d, DataDir: dataDir, Store: st, Registry: engine.NewRegistry(), extras: map[string]bool{}}
 	r := a.Registry
 	registerPrimary := func(c *engine.Connector) {
+		if c.ProfileKind == "cowork" {
+			// An explicit CLAUDE_CONFIG_DIR may point inside a native Cowork task.
+			// Keep its detected product/identity and read-only capabilities.
+			_ = r.Register(c)
+			return
+		}
 		variant := engine.DefaultVariant(c.Harness)
 		id := engine.ProfileID(c.Harness, c.Root, variant)
 		database := ""
@@ -188,17 +194,18 @@ func New(cfg Config) (*App, error) {
 	}
 	if on(cfg.Enable, "claude-code") {
 		claudeRoot := or(cfg.ClaudeRoot, d.ClaudeRoot)
-		registerPrimary(claudecode.New(claudecode.Options{Root: claudeRoot}))
-		for _, p := range claudecode.DiscoverDesktopProfiles(desktop, claudeRoot) {
-			c := claudecode.New(claudecode.Options{Root: p.Root, ID: p.ID, DesktopScope: p.Scope, Identity: p.Identity})
-			c.ProfileLabel, c.ProfileKind = p.Label, "desktop-account"
-			_ = r.Register(c)
+		primary := claudecode.New(claudecode.Options{Root: claudeRoot})
+		registerPrimary(primary)
+		if primary.ProfileKind != "cowork" {
+			for _, p := range claudecode.DiscoverDesktopProfiles(desktop, claudeRoot) {
+				c := claudecode.New(claudecode.Options{Root: p.Root, ID: p.ID, DesktopScope: p.Scope, Identity: p.Identity})
+				c.ProfileLabel, c.ProfileKind = p.Label, "desktop-account"
+				_ = r.Register(c)
+			}
 		}
 		// Each Claude Desktop Cowork session is its own storage root.
 		for _, c := range claudecode.DiscoverCoworkRoots(desktop) {
-			connector := claudecode.New(claudecode.Options{Root: c.Root, ID: c.ID, Identity: c.Identity})
-			connector.ProfileLabel, connector.ProfileKind = c.Label, "cowork"
-			_ = r.Register(connector)
+			_ = r.Register(claudecode.NewCowork(c))
 		}
 	}
 	if on(cfg.Enable, "pi") {
@@ -615,7 +622,7 @@ func (a *App) AddRoot(harness, root string, variants ...string) (ConnectorInfo, 
 		return x == y || strings.HasPrefix(x, strings.TrimSuffix(y, string(filepath.Separator))+string(filepath.Separator))
 	}
 	for _, c := range a.Registry.ByHarness(harness) {
-		if c.Root == "" || engine.ProfileVariant(c) != variant {
+		if c.Root == "" || engine.ProfileVariant(c) != variant && c.ProfileKind != "cowork" {
 			continue
 		}
 		cr := normalizedRoot(c.Root)

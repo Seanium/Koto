@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { accountClaims, storageAccount, matchesIdentity, matchesProduct, preferredCopyTarget, UNKNOWN_ACCOUNT } from '../src/api/identity.ts'
 import type { AgentProfile, Binding, IdentityClaim } from '../src/api/types.ts'
+import { desktopSourceDescription, fromDesktop, productName } from '../src/api/model.ts'
 
 const claim = (id: string, kind: IdentityClaim['kind'] = 'account'): IdentityClaim => ({ kind, id, scope: 'storage', evidence: 'native sessions.user_id' })
 const binding = (connector: string, claims: IdentityClaim[]): Binding => ({ harness: 'workbuddy', connector, session: 'same-native-id', thread: 'thread', leaf: null, path: null, meta: { identity: { status: claims.length ? 'known' : 'unknown', claims, providers: [{ id: 'gateway', scope: 'current-config', evidence: 'settings' }] } } })
@@ -30,3 +31,14 @@ assert.deepEqual(preferredCopyTarget(profiles, {profile:'workbuddy@a',harness:'w
 assert.equal(storageAccount(binding('workbuddy@a',[claim('owner-a'),claim('owner-b')])),undefined,'multiple storage owners are never guessed')
 assert.equal(storageAccount(binding('workbuddy@a',[{...claim('owner-a'),scope:'creator'},claim('owner-b')])), 'owner-b')
 assert.equal(storageAccount(binding('workbuddy@a',[claim('owner-a'),{...claim('owner-a'),scope:'session'}])), 'owner-a')
+
+const desktopCode: AgentProfile = { ...cursorApp, id: 'claude-desktop-code', harness: 'claude-code', variant: 'desktop', kind: 'desktop-account' }
+const cowork: AgentProfile = { ...desktopCode, id: 'claude-cowork-task', kind: 'cowork', writable: false, default: false }
+const coworkBinding: Binding = { ...a, harness: 'claude-code', connector: cowork.id, meta: { frontend: 'claude-desktop', desktopMode: 'cowork', sourceProfile: cowork } }
+assert.equal(productName(cowork.harness, cowork.variant), 'Claude Desktop')
+assert.equal(matchesProduct([coworkBinding], 'claude-code/desktop'), true)
+assert.equal(matchesProduct([coworkBinding], 'claude-code/cli'), false)
+assert.equal(fromDesktop(coworkBinding), true)
+assert.match(desktopSourceDescription([coworkBinding]), /Cowork/)
+assert.equal(preferredCopyTarget([cowork, desktopCode], { profile: cowork.id, harness: cowork.harness, variant: cowork.variant }).profile, desktopCode.id, 'readable Cowork source must not become a destination')
+assert.deepEqual(preferredCopyTarget([cowork]), { profile: '' }, 'Cowork-only profile has no writable destination')

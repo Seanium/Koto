@@ -6,7 +6,7 @@
 
 | Agent | 読み込み | コピー作成 |
 | --- | --- | --- |
-| Claude Code / Claude Desktop | JSONL とネイティブの分岐 | 新しい UUID とネイティブ JSONL |
+| Claude Code / Claude Desktop（Code） | JSONL とネイティブの分岐 | 新しい UUID とネイティブ JSONL |
 | pi | v3 JSONL ツリー | 新しい ID・親チェーンを持つセッション |
 | Codex | rollout JSONL / zstd | 新しいネイティブ rollout を作成し、app-server で読み込み検証 |
 | DeepSeek Harness | v4 JSONL / zstd | 新しいディレクトリとネイティブ圧縮ログ |
@@ -23,7 +23,9 @@ OpenCode 1.19.3 の v1 形式に対応しています。v2 の保存形式は明
 
 Cursor Desktop と CLI は保存先と継続方法が異なります。ZCode は製品版のネイティブ Agent に対応し、Preview や ZCode から起動する外部 Agent は対象外です。WorkBuddy 中国版と国際版は別のコピー先です。履歴のアカウント表示は、継続時の認証情報を変更しません。
 
-コピーした会話が Claude Desktop に表示されない場合は、アプリを再起動して会話一覧を更新してください。
+Claude Desktop のローカル Code セッションは読み取りと新規コピーに対応しています。既存のローカル Cowork ログは読み取り、対応するコピー先へコピーできますが、Cowork タスクの新規作成には対応していません。クラウドの Chat 履歴はローカルスキャンの対象外です。
+
+コピーした Code セッションが Claude Desktop に表示されない場合は、アプリを再起動して会話一覧を更新してください。
 
 ## 添付ファイル
 

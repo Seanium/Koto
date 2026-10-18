@@ -50,10 +50,8 @@ func ProfileVariant(c *Connector) string {
 		return c.Variant
 	}
 	switch c.ProfileKind {
-	case "desktop-account":
+	case "desktop-account", "cowork":
 		return "desktop"
-	case "cowork":
-		return "cowork"
 	}
 	return DefaultVariant(c.Harness)
 }

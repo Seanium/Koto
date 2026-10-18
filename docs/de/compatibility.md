@@ -6,7 +6,7 @@ Die Tabellen zeigen unterstützte Speicherformate. Agent-Updates können diese �
 
 | Agent | Lesen | Kopie erstellen |
 | --- | --- | --- |
-| Claude Code / Claude Desktop | JSONL und native Verzweigungen | Neue UUID und natives JSONL |
+| Claude Code / Claude Desktop (Code) | JSONL und native Verzweigungen | Neue UUID und natives JSONL |
 | pi | v3-JSONL-Bäume | Neue Sitzung mit neuer ID- und Elternkette |
 | Codex | rollout JSONL / zstd | Neuer nativer Rollout, danach Leseprüfung über app-server |
 | DeepSeek Harness | v4 JSONL / zstd | Neues Verzeichnis und natives komprimiertes Protokoll |
@@ -23,7 +23,9 @@ Jede Kopie erstellt eine neue native Sitzung; bestehende Sitzungs-IDs und einzel
 
 Cursor Desktop und CLI haben getrennte Speicher und Fortsetzungswege. ZCode unterstützt den nativen Agent der regulären Version, nicht Preview oder extern gestartete Agents. WorkBuddy und WorkBuddy AI sind getrennte Ziele. Historische Kontokennungen ändern nicht die Anmeldung beim Fortsetzen.
 
-Falls die kopierte Sitzung in Claude Desktop nicht erscheint, starten Sie die App neu, um die Sitzungsliste zu aktualisieren.
+Claude Desktop unterstützt lokale Code-Sitzungen als Quelle und Ziel. Vorhandene lokale Cowork-Protokolle lassen sich lesen und in unterstützte Ziele kopieren; neue Cowork-Aufgaben werden nicht erstellt. Der lokale Scan erfasst keinen Chat-Verlauf aus der Cloud.
+
+Falls die kopierte Code-Sitzung in Claude Desktop nicht erscheint, starten Sie die App neu, um die Sitzungsliste zu aktualisieren.
 
 ## Anhänge
 

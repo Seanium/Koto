@@ -665,7 +665,13 @@ func (e *Engine) CarryLocked(ctx context.Context, o CarryOptions) (*CarryResult,
 
 // ApplyPlan writes only a new native session. No copy history is stored.
 func (e *Engine) ApplyPlan(ctx context.Context, sink *Connector, plan *DeliveryPlan) (*CarryResult, error) {
-	if plan.Mode != "create" {
+	if sink == nil || sink.Sink == nil {
+		return nil, fmt.Errorf("connector cannot be a delivery target")
+	}
+	if current := e.Registry.Get(sink.ID); current != sink || current.Sink == nil {
+		return nil, fmt.Errorf("delivery target changed or is no longer writable")
+	}
+	if plan == nil || plan.Mode != "create" {
 		return nil, fmt.Errorf("only new-session copies are supported")
 	}
 	receipt, err := sink.Sink.Apply(ctx, plan)
