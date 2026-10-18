@@ -41,6 +41,15 @@ func attachedFile(row core.JsonObject, ctx *engine.DecodeContext) ([]core.Part, 
 		return []core.Part{{"type": "text", "text": note}, part}, attrs, true
 	}
 	part["blob"] = ctx.Blob([]byte(text))
+	// Keep the native recorded range through selection and re-encoding. It is
+	// descriptive metadata, never permission to read the original file.
+	snapshot := core.JsonObject{}
+	for _, key := range []string{"startLine", "numLines", "totalLines"} {
+		if value, exists := file[key]; exists {
+			snapshot[key] = value
+		}
+	}
+	part["snapshot"] = snapshot
 	start, startOK := core.Num(file["startLine"])
 	count, countOK := core.Num(file["numLines"])
 	total, totalOK := core.Num(file["totalLines"])
@@ -53,7 +62,8 @@ func attachedFile(row core.JsonObject, ctx *engine.DecodeContext) ([]core.Part, 
 		if validRange && count > 0 {
 			note = fmt.Sprintf("[File snapshot: %s, lines %g–%g of %g. Only this recorded range is included.]", name, start, start+count-1, total)
 		}
-		parts = append(parts, core.Part{"type": "text", "text": note})
+		snapshot["notice"] = note
+		parts = append(parts, core.Part{"type": "text", "text": note, "attachmentSnapshotNotice": true})
 		attrs["attachmentPartial"] = note
 	}
 	return append(parts, part), attrs, true

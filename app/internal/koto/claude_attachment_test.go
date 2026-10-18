@@ -189,3 +189,52 @@ func TestClaudeNativeQuestionAttachments(t *testing.T) {
 		})
 	}
 }
+
+func TestClaudeTextSnapshotRepeatedCopy(t *testing.T) {
+	for _, throughPi := range []bool{false, true} {
+		t.Run(map[bool]string{false: "same-agent", true: "through-pi"}[throughPi], func(t *testing.T) {
+			s := newSandbox(t)
+			file := filepath.Join(ccDir(s.Claude), CCA+".jsonl")
+			data := "中文🐙\r\nsecond\r\n"
+			rows := []any{
+				core.JsonObject{"type": "user", "uuid": "u", "sessionId": CCA, "cwd": CWD, "message": core.JsonObject{"role": "user", "content": "one question"}},
+				core.JsonObject{"type": "attachment", "uuid": "f", "parentUuid": "u", "attachment": core.JsonObject{"type": "file", "filename": "note.txt", "content": core.JsonObject{"type": "text", "file": core.JsonObject{"content": data, "startLine": 5, "numLines": 3, "totalLines": 20}}}},
+				core.JsonObject{"type": "attachment", "uuid": "f2", "parentUuid": "f", "attachment": core.JsonObject{"type": "file", "filename": "other.txt", "content": core.JsonObject{"type": "text", "file": core.JsonObject{"content": data, "startLine": 1, "numLines": 3, "totalLines": 3}}}},
+				core.JsonObject{"type": "assistant", "uuid": "a", "parentUuid": "f2", "message": core.JsonObject{"role": "assistant", "content": "one answer"}},
+			}
+			writeLines(t, file, rows)
+			a := s.app(enable("claude-code", "pi"))
+			api := newAPI(a)
+			eq(t, len(api.Reindex(ctx).Errors), 0)
+			selector := "claude-code:" + CCA
+			for i := 0; i < 3; i++ {
+				target := "claude-code"
+				if throughPi && i == 0 {
+					target = "pi"
+				}
+				result, err := api.Carry(ctx, CarryRequest{From: selector, To: target, Cwd: s.Root, Level: "L1"})
+				must(t, err)
+				ok(t, result.Applied)
+				selector = target + ":" + result.Plan.Target.Session
+				detail, err := api.Thread(ctx, selector, 0, "")
+				must(t, err)
+				eq(t, detail.CompleteTurns, 1, "snapshot copy does not create another human turn")
+				files, notices := map[string]int{}, 0
+				for _, event := range detail.Events {
+					for _, part := range event.Parts {
+						if part["type"] == "file" {
+							files[core.S(part["name"])]++
+							eq(t, core.S(core.Obj(part["blob"])["sha256"]), core.SHA256Hex(data))
+						}
+						if part["type"] == "text" {
+							notices += strings.Count(core.S(part["text"]), "Only this recorded range is included.")
+						}
+					}
+				}
+				eq(t, files["note.txt"], 1)
+				eq(t, files["other.txt"], 1, "same bytes under different filenames remain distinct")
+				eq(t, notices, 1, "partial snapshot notice must not grow on recopy")
+			}
+		})
+	}
+}

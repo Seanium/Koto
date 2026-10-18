@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	Version      = "claude-code-connector@0.3.0"
+	Version      = "claude-code-connector@0.4.0"
 	WriteVersion = "2.1.300"
 )
 
@@ -345,7 +345,7 @@ func jsString(v any) string {
 // record (a sibling of the next tool_use); inside a turn it is re-parented onto the tip.
 type Decoder struct{}
 
-func (Decoder) FormatVersion() string { return "cc-jsonl@2" }
+func (Decoder) FormatVersion() string { return "cc-jsonl@3" }
 func (Decoder) InitialState() core.JsonObject {
 	return core.JsonObject{"cwd": nil, "turn": []any{}, "tip": nil}
 }
@@ -712,7 +712,8 @@ func renderCC(it planner.Item, in engine.PlanInput, c ccCtx) []core.O {
 	prompt := core.UUID5("cc-prompt\x00" + c.session + "\x00" + it.Key)
 	switch it.Role {
 	case "user":
-		content := ccContent(in, it.Parts, false)
+		parts, snapshots := textSnapshotRecords(in, it.Parts)
+		content := ccContent(in, parts, false)
 		if arr, ok := content.([]any); ok {
 			all := true
 			var ts []string
@@ -734,7 +735,7 @@ func renderCC(it planner.Item, in engine.PlanInput, c ccCtx) []core.O {
 			// distinction between a delivered task result and a fresh human prompt.
 			return []core.O{{{K: "type", V: "user"}, {K: "message", V: core.O{{K: "role", V: "user"}, {K: "content", V: content}}}, {K: "promptSource", V: "system"}, {K: "turnOrigin", V: "task_notification"}, {K: "origin", V: core.O{{K: "kind", V: "task-notification"}, {K: "producer", V: "session-task"}}}}}
 		}
-		return []core.O{{{K: "type", V: "user"}, {K: "message", V: core.O{{K: "role", V: "user"}, {K: "content", V: content}}}, {K: "promptId", V: prompt}, {K: "promptSource", V: "typed"}, {K: "permissionMode", V: "default"}}}
+		return append([]core.O{{{K: "type", V: "user"}, {K: "message", V: core.O{{K: "role", V: "user"}, {K: "content", V: content}}}, {K: "promptId", V: prompt}, {K: "promptSource", V: "typed"}, {K: "permissionMode", V: "default"}}}, snapshots...)
 	case "assistant":
 		content := []any{}
 		hasCalls := false
@@ -1000,11 +1001,14 @@ func (c *cc) Plan(in engine.PlanInput) (*engine.DeliveryPlan, error) {
 	if file == "" {
 		file = filepath.Join(c.projects, ProjectDir(cwd), t.Session+".jsonl")
 	}
-	in, attachments := shared.PrepareAttachments(in, filepath.Join(strings.TrimSuffix(file, ".jsonl"), "attachments"), func(p core.Part, role string) bool {
+	attachmentDir := filepath.Join(strings.TrimSuffix(file, ".jsonl"), "attachments")
+	in, snapshots := prepareTextSnapshots(in, attachmentDir)
+	in, attachments := shared.PrepareAttachments(in, attachmentDir, func(p core.Part, role string) bool {
 		m := core.S(p["mediaType"])
 		data, ok := in.Hub.Blob(core.S(core.Obj(p["blob"])["sha256"]))
 		return role != "assistant" && (core.S(p["uri"]) != "" || m == "application/pdf" || strings.HasPrefix(m, "text/") && ok && utf8.Valid(data))
 	})
+	attachments = append(attachments, snapshots...)
 	lines := encodeItems(in, in.Projection, ccCtx{session: t.Session, cwd: cwd, gitBranch: in.Projection.Hints.GitBranch})
 	mode := t.Mode
 	if len(lines) == 0 {
