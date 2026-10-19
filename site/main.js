@@ -1,5 +1,5 @@
 import { locales, resolveLocale, watchAppearance } from './preferences.mjs';
-import { translations } from './translations.mjs?v=0.1.0-download-20261019';
+import { translations } from './translations.mjs?v=0.1.0-positioning-20261019';
 import { createTypewriter, cycleAgentLogos, createDialogue } from './motion.mjs?v=0.1.0-download-20261019';
 import { publication, releaseAssets, downloadURL, matchingAsset } from './publication.mjs?v=0.1.0-download-20261019';
 import { detectSystem } from './detection.mjs';

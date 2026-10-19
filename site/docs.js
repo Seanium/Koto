@@ -1,6 +1,6 @@
 import { content, commands } from './docs-content.mjs?v=0.1.0-download-20261019';
 import { locales, resolveLocale, watchAppearance } from './preferences.mjs?v=0.1.0-download-20261019';
-import { translations } from './translations.mjs?v=0.1.0-download-20261019';
+import { translations } from './translations.mjs?v=0.1.0-positioning-20261019';
 
 const readPreference = key => { try { return localStorage.getItem(key); } catch { return null; } };
 const savePreference = (key, value) => { try { localStorage.setItem(key, value); } catch {} };

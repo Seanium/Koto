@@ -4,7 +4,9 @@
 
 **Switch Agent Harnesses. Keep talking.**
 
-Copy sessions between Agent Harnesses. Compare them with a session tree and diff.
+Move conversations between Claude Code, Codex, Cursor, and more.
+
+Keep your conversation history, branch into different agents, and compare what happens next.
 
 [Download](https://github.com/Seanium/koto/releases/latest) · [Website](https://kotoai.site/)
 

@@ -77,9 +77,9 @@ h1 { font-size: clamp(42px, 4.5vw, 63px); line-height: 1.15; font-weight: 650; l
 #hero-typed[data-phase=paused] .type-cursor { display: none; }
 @keyframes cursor-pulse { 0%, 100% { opacity: .75; } 50% { opacity: 0; } }
 .hero > p { max-width: 650px; margin: 25px auto 0; color: var(--muted); font-size: 18px; line-height: 1.6; }
-.lead-line { display: flex; flex-wrap: wrap; justify-content: center; }
-.lead-line > span { display: inline-block; max-width: 100%; text-wrap: pretty; }
-html:lang(en) .lead-line, html:lang(de) .lead-line { column-gap: .25em; }
+.lead-line { display: block; text-wrap: balance; }
+.lead-line:first-child { color: var(--ink); font-weight: 500; }
+.lead-line + .lead-line { margin-top: 8px; }
 html:lang(zh) h1 { font-size: clamp(36px, 4.4vw, 60px); line-height: 1.35; letter-spacing: -1.5px; }
 html:lang(zh) .hero > p { max-width: 600px; line-height: 1.8; }
 html:lang(de) h1 { font-size: clamp(35px, 4.1vw, 59px); }
@@ -173,7 +173,6 @@ footer > span { font-size: 12px; color: var(--subtle); }
   html:lang(zh) .hero > p { line-height: 1.75; }
   html:lang(de) h1 { font-size: 34px; letter-spacing: -1.4px; }
   html:lang(ja) h1 { font-size: 30px; letter-spacing: -1px; }
-  .lead-line { justify-content: flex-start; }
   .lead-line + .lead-line { margin-top: 5px; }
   .showcase { padding-bottom: 40px; }
   .tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }

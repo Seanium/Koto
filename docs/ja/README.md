@@ -4,7 +4,9 @@
 
 **Agent Harness を変えて、対話の続きを。**
 
-対話を別の Agent Harness にコピー。ツリーと diff でセッションを比較。
+Claude Code、Codex、Cursor などの Agent Harness 間で会話をコピー。
+
+会話の履歴を保ち、異なるエージェントへ分岐して続きを進め、その後の展開を比較できます。
 
 [ダウンロード](https://github.com/Seanium/koto/releases/latest) · [Webサイト](https://kotoai.site/)
 

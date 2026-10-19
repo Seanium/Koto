@@ -4,7 +4,9 @@
 
 **Agent Harness wechseln. Gespräch fortsetzen.**
 
-Gespräche zwischen Agent Harnesses kopieren. Sitzungen mit Baumansicht und Diff vergleichen.
+Übertrage Gespräche zwischen Claude Code, Codex, Cursor und weiteren Tools.
+
+Behalte deinen Gesprächsverlauf, führe ihn in verschiedenen Agenten weiter und vergleiche, wie es jeweils weitergeht.
 
 [Download](https://github.com/Seanium/koto/releases/latest) · [Website](https://kotoai.site/)
 

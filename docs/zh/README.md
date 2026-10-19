@@ -4,7 +4,9 @@
 
 **换个 Agent Harness，接着聊。**
 
-在 Agent Harness 之间复制会话。用会话树和 diff 对比多条对话。
+在 Claude Code、Codex、Cursor 等 Agent Harness 之间复制会话。
+
+保留对话历史，在不同 Agent Harness 中分叉续聊，比较后续进展。
 
 [下载](https://github.com/Seanium/koto/releases/latest) · [网站](https://kotoai.site/)
 
