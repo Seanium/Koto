@@ -1,5 +1,6 @@
-import { content, commands } from './docs-content.mjs?v=0.1.0-docs-20261019';
-import { locales, resolveLocale, watchAppearance } from './preferences.mjs?v=0.1.0-docs-20261019';
+import { content, commands } from './docs-content.mjs?v=0.1.0-download-20261019';
+import { locales, resolveLocale, watchAppearance } from './preferences.mjs?v=0.1.0-download-20261019';
+import { translations } from './translations.mjs?v=0.1.0-download-20261019';
 
 const readPreference = key => { try { return localStorage.getItem(key); } catch { return null; } };
 const savePreference = (key, value) => { try { localStorage.setItem(key, value); } catch {} };
@@ -85,20 +86,24 @@ function referenceLink(label, file) {
 function render() {
   locale = resolveLocale(preference, navigator.language);
   const t = content[locale];
+  const shared = translations[locale];
   document.documentElement.lang = locale === 'zh' ? 'zh-CN' : locale;
   document.title = `${t.title} — koto App & CLI`;
   document.querySelector('meta[name=description]').content = t.description;
   document.querySelectorAll('[data-doc]').forEach(node => { node.textContent = t[node.dataset.doc]; });
+  document.querySelectorAll('[data-i18n]').forEach(node => { node.textContent = shared[node.dataset.i18n]; });
   languageSelect.value = preference;
-  languageSelect.setAttribute('aria-label', t.language);
-  languageSelect.closest('label').title = t.language;
-  appearanceSelect.setAttribute('aria-label', t.appearance);
-  appearanceSelect.closest('label').title = t.appearance;
-  document.querySelector('[data-home]').setAttribute('aria-label', t.home);
+  languageSelect.setAttribute('aria-label', shared.language);
+  languageSelect.closest('label').title = shared.language;
+  appearanceSelect.setAttribute('aria-label', shared.appearance);
+  appearanceSelect.closest('label').title = shared.appearance;
+  document.querySelector('.header nav').setAttribute('aria-label', shared.navigation);
+  document.querySelector('.github-link').setAttribute('aria-label', shared.github);
+  document.querySelector('.github-link').title = shared.github;
   const nav = document.querySelector('#docs-nav');
   nav.setAttribute('aria-label', t.navigation);
   nav.replaceChildren();
-  [['app', 'App', true], ['app-browse', t.browseTitle], ['app-copy', t.copyTitle], ['app-compare', t.compareTitle], ['cli', 'CLI', true], ['cli-install', t.installTitle], ['cli-conversation', t.conversationTitle], ['cli-commands', t.commandsTitle], ['updates', t.updateTitle]].forEach(([id, title, isChapter]) => {
+  [['app', 'App', true], ['app-browse', t.browseTitle], ['app-copy', t.copyTitle], ['app-compare', t.compareTitle], ['app-update', t.updateTitle], ['cli', 'CLI', true], ['cli-install', t.installTitle], ['cli-conversation', t.conversationTitle], ['cli-commands', t.commandsTitle], ['cli-update', t.updateTitle]].forEach(([id, title, isChapter]) => {
     const link = element('a', title, isChapter ? 'docs-nav-chapter' : 'docs-nav-section');
     link.href = `#${id}`;
     nav.append(link);
@@ -109,15 +114,16 @@ function render() {
     section('app-browse', t.browseTitle, t.browse.map(text => paragraph(text))),
     section('app-copy', t.copyTitle, [steps, paragraph(t.copyNote, 'docs-note')]),
     section('app-compare', t.compareTitle, [paragraph(t.compare)]),
+    section('app-update', t.updateTitle, [paragraph(t.appUpdate)]),
   ]);
   const appLinks = element('div', undefined, 'docs-links');
   appLinks.append(referenceLink(t.compatibility, 'compatibility'));
   app.append(appLinks);
   const cli = chapter('cli', 'koto CLI', t.cliIntro, [
     section('cli-install', t.installTitle, [codeBlock(t.unixLabel, commands.unix), codeBlock(t.windowsLabel, commands.windows), paragraph(t.installNote)]),
-    section('cli-conversation', t.conversationTitle, [element('blockquote', t.prompt, 'docs-prompt'), paragraph(t.conversation), codeBlock(t.currentLabel, commands.current), paragraph(t.currentNote), paragraph(t.receipt)]),
-    section('cli-commands', t.commandsTitle, [codeBlock(t.browseLabel, commands.browse), codeBlock(t.copyLabel, commands.copy), codeBlock(t.profilesLabel, commands.profiles), codeBlock(t.compareLabel, commands.compare), paragraph(t.commandsNote, 'docs-note')]),
-    section('updates', t.updateTitle, [paragraph(t.update), codeBlock('koto update', commands.update), paragraph(t.updateNote)]),
+    section('cli-conversation', t.conversationTitle, [element('blockquote', t.prompt, 'docs-prompt'), paragraph(t.destinationNote), paragraph(t.conversation), codeBlock(t.currentLabel, commands.current), paragraph(t.currentNote), paragraph(t.receipt)]),
+    section('cli-commands', t.commandsTitle, [codeBlock(t.browseLabel, commands.browse), codeBlock(t.copyLabel, commands.copy), codeBlock(t.targetsLabel, commands.targets), codeBlock(t.profilesLabel, commands.profiles), codeBlock(t.compareLabel, commands.compare), paragraph(t.commandsNote, 'docs-note')]),
+    section('cli-update', t.updateTitle, [paragraph(t.update), codeBlock('koto update', commands.update), paragraph(t.updateNote)]),
   ]);
   const cliLinks = element('div', undefined, 'docs-links');
   cliLinks.append(referenceLink(t.fullReference, 'usage'), referenceLink(t.compatibility, 'compatibility'));
@@ -148,6 +154,14 @@ window.addEventListener('languagechange', () => { if (preference === 'system') r
 window.addEventListener('storage', event => {
   if (event.key === 'koto-site-language') { preference = locales.includes(event.newValue) ? event.newValue : 'system'; render(); }
   if (event.key === 'koto-site-appearance') { appearance = ['light', 'dark'].includes(event.newValue) ? event.newValue : 'system'; syncAppearance(); }
+});
+for (const select of [languageSelect, appearanceSelect]) {
+  select.addEventListener('pointerdown', () => { select.dataset.pointerFocus = 'true'; });
+  select.addEventListener('keydown', () => { delete select.dataset.pointerFocus; });
+  select.addEventListener('blur', () => { delete select.dataset.pointerFocus; });
+}
+document.addEventListener('keydown', event => {
+  if (event.key === 'Tab') for (const select of [languageSelect, appearanceSelect]) delete select.dataset.pointerFocus;
 });
 render();
 syncAppearance();

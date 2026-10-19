@@ -9,8 +9,8 @@
   <title>koto — copy sessions between Agent Harnesses</title>
   <link rel="icon" href="favicon.png?v=apple-fixed-1" type="image/png" sizes="64x64">
   <script>try{const p=localStorage.getItem("koto-site-appearance")||"system";document.documentElement.dataset.theme=p==="dark"||p!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}catch{document.documentElement.dataset.theme=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}</script>
-  <link rel="stylesheet" href="style.css?v=0.1.0-docs-20261019">
-  <script type="module" src="main.js?v=0.1.0-docs-20261019"></script>
+  <link rel="stylesheet" href="style.css?v=0.1.0-download-20261019">
+  <script type="module" src="main.js?v=0.1.0-download-20261019"></script>
 </head>
 <body>
   <a class="skip" href="#main" data-i18n="skip">Skip to content</a>
@@ -94,11 +94,19 @@
     </section>
 
     <section class="download wrap" id="get-koto">
-      <h2 data-i18n="getTitle">Get koto</h2>
-      <div class="download-status">
-        <div class="download-products" role="group" aria-label="Download" data-download-products><button type="button" data-product="app" aria-pressed="true">App</button><button type="button" data-product="cli" aria-pressed="false">CLI</button></div>
-        <div class="download-controls"><label class="sr-only" for="release-asset" data-i18n="downloadPlatform">Platform and architecture</label><select id="release-asset"><option value="" disabled selected data-i18n="downloadChoose">Choose a version</option></select><span class="download-action"><a class="download-button" id="release-download" role="link" aria-disabled="true" data-i18n="downloadPending">Coming soon</a><span class="download-size" id="release-size" aria-live="polite" hidden></span></span></div>
-        <div class="cli-install" id="cli-install" hidden><span data-i18n="cliInstall">Or install from your terminal</span><div class="install-command"><code id="cli-install-command"></code><button type="button" id="cli-install-copy" aria-label="Copy install command"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div><span class="install-feedback" id="cli-install-feedback" role="status"></span></div>
+      <div class="download-panel">
+        <div class="download-header">
+          <h2 data-i18n="getTitle">Get koto</h2>
+          <div class="download-products" role="group" aria-label="Download" data-download-products><button type="button" data-product="app" aria-pressed="true">App</button><button type="button" data-product="cli" aria-pressed="false">CLI</button></div>
+        </div>
+        <div class="cli-install" id="cli-install" hidden><span data-i18n="cliInstall">Install from the command line</span><div class="install-command"><code id="cli-install-command"></code><button type="button" id="cli-install-copy" aria-label="Copy install command"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div><span class="install-feedback" id="cli-install-feedback" role="status"></span></div>
+        <p class="download-direct" id="download-direct" data-i18n="downloadDirect" hidden>Or download directly:</p>
+        <div class="download-controls">
+          <label class="sr-only" for="release-asset" data-i18n="downloadPlatform">Platform and architecture</label>
+          <select id="release-asset"><option value="" disabled selected data-i18n="downloadChoose">Choose a version</option></select>
+          <a class="download-button" id="release-download" role="link" aria-disabled="true"><span id="release-label" data-i18n="downloadPending">Coming soon</span><span class="download-size" id="release-size" aria-live="polite" hidden></span></a>
+        </div>
+
       </div>
     </section>
   </main>
