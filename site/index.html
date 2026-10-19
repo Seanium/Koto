@@ -6,17 +6,18 @@
   <meta name="description" content="Copy conversations without repeating yourself. Compare sessions to see what changed.">
   <meta name="color-scheme" content="light dark">
   <link rel="canonical" href="https://kotoai.site/">
-  <title>koto — copy sessions between agents</title>
+  <title>koto — copy sessions between Agent Harnesses</title>
   <link rel="icon" href="favicon.png?v=apple-fixed-1" type="image/png" sizes="64x64">
   <script>try{const p=localStorage.getItem("koto-site-appearance")||"system";document.documentElement.dataset.theme=p==="dark"||p!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}catch{document.documentElement.dataset.theme=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}</script>
-  <link rel="stylesheet" href="style.css?v=0.1.0">
-  <script type="module" src="main.js?v=0.1.0"></script>
+  <link rel="stylesheet" href="style.css?v=0.1.0-docs-20261019">
+  <script type="module" src="main.js?v=0.1.0-docs-20261019"></script>
 </head>
 <body>
   <a class="skip" href="#main" data-i18n="skip">Skip to content</a>
   <header class="header wrap">
     <a class="wordmark" href="#" aria-label="koto home"><img class="wordmark-icon" src="assets/koto.png" alt="" width="28" height="28"><span class="wordmark-name">koto<span class="wordmark-dot">.</span></span></a>
     <nav aria-label="Main navigation">
+      <a class="docs-link" href="docs.html" data-i18n="docs">Docs</a>
       <a class="github-link" href="https://github.com/Seanium/koto" target="_blank" rel="noopener noreferrer" aria-label="GitHub repository" title="GitHub"><svg aria-hidden="true" fill="currentColor" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M6.766 11.328c-2.063-.25-3.516-1.734-3.516-3.656 0-.781.281-1.625.75-2.188-.203-.515-.172-1.609.063-2.062.625-.078 1.468.25 1.968.703.594-.187 1.219-.281 1.985-.281.765 0 1.39.094 1.953.265.484-.437 1.344-.765 1.969-.687.218.422.25 1.515.046 2.047.5.593.766 1.39.766 2.203 0 1.922-1.453 3.375-3.547 3.64.531.344.89 1.094.89 1.954v1.625c0 .468.391.734.86.547C13.781 14.359 16 11.53 16 8.03 16 3.61 12.406 0 7.984 0 3.563 0 0 3.61 0 8.031a7.88 7.88 0 0 0 5.172 7.422c.422.156.828-.125.828-.547v-1.25c-.219.094-.5.156-.75.156-1.031 0-1.64-.562-2.078-1.609-.172-.422-.36-.672-.719-.719-.187-.015-.25-.093-.25-.187 0-.188.313-.328.625-.328.453 0 .844.281 1.25.86.313.452.64.655 1.031.655s.641-.14 1-.5c.266-.265.47-.5.657-.656"/></svg></a>
       <div class="preferences">
         <label class="icon-control language-control" title="Language"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c5 5 5 13 0 18-5-5-5-13 0-18Z"/></svg>
@@ -34,7 +35,7 @@
   </header>
   <main id="main">
     <section class="hero wrap">
-      <h1><span class="hero-agent-line"><span class="sr-only" data-i18n="hero1">Switch agents.</span><span aria-hidden="true" data-i18n="hero1Prefix">Switch</span><span class="hero-agent" aria-hidden="true"><img class="is-active" src="assets/claude-code.svg" alt=""><img src="assets/codex.svg" alt=""><img src="assets/pi.svg" alt=""><img src="assets/dsh.svg" alt=""><img src="assets/antigravity.svg" alt=""><img src="assets/opencode.svg" alt=""><img src="assets/cursor.svg" alt=""><img src="assets/workbuddy.svg" alt=""><img src="assets/zcode.svg" alt=""></span><span aria-hidden="true" data-i18n="hero1Suffix">agents.</span></span><br><span class="accent typewriter"><span class="sr-only" data-i18n="hero2">Keep talking.</span><span id="hero-typed" aria-hidden="true">Keep talking.</span></span></h1>
+      <h1><span class="hero-agent-line"><span class="sr-only" data-i18n="hero1">Switch Agent Harnesses.</span><span aria-hidden="true" data-i18n="hero1Prefix">Switch</span><span class="hero-agent-group" aria-hidden="true"><span class="hero-agent" aria-hidden="true"><img class="is-active" src="assets/claude-code.svg" alt=""><img src="assets/codex.svg" alt=""><img src="assets/pi.svg" alt=""><img src="assets/dsh.svg" alt=""><img src="assets/antigravity.svg" alt=""><img src="assets/opencode.svg" alt=""><img src="assets/cursor.svg" alt=""><img src="assets/workbuddy.svg" alt=""><img src="assets/zcode.svg" alt=""></span><span data-i18n="hero1Term">Agent Harnesses.</span></span><span aria-hidden="true" data-i18n="hero1Suffix" hidden></span></span><br><span class="accent typewriter"><span class="sr-only" data-i18n="hero2">Keep talking.</span><span id="hero-typed" aria-hidden="true">Keep talking.</span></span></h1>
       <p class="lead"><span class="lead-line"><span data-i18n="lead1a">Copy conversations </span><span data-i18n="lead1b">without repeating yourself.</span></span><span class="lead-line"><span data-i18n="lead2a">Compare sessions </span><span data-i18n="lead2b">to see what changed.</span></span></p>
     </section>
 
@@ -45,13 +46,13 @@
         <button id="diff-tab" role="tab" type="button" aria-selected="false" aria-controls="diff-panel" aria-describedby="diff-description" tabindex="-1"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M12.25 3.5a.75.75 0 0 1 .75.75V8.5h4.25a.75.75 0 0 1 0 1.5H13v4.25a.75.75 0 0 1-1.5 0V10H7.25a.75.75 0 0 1 0-1.5h4.25V4.25a.75.75 0 0 1 .75-.75ZM6.562 19.25a.75.75 0 0 1 .75-.75h9.938a.75.75 0 0 1 0 1.5H7.312a.75.75 0 0 1-.75-.75Z"/></svg><span data-i18n="diffTab">Session diff</span></button>
       </div>
       <div class="showcase-descriptions">
-        <p id="copy-description" class="is-active" data-i18n="copyText">Copy a session to another agent.</p>
+        <p id="copy-description" class="is-active" data-i18n="copyText">Copy a session to another Agent Harness.</p>
         <p id="tree-description" aria-hidden="true" data-i18n="treeText">See shared history and branches.</p>
         <p id="diff-description" aria-hidden="true" data-i18n="diffText">Compare changes line by line.</p>
       </div>
       <div class="screenshot-panel" id="copy-panel" role="tabpanel" aria-labelledby="copy-tab">
         <p class="screenshot-placeholder" data-i18n="screenshotPending">Screenshot in preparation</p>
-          <img class="screenshot" hidden data-screen="copy" width="2560" height="1668" alt="koto's copy dialog lets you choose a destination agent for selected conversation turns.">
+          <img class="screenshot" hidden data-screen="copy" width="2560" height="1668" alt="koto's copy dialog lets you choose a destination Agent Harness for selected conversation turns.">
       </div>
       <div class="screenshot-panel" id="tree-panel" role="tabpanel" aria-labelledby="tree-tab" hidden>
         <p class="screenshot-placeholder" data-i18n="screenshotPending">Screenshot in preparation</p>
@@ -74,7 +75,7 @@
     </section>
 
     <section class="agents wrap" aria-labelledby="agents-title">
-      <h2 id="agents-title" data-i18n="agentsTitle">Works with your agents</h2>
+      <h2 id="agents-title" data-i18n="agentsTitle">Works with your Agent Harnesses</h2>
       <div class="agent-list">
         <span><img src="assets/antigravity.svg" alt="">Antigravity CLI</span>
         <span><img src="assets/claude-code.svg" alt="">Claude Code</span>
@@ -88,7 +89,7 @@
         <span><img src="assets/workbuddy.svg" alt="">WorkBuddy</span>
         <span><img src="assets/workbuddy.svg" alt="">WorkBuddy AI</span>
         <span><img src="assets/zcode.svg" alt="">ZCode</span>
-        <span class="agent-roadmap" data-i18n="moreAgents">More agents coming soon.</span>
+        <span class="agent-roadmap" data-i18n="moreAgents">More Agent Harnesses coming soon.</span>
       </div>
     </section>
 
@@ -96,7 +97,7 @@
       <h2 data-i18n="getTitle">Get koto</h2>
       <div class="download-status">
         <div class="download-products" role="group" aria-label="Download" data-download-products><button type="button" data-product="app" aria-pressed="true">App</button><button type="button" data-product="cli" aria-pressed="false">CLI</button></div>
-        <div class="download-controls"><label class="sr-only" for="release-asset" data-i18n="downloadPlatform">Platform and architecture</label><select id="release-asset"><option value="" disabled selected data-i18n="downloadChoose">Choose a version</option></select><a class="download-button" id="release-download" role="link" aria-disabled="true" data-i18n="downloadPending">Coming soon</a></div>
+        <div class="download-controls"><label class="sr-only" for="release-asset" data-i18n="downloadPlatform">Platform and architecture</label><select id="release-asset"><option value="" disabled selected data-i18n="downloadChoose">Choose a version</option></select><span class="download-action"><a class="download-button" id="release-download" role="link" aria-disabled="true" data-i18n="downloadPending">Coming soon</a><span class="download-size" id="release-size" aria-live="polite" hidden></span></span></div>
         <div class="cli-install" id="cli-install" hidden><span data-i18n="cliInstall">Or install from your terminal</span><div class="install-command"><code id="cli-install-command"></code><button type="button" id="cli-install-copy" aria-label="Copy install command"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div><span class="install-feedback" id="cli-install-feedback" role="status"></span></div>
       </div>
     </section>

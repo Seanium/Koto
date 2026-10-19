@@ -2,9 +2,9 @@
 
 [English](../compatibility.md) · [简体中文](../zh/compatibility.md) · [繁體中文](compatibility.md) · [日本語](../ja/compatibility.md) · [Deutsch](../de/compatibility.md)
 
-下表說明儲存格式的支援情況。Agent 升級可能改變格式；附件能否被辨識取決於目標模型。
+下表說明儲存格式的支援情況。Agent Harness 升級可能改變格式；附件能否被辨識取決於目標模型。
 
-| Agent | 讀取 | 建立副本 |
+| Agent Harness | 讀取 | 建立副本 |
 | --- | --- | --- |
 | Claude Code / Claude Desktop（Code） | JSONL 與原生分支 | 新 UUID 與原生 JSONL |
 | pi | v3 JSONL 樹 | 新工作階段與新的 ID / 父節點鏈 |
@@ -19,9 +19,9 @@
 
 支援 OpenCode 1.19.3 的 v1 格式；遇到 v2 工作階段儲存會明確拒絕。複製到 OpenCode 需要其 CLI 與已設定的預設模型，續聊使用目標模型。
 
-所有複製都會建立新的原生工作階段，不覆寫既有工作階段 ID 或獨立檔案。目標 Agent 載入自己的設定，來源的系統、開發者、環境、設定和權限上下文不會複製。目標不支援對應原生表達時，工具紀錄和推理內容可能轉換為可讀文字。
+所有複製都會建立新的原生工作階段，不覆寫既有工作階段 ID 或獨立檔案。目標 Agent Harness 載入自己的設定，來源的系統、開發者、環境、設定和權限上下文不會複製。目標不支援對應原生表達時，工具紀錄和推理內容可能轉換為可讀文字。
 
-Cursor Desktop 與 CLI 的儲存與續聊入口獨立。ZCode 支援正式版的原生 Agent，不含 Preview 或由 ZCode 啟動的外部 Agent。WorkBuddy 中國版與國際版是獨立目標。歷史帳號標示不會改變續聊使用的憑據。
+Cursor Desktop 與 CLI 的儲存與續聊入口獨立。ZCode 支援正式版的原生 Agent Harness，不含 Preview 或由 ZCode 啟動的外部 Agent Harness。WorkBuddy 中國版與國際版是獨立目標。歷史帳號標示不會改變續聊使用的憑據。
 
 Claude Desktop 支援讀取及建立本機 Code 對話。Cowork 的既有本機日誌可讀取並複製到支援的目標，暫不支援建立 Cowork 任務；雲端 Chat 不在本機掃描範圍內。
 
@@ -36,7 +36,7 @@ Claude Desktop 支援讀取及建立本機 Code 對話。Cowork 的既有本機�
 | 音訊 | 完整檔案 | 完整檔案 | 原生音訊 | 原生檔案附件 | 原生 Media | 原生檔案 |
 | DOCX、ZIP、JSON、其他二進位檔 | 完整檔案 | 完整檔案 | 完整檔案 | 原生檔案附件 | 原生 Media | 原生檔案 |
 
-| 新增 Agent | 附件表示方式 |
+| 新增 Agent Harness | 附件表示方式 |
 | --- | --- |
 | Cursor CLI / Cursor Desktop | 原生圖片；完整檔案或檔案參照 |
 | WorkBuddy / WorkBuddy AI | 原生圖片、使用者檔案參照；工具檔案使用驗證後的參照 |
@@ -52,6 +52,6 @@ Claude Desktop 支援讀取及建立本機 Code 對話。Cowork 的既有本機�
 
 ## 驗證範圍
 
-預設測試使用合成 fixture 和可捨棄的 Agent 根目錄，涵蓋支援的 Agent 間複製、同 Agent 複製、明確選取、重複新建工作階段、路徑衝突、附件與再次複製的完整性。
+預設測試使用合成 fixture 和可捨棄的 Agent Harness 根目錄，涵蓋支援的 Agent Harness 間複製、同 Agent Harness 複製、明確選取、重複新建工作階段、路徑衝突、附件與再次複製的完整性。
 
-原生續聊測試取決於已安裝的 Agent、模型和服務商，與預設測試分開執行。目前仍未涵蓋所有模型、格式與角色組合，以及全部桌面平台。
+原生續聊測試取決於已安裝的 Agent Harness、模型和服務商，與預設測試分開執行。目前仍未涵蓋所有模型、格式與角色組合，以及全部桌面平台。

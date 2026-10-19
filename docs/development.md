@@ -58,7 +58,7 @@ go run ./cmd/seed
 KOTO_APP_SANDBOX="$PWD/.sandbox" wails3 dev -config ./build/config.yml
 ```
 
-The seed tool creates `.sandbox` with a `.koto-sandbox` marker. Re-seeding clears only a marked sandbox and refuses an unmarked existing directory. Never pass a personal agent root to the seed tool.
+The seed tool creates `.sandbox` with a `.koto-sandbox` marker. Re-seeding clears only a marked sandbox and refuses an unmarked existing directory. Never pass a personal Agent Harness root to the seed tool.
 
 `app/scripts/preview-mac.sh` builds a macOS preview using the synthetic sandbox.
 

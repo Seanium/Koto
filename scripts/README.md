@@ -19,4 +19,4 @@ After changing dependencies, provision the pinned packages and refresh their not
 app/.cache/release-venv/bin/python scripts/collect-licenses.py
 ```
 
-The collector reads installed project-local Go/npm dependencies and downloads the upstream licenses for the included Agent marks. `licenses/INDEX.json` records package versions and file hashes. It refuses to replace a nonempty license directory without that index.
+The collector reads installed project-local Go/npm dependencies and downloads the upstream licenses for the included Agent Harness marks. `licenses/INDEX.json` records package versions and file hashes. It refuses to replace a nonempty license directory without that index.

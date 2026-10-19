@@ -1,7 +1,7 @@
 import { locales, resolveLocale, watchAppearance } from './preferences.mjs';
-import { translations } from './translations.mjs?v=0.1.0';
-import { createTypewriter, cycleAgentLogos, createDialogue } from './motion.mjs?v=0.1.0';
-import { publication, releaseAssets, downloadURL, matchingAsset } from './publication.mjs?v=0.1.0';
+import { translations } from './translations.mjs?v=0.1.0-docs-20261019';
+import { createTypewriter, cycleAgentLogos, createDialogue } from './motion.mjs?v=0.1.0-docs-20261019';
+import { publication, releaseAssets, downloadURL, matchingAsset } from './publication.mjs?v=0.1.0-docs-20261019';
 import { detectSystem } from './detection.mjs';
 
 const languageSelect = document.getElementById('language-select');
@@ -12,6 +12,7 @@ cycleAgentLogos([...document.querySelectorAll('.hero-agent img')], reducedMotion
 const dialogue = createDialogue(['cli-request-typed', 'cli-response-typed', 'cli-instruction-typed', 'cli-command-typed'].map(id => document.getElementById(id)), reducedMotion);
 const releaseSelect = document.getElementById('release-asset');
 const releaseLink = document.getElementById('release-download');
+const releaseSize = document.getElementById('release-size');
 const installPanel = document.getElementById('cli-install');
 const installCommand = document.getElementById('cli-install-command');
 const installCopy = document.getElementById('cli-install-copy');
@@ -42,6 +43,9 @@ for (const button of document.querySelectorAll('[data-product]')) button.addEven
 });
 function renderDownload(text = translations[activeLocale]) {
   const url = downloadURL(releaseSelect.value);
+  const asset = releaseAssets.find(value => value.id === releaseSelect.value);
+  releaseSize.hidden = !url || !asset?.bytes;
+  releaseSize.textContent = releaseSize.hidden ? '' : `${new Intl.NumberFormat(activeLocale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(asset.bytes / 1_000_000)} MB`;
   releaseLink.textContent = url ? text.download : publication.published ? text.downloadChoose : text.downloadPending;
   if (url) { releaseLink.href = url; releaseLink.removeAttribute('aria-disabled'); }
   else { releaseLink.removeAttribute('href'); releaseLink.setAttribute('aria-disabled', 'true'); }

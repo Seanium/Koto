@@ -6,10 +6,10 @@ The App's controls use a static subset of [Lucide](https://github.com/lucide-ico
 pinned to revision `1ef60af944de207e0d5176905a0759ba12e6ee8d`. The original SVG paths
 are unchanged; their wrapper sets size, `currentColor`, and the common stroke style.
 Only used icons are included. The ISC and Feather-derived MIT notices are preserved in
-`licenses/assets/lucide-LICENSE`. Agent marks and the application icon remain separate
+`licenses/assets/lucide-LICENSE`. Agent Harness marks and the application icon remain separate
 brand assets.
 
-## Agent (harness) marks — `frontend/src/assets/harness/`
+## Agent Harness marks — `frontend/src/assets/harness/`
 
 | File | Harness | Upstream icon |
 |---|---|---|
@@ -27,7 +27,7 @@ brand assets.
   from lobe-icons. The app does not depend on magpie; only these files were copied.
 - `cursor.svg` is copied unchanged from [LobeHub Icons](https://github.com/lobehub/lobe-icons/blob/8a1b2821bb768c484fe8da20c5e1838b6bf551a9/packages/static-svg/icons/cursor.svg) under the same MIT notice.
 - **Trademarks:** the logos are trademarks of their respective owners (Anthropic, OpenAI, DeepSeek,
-  Google, the pi project). They are used only to identify which agent a conversation lives in; no
+  Google, the pi project). They are used only to identify which Agent Harness a conversation lives in; no
   endorsement is implied.
 The `zcode.svg` mark comes from the official [ZCodeAboutLogo](https://github.com/zai-org/ZCode/blob/aac4755666d09fdcd70272fcf063c077a639015f/packages/ui/src/components/ui/ZCodeAboutLogo.tsx), Apache-2.0. It retains the original paths in a standalone SVG. Its license is preserved separately in `licenses/assets/zcode-LICENSE`.
 
@@ -90,4 +90,4 @@ node app/scripts/generate-installer.cjs
 `KOTO_ICON_SHARP_PATH` can select an existing project-local `sharp` package.
 
 The actual draggable items remain `koto.app` and the Applications shortcut. The backgrounds
-illustrate a transfer between Agents; dragging the app installs it without copying sessions.
+illustrate a transfer between Agent Harnesses; dragging the app installs it without copying sessions.

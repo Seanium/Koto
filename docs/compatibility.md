@@ -2,9 +2,9 @@
 
 [English](compatibility.md) · [简体中文](zh/compatibility.md) · [繁體中文](zh-TW/compatibility.md) · [日本語](ja/compatibility.md) · [Deutsch](de/compatibility.md)
 
-The tables describe supported storage formats. Agent updates can change those formats. Attachment recognition depends on the destination model.
+The tables describe supported storage formats. Agent Harness updates can change those formats. Attachment recognition depends on the destination model.
 
-| Agent | Read | Create a copy |
+| Agent Harness | Read | Create a copy |
 | --- | --- | --- |
 | Claude Code / Claude Desktop (Code) | JSONL and native forks | New UUID and native JSONL |
 | pi | v3 JSONL trees | New session with a new ID/parent chain |
@@ -19,9 +19,9 @@ The tables describe supported storage formats. Agent updates can change those fo
 
 OpenCode 1.19.3 uses the supported v1 schema. v2 session storage is rejected explicitly. OpenCode copies require its CLI and a configured default model; continuation uses the destination model.
 
-All copies create a new native session; existing session IDs and standalone files are not overwritten. The target agent loads its own settings; source system/developer/environment/configuration and permission context are not copied. Tools and reasoning may be converted to readable text where the target has no compatible native representation.
+All copies create a new native session; existing session IDs and standalone files are not overwritten. The target Agent Harness loads its own settings; source system/developer/environment/configuration and permission context are not copied. Tools and reasoning may be converted to readable text where the target has no compatible native representation.
 
-Cursor Desktop and CLI use separate stores and continuation methods. ZCode support covers the production native agent, not Preview or external agents launched by ZCode. WorkBuddy and WorkBuddy AI remain separate destinations. Historical account labels do not change the credentials used for continuation.
+Cursor Desktop and CLI use separate stores and continuation methods. ZCode support covers the production native Agent Harness, not Preview or external Agent Harnesses launched by ZCode. WorkBuddy and WorkBuddy AI remain separate destinations. Historical account labels do not change the credentials used for continuation.
 
 Claude Desktop supports local Code sessions as sources and destinations. Existing local Cowork logs can be read and copied to supported destinations; creating a new Cowork task is not supported. Cloud Chat history is not part of the local scan.
 
@@ -36,7 +36,7 @@ If a copied Code session does not appear in Claude Desktop, restart the app to r
 | Audio | Complete file | Complete file | Native audio | Native file attachment | Native Media | Native file |
 | DOCX, ZIP, JSON, other binary | Complete file | Complete file | Complete file | Native file attachment | Native Media | Native file |
 
-| Additional Agent | Attachment representation |
+| Additional Agent Harness | Attachment representation |
 | --- | --- |
 | Cursor CLI / Cursor Desktop | Native images; complete files or file references |
 | WorkBuddy / WorkBuddy AI | Native images and user-file references; tool files use verified references |
@@ -52,6 +52,6 @@ When a role or destination cannot embed a file, koto keeps the complete bytes in
 
 ## Verification boundaries
 
-Default tests use synthetic fixtures and disposable agent roots. They cover copying between supported agents, same-agent copies, explicit selections, repeated new sessions, path conflicts, attachments, and re-copy integrity.
+Default tests use synthetic fixtures and disposable Agent Harness roots. They cover copying between supported Agent Harnesses, same-Agent Harness copies, explicit selections, repeated new sessions, path conflicts, attachments, and re-copy integrity.
 
-Native continuation tests depend on the installed Agent, model, and provider. They run separately from the default suite; full coverage of models, format/role combinations, and desktop platforms is still incomplete.
+Native continuation tests depend on the installed Agent Harness, model, and provider. They run separately from the default suite; full coverage of models, format/role combinations, and desktop platforms is still incomplete.

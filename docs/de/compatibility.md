@@ -2,9 +2,9 @@
 
 [English](../compatibility.md) · [简体中文](../zh/compatibility.md) · [繁體中文](../zh-TW/compatibility.md) · [日本語](../ja/compatibility.md) · [Deutsch](compatibility.md)
 
-Die Tabellen zeigen unterstützte Speicherformate. Agent-Updates können diese ändern. Ob Anhänge erkannt werden, hängt vom Zielmodell ab.
+Die Tabellen zeigen unterstützte Speicherformate. Agent Harness-Updates können diese ändern. Ob Anhänge erkannt werden, hängt vom Zielmodell ab.
 
-| Agent | Lesen | Kopie erstellen |
+| Agent Harness | Lesen | Kopie erstellen |
 | --- | --- | --- |
 | Claude Code / Claude Desktop (Code) | JSONL und native Verzweigungen | Neue UUID und natives JSONL |
 | pi | v3-JSONL-Bäume | Neue Sitzung mit neuer ID- und Elternkette |
@@ -19,9 +19,9 @@ Die Tabellen zeigen unterstützte Speicherformate. Agent-Updates können diese �
 
 Unterstützt wird das v1-Format von OpenCode 1.19.3. v2-Speicher wird ausdrücklich abgelehnt. Kopien nach OpenCode benötigen dessen CLI und ein konfiguriertes Standardmodell; beim Fortsetzen wird das Zielmodell verwendet.
 
-Jede Kopie erstellt eine neue native Sitzung; bestehende Sitzungs-IDs und einzelne Dateien werden nicht überschrieben. Der Ziel-Agent lädt seine eigenen Einstellungen; System-, Entwickler-, Umgebungs-, Konfigurations- und Berechtigungskontext der Quelle werden nicht kopiert. Werkzeuge und Denkprotokolle können in lesbaren Text umgewandelt werden, wenn das Ziel keine passende native Darstellung bietet.
+Jede Kopie erstellt eine neue native Sitzung; bestehende Sitzungs-IDs und einzelne Dateien werden nicht überschrieben. Der Ziel-Agent Harness lädt seine eigenen Einstellungen; System-, Entwickler-, Umgebungs-, Konfigurations- und Berechtigungskontext der Quelle werden nicht kopiert. Werkzeuge und Denkprotokolle können in lesbaren Text umgewandelt werden, wenn das Ziel keine passende native Darstellung bietet.
 
-Cursor Desktop und CLI haben getrennte Speicher und Fortsetzungswege. ZCode unterstützt den nativen Agent der regulären Version, nicht Preview oder extern gestartete Agents. WorkBuddy und WorkBuddy AI sind getrennte Ziele. Historische Kontokennungen ändern nicht die Anmeldung beim Fortsetzen.
+Cursor Desktop und CLI haben getrennte Speicher und Fortsetzungswege. ZCode unterstützt den nativen Agent Harness der regulären Version, nicht Preview oder extern gestartete Agent Harnesses. WorkBuddy und WorkBuddy AI sind getrennte Ziele. Historische Kontokennungen ändern nicht die Anmeldung beim Fortsetzen.
 
 Claude Desktop unterstützt lokale Code-Sitzungen als Quelle und Ziel. Vorhandene lokale Cowork-Protokolle lassen sich lesen und in unterstützte Ziele kopieren; neue Cowork-Aufgaben werden nicht erstellt. Der lokale Scan erfasst keinen Chat-Verlauf aus der Cloud.
 
@@ -36,7 +36,7 @@ Falls die kopierte Code-Sitzung in Claude Desktop nicht erscheint, starten Sie d
 | Audio | Vollständige Datei | Vollständige Datei | Natives Audio | Nativer Dateianhang | Native Media | Native Datei |
 | DOCX, ZIP, JSON, andere Binärdateien | Vollständige Datei | Vollständige Datei | Vollständige Datei | Nativer Dateianhang | Native Media | Native Datei |
 
-| Weiterer Agent | Anhangsformat |
+| Weiterer Agent Harness | Anhangsformat |
 | --- | --- |
 | Cursor CLI / Cursor Desktop | Native Bilder; vollständige Dateien oder Dateireferenzen |
 | WorkBuddy / WorkBuddy AI | Native Bilder und Benutzer-Dateireferenzen; geprüfte Referenzen für Werkzeugdateien |
@@ -52,6 +52,6 @@ Wenn eine Rolle oder ein Ziel eine Datei nicht einbetten kann, speichert koto di
 
 ## Grenzen der Verifikation
 
-Die Standardtests verwenden synthetische Fixtures und entbehrliche Agent-Verzeichnisse. Sie prüfen Kopien zwischen unterstützten Agents, Kopien zum selben Agent, ausdrückliche Auswahlen, wiederholte neue Sitzungen, Pfadkonflikte, Anhänge und die Integrität beim erneuten Kopieren.
+Die Standardtests verwenden synthetische Fixtures und entbehrliche Agent Harness-Verzeichnisse. Sie prüfen Kopien zwischen unterstützten Agent Harnesses, Kopien zum selben Agent Harness, ausdrückliche Auswahlen, wiederholte neue Sitzungen, Pfadkonflikte, Anhänge und die Integrität beim erneuten Kopieren.
 
-Tests der nativen Gesprächsfortsetzung hängen vom installierten Agent, Modell und Anbieter ab und laufen getrennt von der Standardsuite. Nicht alle Modelle, Format-Rollen-Kombinationen und Desktop-Plattformen sind bisher abgedeckt.
+Tests der nativen Gesprächsfortsetzung hängen vom installierten Agent Harness, Modell und Anbieter ab und laufen getrennt von der Standardsuite. Nicht alle Modelle, Format-Rollen-Kombinationen und Desktop-Plattformen sind bisher abgedeckt.

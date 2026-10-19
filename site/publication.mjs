@@ -1,4 +1,5 @@
 // Set published only after every listed asset is available on the release.
+// Refresh each asset byte size from that release when changing the version.
 export const publication = Object.freeze({
   published: true,
   version: '0.1.0',
@@ -6,20 +7,20 @@ export const publication = Object.freeze({
 });
 
 export const releaseAssets = Object.freeze([
-  { id: 'macos-arm64', product: 'app', label: 'macOS · Apple silicon · DMG', file: 'koto-darwin-arm64.dmg' },
-  { id: 'macos-amd64', product: 'app', label: 'macOS · Intel · DMG', file: 'koto-darwin-amd64.dmg' },
-  { id: 'windows-arm64', product: 'app', label: 'Windows · ARM64 · EXE', file: 'koto-windows-arm64.exe' },
-  { id: 'windows-amd64', product: 'app', label: 'Windows · x64 · EXE', file: 'koto-windows-amd64.exe' },
-  { id: 'linux-arm64', product: 'app', label: 'Linux · ARM64', file: 'koto-linux-arm64' },
-  { id: 'linux-amd64', product: 'app', label: 'Linux · x86_64', file: 'koto-linux-amd64' },
-  { id: 'linux-arm64-deb', product: 'app', label: 'Linux · ARM64 · DEB', file: 'koto-linux-arm64.deb' },
-  { id: 'linux-amd64-deb', product: 'app', label: 'Linux · x86_64 · DEB', file: 'koto-linux-amd64.deb' },
-  { id: 'cli-macos-arm64', product: 'cli', label: 'macOS · Apple silicon', file: 'koto-cli-darwin-arm64' },
-  { id: 'cli-macos-amd64', product: 'cli', label: 'macOS · Intel', file: 'koto-cli-darwin-amd64' },
-  { id: 'cli-windows-arm64', product: 'cli', label: 'Windows · ARM64 · EXE', file: 'koto-cli-windows-arm64.exe' },
-  { id: 'cli-windows-amd64', product: 'cli', label: 'Windows · x64 · EXE', file: 'koto-cli-windows-amd64.exe' },
-  { id: 'cli-linux-arm64', product: 'cli', label: 'Linux · ARM64', file: 'koto-cli-linux-arm64' },
-  { id: 'cli-linux-amd64', product: 'cli', label: 'Linux · x86_64', file: 'koto-cli-linux-amd64' }
+  { id: 'macos-arm64', product: 'app', label: 'macOS · Apple silicon · DMG', file: 'koto-darwin-arm64.dmg', bytes: 8336196 },
+  { id: 'macos-amd64', product: 'app', label: 'macOS · Intel · DMG', file: 'koto-darwin-amd64.dmg', bytes: 9051516 },
+  { id: 'windows-arm64', product: 'app', label: 'Windows · ARM64 · EXE', file: 'koto-windows-arm64.exe', bytes: 18262016 },
+  { id: 'windows-amd64', product: 'app', label: 'Windows · x64 · EXE', file: 'koto-windows-amd64.exe', bytes: 19624448 },
+  { id: 'linux-arm64', product: 'app', label: 'Linux · ARM64', file: 'koto-linux-arm64', bytes: 18303672 },
+  { id: 'linux-amd64', product: 'app', label: 'Linux · x86_64', file: 'koto-linux-amd64', bytes: 19482352 },
+  { id: 'linux-arm64-deb', product: 'app', label: 'Linux · ARM64 · DEB', file: 'koto-linux-arm64.deb', bytes: 6298836 },
+  { id: 'linux-amd64-deb', product: 'app', label: 'Linux · x86_64 · DEB', file: 'koto-linux-amd64.deb', bytes: 6902584 },
+  { id: 'cli-macos-arm64', product: 'cli', label: 'macOS · Apple silicon', file: 'koto-cli-darwin-arm64', bytes: 13467536 },
+  { id: 'cli-macos-amd64', product: 'cli', label: 'macOS · Intel', file: 'koto-cli-darwin-amd64', bytes: 14393200 },
+  { id: 'cli-windows-arm64', product: 'cli', label: 'Windows · ARM64 · EXE', file: 'koto-cli-windows-arm64.exe', bytes: 13265920 },
+  { id: 'cli-windows-amd64', product: 'cli', label: 'Windows · x64 · EXE', file: 'koto-cli-windows-amd64.exe', bytes: 14373888 },
+  { id: 'cli-linux-arm64', product: 'cli', label: 'Linux · ARM64', file: 'koto-cli-linux-arm64', bytes: 13369506 },
+  { id: 'cli-linux-amd64', product: 'cli', label: 'Linux · x86_64', file: 'koto-cli-linux-amd64', bytes: 14266530 }
 ]);
 
 export function downloadURL(assetId, config = publication) {

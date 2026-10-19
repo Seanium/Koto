@@ -2,15 +2,15 @@
 
 [English](../../README.md) · [简体中文](../zh/README.md) · [繁體中文](README.md) · [日本語](../ja/README.md) · [Deutsch](../de/README.md)
 
-**換個 Agent，接著聊。**
+**換個 Agent Harness，接著聊。**
 
-把對話複製到另一個 Agent。用樹狀檢視和 diff 比較對話。
+把對話複製到另一個 Agent Harness。用樹狀檢視和 diff 比較對話。
 
 [下載](https://github.com/Seanium/koto/releases/latest) · [網站](https://kotoai.site/)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="../../site/assets/screenshots/zh-TW-dark-copy.png">
-  <img src="../../site/assets/screenshots/zh-TW-light-copy.png" alt="koto：將選取的對話複製到另一個 Agent" width="1120">
+  <img src="../../site/assets/screenshots/zh-TW-light-copy.png" alt="koto：將選取的對話複製到另一個 Agent Harness" width="1120">
 </picture>
 
 <picture>
@@ -25,11 +25,11 @@
 
 > 你：用 koto 複製目前的對話到 pi
 >
-> Agent：已複製 5 輪到 pi。<br>
+> Agent Harness：已複製 5 輪到 pi。<br>
 > 用這個指令開啟 pi 中複製好的對話：<br>
 > `cd <專案路徑> && pi --session <新工作階段ID>`
 
-[使用指南](usage.md) · [相容性](compatibility.md) · [開發指南](development.md) · [參與貢獻](contributing.md)
+[使用指南](https://kotoai.site/docs.html?lang=zh-TW) · [相容性](compatibility.md) · [開發指南](development.md) · [參與貢獻](contributing.md)
 
 [MIT 授權條款](../../LICENSE) · [第三方聲明](../../THIRD_PARTY_NOTICES.md)
 

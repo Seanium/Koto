@@ -58,7 +58,7 @@ go run ./cmd/seed
 KOTO_APP_SANDBOX="$PWD/.sandbox" wails3 dev -config ./build/config.yml
 ```
 
-seed 工具创建带有 `.koto-sandbox` 标记的 `.sandbox`。重新生成时只清空有标记的沙箱，拒绝没有标记的已有目录。不要向 seed 工具传入个人 Agent 根目录。
+seed 工具创建带有 `.koto-sandbox` 标记的 `.sandbox`。重新生成时只清空有标记的沙箱，拒绝没有标记的已有目录。不要向 seed 工具传入个人 Agent Harness 根目录。
 
 `app/scripts/preview-mac.sh` 构建使用合成沙箱的 macOS 预览应用。
 

@@ -58,7 +58,7 @@ go run ./cmd/seed
 KOTO_APP_SANDBOX="$PWD/.sandbox" wails3 dev -config ./build/config.yml
 ```
 
-seed ツールは `.koto-sandbox` マーカーを持つ `.sandbox` を作成します。再生成時に消去するのはマーカーのあるサンドボックスだけで、マーカーのない既存ディレクトリは拒否します。個人の Agent ルートを seed ツールに渡さないでください。
+seed ツールは `.koto-sandbox` マーカーを持つ `.sandbox` を作成します。再生成時に消去するのはマーカーのあるサンドボックスだけで、マーカーのない既存ディレクトリは拒否します。個人の Agent Harness ルートを seed ツールに渡さないでください。
 
 `app/scripts/preview-mac.sh` は合成サンドボックスを使う macOS プレビューアプリをビルドします。
 

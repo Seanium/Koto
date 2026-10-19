@@ -58,7 +58,7 @@ go run ./cmd/seed
 KOTO_APP_SANDBOX="$PWD/.sandbox" wails3 dev -config ./build/config.yml
 ```
 
-Das Seed-Werkzeug erstellt `.sandbox` mit einer `.koto-sandbox`-Markierung. Bei erneuter Ausführung leert es nur eine markierte Sandbox und verweigert ein bereits vorhandenes unmarkiertes Verzeichnis. Übergib dem Seed-Werkzeug nie ein persönliches Agent-Verzeichnis.
+Das Seed-Werkzeug erstellt `.sandbox` mit einer `.koto-sandbox`-Markierung. Bei erneuter Ausführung leert es nur eine markierte Sandbox und verweigert ein bereits vorhandenes unmarkiertes Verzeichnis. Übergib dem Seed-Werkzeug nie ein persönliches Agent Harness-Verzeichnis.
 
 `app/scripts/preview-mac.sh` baut eine macOS-Vorschau mit der synthetischen Sandbox.
 
